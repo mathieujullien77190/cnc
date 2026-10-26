@@ -5,12 +5,12 @@ import { NumField } from '../../ui/NumField'
 /** Formats de planche proposés (largeur × hauteur, mm). */
 export const SHEET_FORMATS: readonly [number, number][] = [
   [300, 300],
-  [420, 300],
+  [400, 320],
 ]
 
 const isPreset = (w: number, h: number) => SHEET_FORMATS.some(([pw, ph]) => pw === w && ph === h)
 
-/** Choix du format de planche : 300 × 300, 420 × 300 ou personnalisé (largeur et hauteur libres). */
+/** Choix du format de planche : 300 × 300, 400 × 320 (zone de la E1 Pro) ou personnalisé (largeur et hauteur libres). */
 export function SizePicker({ width, height, onChange }: { width: number; height: number; onChange: (w: number, h: number) => void }) {
   const [custom, setCustom] = useState(() => !isPreset(width, height))
   const showFields = custom || !isPreset(width, height)
