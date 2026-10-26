@@ -33,7 +33,7 @@ Repère d'une plaque : u vers la droite, v vers le **bas**, coin haut-gauche du 
 
 1. **Lister les arêtes qui se touchent.** Pour chacune : quelle plaque porte les languettes, laquelle les encoches/fenêtres. Règle de choix : la plaque qui **traverse ou reçoit** (flanc, fond) a les fenêtres/encoches ; la plaque qui **arrive dessus** a les languettes. Sur une boîte fermée, l'une des deux est « propriétaire » des crans pairs.
 2. **Même arête, mêmes crans.** Donner à `fingerSpans` / `plateOutline` la **même longueur et la même zone** `[a, b]` des deux côtés. Si les longueurs diffèrent (plaque plus courte de 2 T…), dire la zone explicitement avec `a` / `b`.
-3. **Languette qui traverse la plaque voisine** (étagère entre deux flancs) : languettes sur la tablette (`plateOutline`), fenêtres dans le flanc (`windowsFor`) à la hauteur de la tablette ; les positions u doivent correspondre en coordonnées monde (voir `etagere.model.ts`).
+3. **Languette qui traverse la plaque voisine** (étagère entre deux flancs) : languettes sur la tablette (`plateOutline`), fenêtres dans le flanc (`windowsFor`) à la hauteur de la tablette ; les positions u doivent correspondre en coordonnées monde (voir `mangeoire-v3.model.ts`).
 4. **Languette en bout d'arête** (angle de boîte) : encoches (`d < 0`) dans la plaque qui reçoit.
 5. **Ne pas appeler `snugPanel` dans le modèle** : `finishPanels` le fait (vue 3D, export, découpe voient la même géométrie).
 6. **Vérifier** : `npm run typecheck && npm run check`. Le check contrôle le comptage des crans, le serrage (fenêtre −0,4 mm, encoche −0,4 mm, languette intacte), et que les trous restent dans le contour. Vérifier aussi par le calcul que les positions monde des languettes tombent dans les fenêtres (même z / x des deux côtés).

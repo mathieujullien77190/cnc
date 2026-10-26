@@ -3,6 +3,7 @@ import { AutoView, BoardsView, LaserDialog, ModelsView, PartsPanel, SettingsPane
 import { laserItems } from './core/job'
 import type { Marking, Sheet } from './core/types'
 import { crenelTestSheet } from './models/crenelTest'
+import { goujonTestSheet } from './models/goujonTest'
 import { useLaserMachine } from './laser'
 import { Btn } from './laser/ui'
 import { useProject, type ImportReport } from './state/useProject'
@@ -23,7 +24,7 @@ export default function App() {
   const [over, setOver] = useState(false)
   const [lowered, setLowered] = useState(false)
 
-  const [crenel, setCrenel] = useState<{ sheet: Sheet; marking: Marking } | null>(null) // essai de crantage : planche temporaire, hors projet
+  const [crenel, setCrenel] = useState<{ sheet: Sheet; marking: Marking } | null>(null) // essai de crantage ou de goujons : planche temporaire, hors projet
   const items = useMemo(() => laserItems(crenel ? [...entries, crenel] : entries), [entries, crenel])
   const m = useLaserMachine(items, { W: settings.width, H: settings.height })
   useEffect(() => {
@@ -33,11 +34,11 @@ export default function App() {
     }
   }, [m.open])
 
-  const startCrenelTest = () => {
+  const startTest = (make: typeof crenelTestSheet) => {
     const count = new Map<number, number>()
     for (const p of parts) count.set(p.thickness, (count.get(p.thickness) ?? 0) + 1)
     const thickness = [...count].sort((x, y) => y[1] - x[1])[0]?.[0] ?? 3 // l'épaisseur la plus utilisée du projet, 3 mm sinon
-    setCrenel(crenelTestSheet(thickness, settings.width, settings.height))
+    setCrenel(make(thickness, settings.width, settings.height))
     m.setItemIndex(entries.filter((e) => e.sheet.items.length).length)
     m.setOpen(true)
   }
@@ -91,7 +92,7 @@ export default function App() {
         {tab !== 'modeles' && (
         <aside className="space-y-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto">
           <PartsPanel parts={parts} reports={reports} onFiles={(f) => void onFiles(f)} onQty={project.setQty} onRemove={project.removePart} onRemoveProject={project.removeProject} onClear={project.clearAll} />
-          <SettingsPanel settings={settings} onChange={project.setSettings} onCrenelTest={startCrenelTest} onPowerSpeedTest={m.startTest} />
+          <SettingsPanel settings={settings} onChange={project.setSettings} onCrenelTest={() => startTest(crenelTestSheet)} onGoujonTest={() => startTest(goujonTestSheet)} onPowerSpeedTest={m.startTest} />
         </aside>
         )}
         <main className="min-w-0">

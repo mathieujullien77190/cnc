@@ -1,7 +1,7 @@
 import { circle, count, placePanel, plate, rectHole, T, toShape, type Placed2, type Shape2, type V3 } from '../testbrick'
 import { defineModel, type Panel } from '../types'
 
-// Mangeoire à perruches V3 de testBrick (iris.js, trappe à languette), portée : mêmes cotes, mêmes crans (box.js `plate`), mêmes pièces, sauf la planche de plafond sous le plafond du bac les plaques du bas et du haut du boîtier et les goujons (supprimés).
+// Mangeoire à perruches V3 de testBrick (iris.js, trappe à languette), portée : mêmes cotes, mêmes crans (box.js `plate`), mêmes pièces, sauf la planche de plafond sous le plafond du bac les plaques du bas et du haut du boîtier et les goujons de testBrick (remplacés par 4 trous de goujon de 3 × 3 mm dans R-01, BO-01 et BA-02).
 // Repère de calcul = celui de testBrick (Z vertical, centré en X et Y, boîtier de l'iris à z = 0) ; `placePanel` le tourne vers le monde de l'app.
 //
 // Trappe à languette : une languette de contreplaqué 3 mm coulisse entre deux plaques percées d'un trou de Ø 30 ; tirée, son trou vient en face de ceux des plaques (ouvert), poussée, elle les ferme.
@@ -13,6 +13,11 @@ const FRAME_Z = T // dessous du cadre, et de la languette
 const TOP_Z = 2 * T // dessous de la plaque du haut
 const GATE = { hole: 15, stroke: 36, w: 40, head: 52, headLen: 6, back: 56, front: 106, grip: 11, clear: 0.6 }
 const NECK = -GATE.back + GATE.headLen + GATE.stroke
+
+// goujons : 4 trous de 3 × 3 mm (le goujon, large de 3,4, rentre serré) alignés dans le fond du réservoir (R-01), le cadre (BO-01) et le plafond du bac (BA-02)
+const DOWEL = { side: 3.4, inset: 9, out: 0 }
+const DOWELS: [number, number][] = [-1, 1].flatMap((sy) => [-S / 2 + DOWEL.inset, 50 - DOWEL.inset].map((x): [number, number] => [x, (sy * (S / 2 - DOWEL.inset))]))
+const dowelHoles = (sh: Shape2, ox: number, oy: number) => DOWELS.forEach(([x, y]) => sh.holes.push(rectHole(x - ox - T / 2, y - oy - T / 2, x - ox + T / 2, y - oy + T / 2)))
 
 const X: V3 = [1, 0, 0]
 const Y: V3 = [0, 1, 0]
@@ -111,6 +116,7 @@ const funnelFloor = (): Shape2 => {
   const sides = { a: T, b: D - T, d: -T }
   const sh = plate(W, D, { d: -T }, sides, { d: -T }, sides)
   sh.holes.push(rectHole(-FUN.x0 - FI.hh, FUN.y - FI.hh, -FUN.x0 + FI.hh, FUN.y + FI.hh))
+  dowelHoles(sh, FUN.x0, -FUN.y)
   return sh
 }
 
@@ -119,7 +125,7 @@ const COVER_LIFT = 120 // hauteur dont on soulève le couvercle retiré
 const DRAWER_PULL = 140 // course du tiroir tiré
 
 /** Préfixes d'id (ceux de testBrick) : le numéro est ajouté par l'app. */
-const PREFIX: Record<string, string> = { Boîtier: 'BO', Réservoir: 'R', Couvercle: 'C', Bac: 'BA', Tiroir: 'T', Iris: 'I' }
+const PREFIX: Record<string, string> = { Boîtier: 'BO', Réservoir: 'R', Couvercle: 'C', Bac: 'BA', Tiroir: 'T', Iris: 'I', Goujon: 'G' }
 
 interface Item extends Placed2 {
   name: string
@@ -135,7 +141,9 @@ const items = (): Item[] => {
   const flat = { d: 0 }
 
   // boîtier : seul le cadre (la fente de la languette) est gardé ; les plaques du bas et du haut de testBrick sont supprimées
-  add('cadre', 'Boîtier', frameShape(), [0, 0, FRAME_Z], [X, Y])
+  const frame = frameShape()
+  dowelHoles(frame, 0, 0)
+  add('cadre', 'Boîtier', frame, [0, 0, FRAME_Z], [X, Y])
 
   // réservoir : fond percé, quatre murs, escalier d'anneaux
   const fw = wallHeight()
@@ -198,6 +206,7 @@ const items = (): Item[] => {
   add('fond du bac', 'Bac', binFloor, [-BS / 2, -BS / 2, BIN_Z0 - T], [X, Y])
   const binCeiling = plate(BS, BS, { a: T, b: BS, d: -T }, flat, { a: T, b: BS, d: -T }, notch)
   binCeiling.holes.push(circle(BS / 2, BS / 2, 15, 64))
+  dowelHoles(binCeiling, -BS / 2, -BS / 2)
   add('plafond du bac', 'Bac', binCeiling, [-BS / 2, -BS / 2, -T], [X, Y])
   add('paroi du fond', 'Bac', plate(BS, BIN_H, tab, notch, tab, notch), [-BS / 2, -BS / 2, BIN_Z0], [Y, Z])
   add('paroi côté', 'Bac', plate(BS - T, BIN_H, tab, flat, tab, tab), [-BS / 2 + T, -BS / 2 + T, BIN_Z0], [X, Z])
@@ -228,6 +237,10 @@ const items = (): Item[] => {
 
   // pièce mobile : la languette, dans l'épaisseur du cadre
   add('languette', 'Iris', tabShape(), [0, 0, FRAME_Z], [X, Y])
+
+  // goujons : lamelles de 3,4 mm de large (dans l'épaisseur du contreplaqué) debout dans les trous, de dessous le plafond du bac à dessus du fond du réservoir (3 plaques), sans dépasser
+  const dl = 3 * T + 2 * DOWEL.out
+  for (const [x, y] of DOWELS) add('goujon', 'Goujon', toShape([[0, 0], [DOWEL.side, 0], [DOWEL.side, dl], [0, dl]]), [x - DOWEL.side / 2, y + T / 2, -T - DOWEL.out], [X, Z])
   return list
 }
 

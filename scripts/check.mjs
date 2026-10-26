@@ -11,7 +11,7 @@ const check = (ok, msg) => {
 
 try {
   const { parseCutParts } = await server.ssrLoadModule('/src/core/format.ts')
-  const { buildAutoSheets, buildCustomSheet, conflicts, marksOf, marksFor, boardMark } = await server.ssrLoadModule('/src/core/sheets.ts')
+  const { buildAutoSheets, buildCustomSheet, conflicts, turnTo, angleOf, marksOf, marksFor } = await server.ssrLoadModule('/src/core/sheets.ts')
   const { sheetToJob, sheetGcode, travelOf } = await server.ssrLoadModule('/src/core/job.ts')
   const { sheetSvg } = await server.ssrLoadModule('/src/core/svg.ts')
 
@@ -48,7 +48,7 @@ try {
   const onlyNames = sheetToJob(sheet, { names: true, frame: false })
   check(!none.layers.engrave, 'sans case cochée : aucune gravure')
   check(onlyFrame.layers.engrave?.length === 1, 'contour seul : 1 tracé gravé')
-  check((onlyNames.layers.engrave?.length ?? 0) > 0 && onlyNames.layers.engrave.length === boardMark(sheet).length + [...marksFor(sheet).values()].reduce((s, m) => s + m.length, 0), 'noms seuls : un rectangle par trait')
+  check((onlyNames.layers.engrave?.length ?? 0) > 0 && onlyNames.layers.engrave.length === [...marksFor(sheet).values()].reduce((s, m) => s + m.length, 0), 'noms seuls : un rectangle par trait')
   check(both.layers.engrave.length === onlyFrame.layers.engrave.length + onlyNames.layers.engrave.length, 'les deux cases : contour + noms')
   check(both.layers.cut.length === none.layers.cut.length && both.layers.cut.length > 0, 'la coupe ne dépend pas des cases')
 
@@ -71,6 +71,12 @@ try {
   check(conflicts(moved).size === 0, 'planche perso : pas de chevauchement après déplacement')
   const over = buildCustomSheet({ ...board, overrides: { [b1.items[0].uid]: { x: 5, y: 5, rot: false }, [b1.items[1].uid]: { x: 6, y: 6, rot: false } } }, parts, 5, 1)
   check(conflicts(over).size === 2, 'planche perso : chevauchement détecté')
+  const p0 = b1.items[0]
+  const turned = buildCustomSheet({ ...board, overrides: { [p0.uid]: { ...turnTo({ ...p0, x: 50, y: 50 }, 45) } } }, parts, 5, 1)
+  const tr0 = turned.items.find((i) => i.uid === p0.uid)
+  check(tr0 && angleOf(tr0) === 45 && Math.abs(tr0.w + tr0.h - (p0.w + p0.h) * Math.SQRT2) < 0.2 && conflicts(turned).size === 0, 'rotation libre : 45° donne une boîte plus grande, centre gardé')
+  const t90 = buildCustomSheet({ ...board, overrides: { [p0.uid]: turnTo(p0, 90) } }, parts, 5, 1).items.find((i) => i.uid === p0.uid)
+  check(t90 && Math.abs(t90.w - p0.h) < 0.01 && Math.abs(t90.h - p0.w) < 0.01, 'rotation libre : 90° échange largeur et hauteur')
   const tiny = buildCustomSheet({ ...board, width: 30, height: 30, qty: { [parts[0].key]: 50 } }, parts, 5, 1)
   check(tiny.rejected.length > 0 && tiny.items.length + tiny.rejected.length === 50, 'planche perso trop petite : le reste est signalé')
   const other = buildCustomSheet({ ...board, thickness: 99 }, parts, 5, 1)
@@ -86,7 +92,7 @@ try {
   check(clash.warnings.length === 1, 'export : deux contours sous le même id signalés')
 
   // desserrer les petites pièces : pas de planche en plus, pas de chevauchement, petites pièces plus espacées
-  const big = parseCutParts(readFileSync(new URL('../examples/etagere.cutparts.json', import.meta.url), 'utf8')).parts
+  const big = parseCutParts(readFileSync(new URL('../examples/exemple.cutparts.json', import.meta.url), 'utf8')).parts
   const tight = buildAutoSheets(big, settings)
   const loose = buildAutoSheets(big, { ...settings, spread: true })
   check(loose.length <= tight.length, `desserrer : ${loose.length} planches contre ${tight.length} (jamais plus)`)
@@ -192,18 +198,12 @@ try {
   check(Math.abs(sg.cutSeconds + sg.engraveSeconds + sg.rapidSeconds - sg.seconds) < 0.01 * sg.seconds + 0.5, `temps : ${sg.cutSeconds.toFixed(0)} + ${sg.engraveSeconds.toFixed(0)} + ${sg.rapidSeconds.toFixed(0)} ≈ ${sg.seconds.toFixed(0)} s`)
   check(sg.rapidMm > 0 && sg.lines > 0 && sg.contours > 0, `${sg.lines} lignes, ${sg.contours} contours, ${sg.rapidMm.toFixed(0)} mm à vide`)
 
-  // numéro de planche : unique, gravé en haut et en bas, hors des pièces
+  // numéro de planche : unique (affiché dans l'app, jamais gravé)
   const nums = sheets.filter((sh) => sh.items.length).map((sh) => sh.mark)
   check(nums.length > 1 && new Set(nums).size === nums.length && nums.join() === nums.map((_, i) => i + 1).join(), `planches numérotées ${nums.join(' ')}`)
-  for (const sh of sheets.filter((x) => x.items.length)) {
-    const bm = boardMark(sh)
-    const ys = bm.map((r) => r[0][1])
-    check(bm.length > 0 && Math.min(...ys) < sh.height / 2 && Math.max(...ys) > sh.height / 2, `${sh.label} : numéro gravé en haut et en bas`)
-    check(bm.every((r) => r.every(([x, y]) => x >= 0 && y >= 0 && x <= sh.width && y <= sh.height)), `${sh.label} : numéro dans la planche`)
-  }
   const eng = sheetToJob(sheets[0], { names: true, frame: false }).layers.engrave.length
   const engNone = sheetToJob(sheets[0], { names: false, frame: false }).layers.engrave
-  check(eng >= boardMark(sheets[0]).length && !engNone, 'numéro gravé avec la case « noms », absent sans')
+  check(eng > 0 && !engNone, 'noms gravés avec la case « noms », absents sans (pas de numéro de planche gravé)')
 
   // crans : mêmes règles que testBrick (impair, 16 mm visés, serrage de 0,4 mm sur les fenêtres, languettes intactes)
   const { fingerCount, fingerSpans, plateOutline } = await server.ssrLoadModule('/src/models/helpers.ts')
@@ -231,6 +231,10 @@ try {
   const cmax = Math.max(...ct.items.map((i) => i.x + i.w))
   const cmin = Math.min(...ct.items.map((i) => i.y))
   check(ct.items.length === 2 && conflicts(ct).size === 0 && ct.rejected.length === 0, 'essai de crantage : 2 plaques, sans conflit')
+  const { goujonTestSheet } = await server.ssrLoadModule('/src/models/goujonTest.ts')
+  const gt = goujonTestSheet(3, 300, 300).sheet
+  const gw = gt.items.filter((i) => i.part.id.startsWith('GJ')).map((i) => i.w).sort((a, b) => a - b)
+  check(gt.items.length === 6 && conflicts(gt).size === 0 && gt.rejected.length === 0 && gw.join() === '3,3.1,3.2,3.3,3.4' && gt.items.some((i) => i.part.id.startsWith('GT') && i.holes.length === 1), 'essai de goujons : 1 mini planche trouée + 5 goujons de 3 à 3,4 mm, sans conflit')
   check(cmax < 90 && cmin > 300 - 100, `essai de crantage : regroupé contre l'origine (x max ${cmax.toFixed(0)} mm, y haut ${cmin.toFixed(0)} mm sur 300)`)
 
   // planche d'essai puissance × vitesse
@@ -264,10 +268,10 @@ try {
   const { MODELS } = await server.ssrLoadModule('/src/models/registry.ts')
   const { panelsToCutParts, finishPanels, numberPanels } = await server.ssrLoadModule('/src/models/toCutParts.ts')
   const { defaultParams } = await server.ssrLoadModule('/src/models/types.ts')
-  // mangeoire V3 : pièces de iris.js de testBrick sans la planche de plafond du bac ni les plaques du bas et du haut du boîtier sans goujons (45 planches, 36 pièces différentes), aux cotes de testBrick
+  // mangeoire V3 : pièces de iris.js de testBrick sans la planche de plafond du bac ni les plaques du bas et du haut du boîtier avec 4 goujons carrés (49 planches, 37 pièces différentes), aux cotes de testBrick
   const v3 = MODELS.find((m) => m.id === 'mangeoire-v3')
   const v3p = v3 ? finishPanels(v3.build(defaultParams(v3)).panels) : []
-  check(v3p.length === 45 && new Set(v3p.map((q) => q.id)).size === 36, `mangeoire V3 : ${v3p.length} planches, ${new Set(v3p.map((q) => q.id)).size} pièces différentes (testBrick : 52 et 39, moins la planche de plafond, 2 plaques du boîtier et les goujons)`)
+  check(v3p.length === 49 && new Set(v3p.map((q) => q.id)).size === 37, `mangeoire V3 : ${v3p.length} planches, ${new Set(v3p.map((q) => q.id)).size} pièces différentes (testBrick : 52 et 39, moins la planche de plafond et 2 plaques du boîtier, plus 4 goujons)`)
   const v3box = v3p.find((q) => q.category === 'Boîtier')
   check(!!v3box && Math.abs(Math.max(...v3box.outer.map((q) => q[0])) - Math.min(...v3box.outer.map((q) => q[0])) - 143) < 0.01, 'mangeoire V3 : boîtier de 143 mm de côté')
 

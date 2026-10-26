@@ -6,7 +6,7 @@ Fichier d'échange entre un projet 3D (three.js) et l'app de découpe. Il ne con
 {
   "format": "cnc-parts",
   "version": 1,
-  "project": "etagere",
+  "project": "exemple",
   "unit": "mm",
   "parts": [
     {
@@ -56,8 +56,8 @@ Copier `export/exportParts.js` dans le projet, puis :
 ```js
 import { toCutParts, downloadCutParts } from './exportParts.js'
 
-const result = toCutParts(pieces, { project: 'etagere', thickness: 3 })
-downloadCutParts(result, 'etagere')   // télécharge etagere.cutparts.json
+const result = toCutParts(pieces, { project: 'exemple', thickness: 3 })
+downloadCutParts(result, 'exemple')   // télécharge exemple.cutparts.json
 ```
 
 `pieces` : tableau de `{ outer, holes, code, cat }`. Les options `id`, `category`, `thickness`, `material` et `rotate` acceptent une fonction pour s'adapter à un autre nommage. `result.warnings` signale les noms en double.

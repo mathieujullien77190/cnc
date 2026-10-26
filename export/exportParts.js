@@ -2,7 +2,7 @@
 // Module autonome, sans dépendance : à copier tel quel dans un projet three.js.
 //
 //   import { toCutParts, downloadCutParts } from './exportParts.js'
-//   downloadCutParts(toCutParts(pieces, { project: 'etagere', thickness: 3 }), 'etagere')
+//   downloadCutParts(toCutParts(pieces, { project: 'exemple', thickness: 3 }), 'exemple')
 //
 // `pieces` : tableau de pièces à plat { outer: [[x, y], …], holes: [[[x, y], …], …], … } en millimètres, y vers le bas.
 // Plusieurs pièces qui portent le même identifiant (`id`) sont regroupées en une seule entrée avec `qty`.

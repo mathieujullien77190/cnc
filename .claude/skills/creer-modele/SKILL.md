@@ -7,7 +7,7 @@ description: Créer un modèle 3D (three.js) pour l'onglet « Modèles 3D » de 
 
 Un modèle = un fichier `src/models/library/<id>.model.ts`. Il décrit des **planches** (contour 2D + épaisseur + position/rotation dans le monde) ; l'app en tire la vue 3D et les pièces à découper. Pas d'import de three.js dans le modèle.
 
-Référence complète : `docs/MODELES.md`. Exemple : `src/models/library/etagere.model.ts`. Types : `src/models/types.ts`. Aides : `src/models/helpers.ts` (`rect`, `circle`, `tabbedBottom`).
+Référence complète : `docs/MODELES.md`. Exemple : `src/models/library/mangeoire-v3.model.ts`. Types : `src/models/types.ts`. Aides : `src/models/helpers.ts` (`rect`, `circle`, `tabbedBottom`).
 
 ## Marche à suivre
 
@@ -66,6 +66,6 @@ export default defineModel({
 ## Pièges
 
 - `v` va vers le **bas** dans le contour ; une hauteur mesurée depuis le bas d'un flanc se convertit en `v = H - y`.
-- Une fente qui touche le bord du contour n'est plus un trou : garder un retrait (≈ 15 mm) comme `etagere.model.ts`.
+- Une fente qui touche le bord du contour n'est plus un trou : garder un retrait (≈ 15 mm) comme `mangeoire-v3.model.ts`.
 - `build` est rappelé à chaque mouvement de curseur : pas de calcul lourd.
 - Les valeurs de `p` sont des `number | boolean | string` : les convertir (`as number`).
