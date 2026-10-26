@@ -146,7 +146,7 @@ export function useProject() {
       const id = uid()
       update((s) => ({
         ...s,
-        boards: [...s.boards, { id, name: `Essai ${s.boards.length + 1}`, thickness, width: s.settings.width, height: s.settings.height, qty: {}, overrides: {}, marking: DEFAULT_MARKING }],
+        boards: [...s.boards, { id, name: 'Planche perso', thickness, width: s.settings.width, height: s.settings.height, qty: {}, overrides: {}, marking: DEFAULT_MARKING }],
       }))
       return id
     },

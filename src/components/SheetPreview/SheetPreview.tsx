@@ -1,7 +1,7 @@
 import { categoryCss } from '../../core/colors'
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type PointerEvent } from 'react'
 import { frameRect } from '../../core/job'
-import { marksFor } from '../../core/sheets'
+import { angleOf, marksFor, turnTo } from '../../core/sheets'
 import type { Marking, Override, Pt, Sheet } from '../../core/types'
 
 const f = (v: number) => Math.round(v * 1000) / 1000
@@ -133,7 +133,7 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
       const it = sheet.items.find((i) => i.uid === selected)
       if (!it || it.part.rotate === 'none') return
       e.preventDefault()
-      interact.onCommit(it.uid, { x: it.x, y: it.y, rot: !it.rot })
+      interact.onCommit(it.uid, turnTo(it, angleOf(it) + 90))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -165,7 +165,7 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
     setPan(null)
     if (!drag || !interact) return setDrag(null)
     const it = sheet.items.find((i) => i.uid === drag.uid)
-    if (it && (Math.abs(drag.dx) > 0.05 || Math.abs(drag.dy) > 0.05)) interact.onCommit(it.uid, { x: round1(it.x + drag.dx), y: round1(it.y + drag.dy), rot: it.rot })
+    if (it && (Math.abs(drag.dx) > 0.05 || Math.abs(drag.dy) > 0.05)) interact.onCommit(it.uid, { x: round1(it.x + drag.dx), y: round1(it.y + drag.dy), rot: it.rot, angle: it.angle })
     setDrag(null)
   }
 
@@ -182,6 +182,12 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
         onPointerDown={downBackground}
         onDoubleClick={() => setView({ x: 0, y: 0, w: sheet.width })}
       >
+        <defs>
+          <pattern id="hachure-conflit" width={3} height={3} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width={3} height={3} fill="#fde2e2" />
+            <line x1={0} y1={0} x2={0} y2={3} stroke="#dc2626" strokeWidth={1.2} />
+          </pattern>
+        </defs>
         <rect x={0} y={0} width={sheet.width} height={sheet.height} fill="#fbf7ee" stroke="#a8a29e" strokeWidth={0.5} />
         {frame && <path d={path(frame)} fill="none" stroke="#2563eb" strokeWidth={0.5} strokeDasharray="3 2" />}
         {sheet.items.map((it) => {
@@ -192,7 +198,7 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
               <path
                 d={[it.outer, ...it.holes].map(path).join('')}
                 fillRule="evenodd"
-                fill={isBad ? '#f3a6a6' : categoryCss(it.part.category)}
+                fill={isBad ? 'url(#hachure-conflit)' : categoryCss(it.part.category)}
                 stroke={selected === it.uid ? '#047857' : '#ff0000'}
                 strokeWidth={selected === it.uid ? 1.2 : 0.6}
                 strokeLinejoin="round"

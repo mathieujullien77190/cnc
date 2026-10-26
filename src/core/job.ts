@@ -1,6 +1,6 @@
 import { buildGcode, gcodeText, DEFAULT_MACHINE_SETTINGS, MACHINE_AREA, type GcodeJob, type LaserJob, type LaserItem, type MachineSettings } from '../laser'
 import { planRoute, type Before, type Group } from './route'
-import { boardMark, marksFor } from './sheets'
+import { marksFor } from './sheets'
 import type { Marking, Placed, Pt, Sheet } from './types'
 
 /** Débord du cadre autour des pièces (mm). */
@@ -86,9 +86,7 @@ const buildJob = (sheet: Sheet, marking: Marking): LaserJob => {
   }
   if (marking.names) {
     const marks = marksFor(sheet)
-    const board = boardMark(sheet)
     const groups: Group[] = [
-      ...(board.length ? [{ free: board.map(flip) }] : []),
       ...sheet.items.flatMap((it) => ((marks.get(it.uid)?.length ?? 0) ? [{ free: marks.get(it.uid)!.map(flip) }] : [])),
     ]
     const r = planRoute(groups, [], pos, { budgetMs: ROUTE_BUDGET_MS })

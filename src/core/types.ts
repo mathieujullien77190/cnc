@@ -30,6 +30,8 @@ export interface Placed {
   w: number
   h: number
   rot: boolean
+  /** Angle libre (degrés, sens horaire) : s'il est présent, il remplace `rot`. */
+  angle?: number
   outer: Pt[]
   holes: Pt[][]
 }
@@ -69,6 +71,7 @@ export interface Override {
   x: number
   y: number
   rot: boolean
+  angle?: number
 }
 
 export interface CustomBoard {
