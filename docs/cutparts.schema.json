@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "cnc-parts",
+  "type": "object",
+  "required": ["format", "version", "parts"],
+  "properties": {
+    "format": { "const": "cnc-parts" },
+    "version": { "const": 1 },
+    "project": { "type": "string" },
+    "unit": { "const": "mm" },
+    "parts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "thickness", "outer"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "description": "Nom gravé sur la pièce (A-Z, 0-9, tiret). Unique dans le fichier." },
+          "category": { "type": "string" },
+          "qty": { "type": "integer", "minimum": 0, "default": 1 },
+          "thickness": { "type": "number", "exclusiveMinimum": 0 },
+          "material": { "type": "string", "default": "contreplaque" },
+          "rotate": { "enum": ["any90", "none"], "default": "any90" },
+          "outer": { "$ref": "#/$defs/polygon" },
+          "holes": { "type": "array", "items": { "$ref": "#/$defs/polygon" } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "polygon": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
+    }
+  }
+}
