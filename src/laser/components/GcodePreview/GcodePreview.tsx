@@ -4,7 +4,7 @@ import { saveText } from '../../lib';
 import { MACHINE_AREA, formatDuration, gcodeText } from '../../grbl';
 import type { LaserMachine } from '../../hooks/useLaserMachine';
 import { JobStats } from '../JobStats';
-import { finishedSegments, panView, segmentGroups, segmentsPath, zoomView, type View } from './helpers';
+import { panView, segmentsPath, splitAtHead, zoomView, type View } from './helpers';
 
 const PAD = 12;
 
@@ -17,13 +17,13 @@ export function GcodePreview({ m }: { m: LaserMachine }) {
   const { program, area, items, itemIndex, grbl, frame } = m;
   const { W, H } = area;
   const head = grbl.status?.wpos;
-  // avancement de l'envoi (m.progress) : une pièce passe en pointillé rouge quand le laser a fini de la couper
+  // avancement de l'envoi (m.progress) : le trait passe en pointillé au fur et à mesure que le laser le coupe ou le grave
   const done = m.progress?.segment ?? 0;
-  const groups = useMemo(() => (program ? segmentGroups(program.segments) : null), [program]);
-  const split = useMemo(() => (program && groups && done > 0 ? finishedSegments(program.segments, groups, done) : null), [program, groups, done]);
+  const split = useMemo(() => (program && done > 0 ? splitAtHead(program.segments, done, head) : null), [program, done, head?.x, head?.y]); // eslint-disable-line react-hooks/exhaustive-deps
   const cutD = useMemo(() => (program ? segmentsPath(split ? split.rest : program.segments, true, false) : ''), [program, split]);
   const doneD = useMemo(() => (split ? segmentsPath(split.done, true, false) : ''), [split]);
-  const engraveD = useMemo(() => (program ? segmentsPath(program.segments, true, true) : ''), [program]);
+  const engraveD = useMemo(() => (program ? segmentsPath(split ? split.rest : program.segments, true, true) : ''), [program, split]);
+  const engraveDoneD = useMemo(() => (split ? segmentsPath(split.done, true, true) : ''), [split]);
   const rapidD = useMemo(() => (program ? segmentsPath(program.segments, false, false) : ''), [program]);
   const st = program?.stats;
   const maxX = Math.max(W, MACHINE_AREA.W), maxY = Math.max(H, MACHINE_AREA.H);
@@ -85,6 +85,7 @@ export function GcodePreview({ m }: { m: LaserMachine }) {
           {rapidD && <path d={rapidD} fill="none" stroke="#9ca3af" strokeWidth={0.4} strokeDasharray="2 2" />}
           {engraveD && <path d={engraveD} fill="none" stroke="#2563eb" strokeWidth={0.6} strokeLinejoin="round" />}
           {cutD && <path d={cutD} fill="none" stroke="#dc2626" strokeWidth={0.6} strokeLinejoin="round" />}
+          {engraveDoneD && <path d={engraveDoneD} fill="none" stroke="#2563eb" strokeWidth={0.6} strokeDasharray="1.2 1.2" strokeLinejoin="round" />}
           {doneD && <path d={doneD} fill="none" stroke="#dc2626" strokeWidth={0.6} strokeDasharray="1.2 1.2" strokeLinejoin="round" />}
           <circle cx={0} cy={0} r={2.5} fill="#16a34a" />
           {head && (
@@ -97,7 +98,7 @@ export function GcodePreview({ m }: { m: LaserMachine }) {
       </svg>
       </div>
       <p className="text-[11px] text-stone-500">
-        Rouge = coupe (une pièce passe en pointillé rouge quand elle est finie, pendant l'envoi), bleu = gravure, pointillés gris = déplacements rapides (laser éteint), cadre bleu = « Cadre à vide », rond vert = origine (X0 Y0), croix orange = la tête. Pointillés noirs = zone de la machine {MACHINE_AREA.W} × {MACHINE_AREA.H} mm.
+        Rouge = coupe, bleu = gravure (le trait passe en pointillé au fur et à mesure que la laser le fait, pendant l'envoi), pointillés gris = déplacements rapides (laser éteint), cadre bleu = « Cadre à vide », rond vert = origine (X0 Y0), croix orange = la tête. Pointillés noirs = zone de la machine {MACHINE_AREA.W} × {MACHINE_AREA.H} mm.
       </p>
       {program && <JobStats program={program} settings={m.settings} extra={m.item?.extra} />}
       {st?.outOfBounds && <Notice kind="error">Une partie du tracé sort de la planche ({W} × {H} mm) : une pièce est plus grande que la planche.</Notice>}

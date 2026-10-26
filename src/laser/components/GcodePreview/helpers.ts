@@ -70,37 +70,20 @@ export function currentSegment(segments: Segment[], segLines: number[], acked: n
   return start + dist.findIndex((d) => d <= near + TIE);
 }
 
-/** Les coupes regroupées par pièce : `id[i]` = groupe du segment `i` (−1 : déplacement rapide ou gravure), `last[g]` = indice du dernier segment du groupe `g`. */
-export interface Groups { id: number[]; last: number[] }
-
 /**
- * Regroupe les segments de coupe en pièces : par le nom de pièce quand il est connu (trous puis contour extérieur ensemble), sinon par suite de traits de coupe sans déplacement rapide
- * (un contour, pour un G-code importé).
+ * Tracé fait / à faire, au fil de l'eau : les segments d'avant `done` sont faits, celui que la tête parcourt est coupé en deux à la position de la tête
+ * (la partie déjà parcourue part dans `done`, le reste dans `rest`), ceux d'après restent à faire.
  */
-export function segmentGroups(segments: Segment[]): Groups {
-  const named = new Map<string, number>(), id: number[] = [], last: number[] = [];
-  let run = -1, prevCut = false;
-  segments.forEach((s, i) => {
-    const isCut = s.cut && !s.engrave;
-    let g = -1;
-    if (isCut) {
-      if (s.piece !== undefined) {
-        let n = named.get(s.piece);
-        if (n === undefined) { n = last.length; named.set(s.piece, n); last.push(i); }
-        g = n;
-      }
-      else { if (!prevCut) { last.push(i); run = last.length - 1; } g = run; }
-      last[g] = i;
-    }
-    id.push(g);
-    prevCut = isCut;
-  });
-  return { id, last };
-}
-
-/** Les segments de coupe dont la pièce est finie : la tête (segment `current`) est passée après le dernier segment de leur groupe. */
-export function finishedSegments(segments: Segment[], groups: Groups, current: number): { done: Segment[]; rest: Segment[] } {
-  const done: Segment[] = [], rest: Segment[] = [];
-  segments.forEach((s, i) => { (groups.id[i] >= 0 && groups.last[groups.id[i]] < current ? done : rest).push(s); });
-  return { done, rest };
+export function splitAtHead(segments: Segment[], done: number, head?: { x: number; y: number }): { done: Segment[]; rest: Segment[] } {
+  const k = Math.min(done, segments.length);
+  const doneSegs = segments.slice(0, k), rest = segments.slice(k);
+  const cur = rest[0];
+  if (cur && head && cur.cut) {
+    const dx = cur.x1 - cur.x0, dy = cur.y1 - cur.y0, len2 = dx * dx + dy * dy;
+    const u = len2 > 0 ? Math.max(0, Math.min(1, ((head.x - cur.x0) * dx + (head.y - cur.y0) * dy) / len2)) : 0;
+    const px = cur.x0 + u * dx, py = cur.y0 + u * dy;
+    doneSegs.push({ ...cur, x1: px, y1: py });
+    rest[0] = { ...cur, x0: px, y0: py };
+  }
+  return { done: doneSegs, rest };
 }
