@@ -43,14 +43,17 @@ export function useLaserMachine(items: LaserItem[], area: Area = { W: MACHINE_AR
     return buildGcode(item.job, { feed: settings.feed, powerPct: settings.power, passes: settings.passes, passMode: settings.passMode, air: settings.air, sMax, capPct: settings.capPct, engraveFeed: settings.engraveFeed, engravePowerPct: settings.engravePower, motion });
   }, [imported, item?.program, item?.job, settings.feed, settings.power, settings.passes, settings.passMode, settings.air, settings.capPct, settings.engraveFeed, settings.engravePower, sMax, motion]);
 
-  const program: GcodeJob | null = cut;
+  // reprise après une coupure : le programme raccourci remplace celui de la planche jusqu'à ce que son résultat soit fermé
+  const [resumeJob, setResumeJob] = useState<GcodeJob | null>(null);
+  const program: GcodeJob | null = resumeJob ?? cut;
   // autre planche choisie : l'envoi terminé (ou arrêté) de la précédente ne doit plus s'afficher (pointillé, temps, barre) ; pendant un envoi, rien ne change
   const { dismiss } = job, runningRef = useRef(job.running), prevIndex = useRef(index);
   runningRef.current = job.running;
   useEffect(() => {
-    if (prevIndex.current !== index && !runningRef.current) dismiss();
+    if (prevIndex.current !== index && !runningRef.current) { dismiss(); setResumeJob(null); }
     prevIndex.current = index;
   }, [index, dismiss]);
+  const dismissJob = () => { dismiss(); setResumeJob(null); };
   const progress = useJobProgress(job.view, program, grbl.status?.wpos); // où en est la tête sur le tracé et le temps qui reste, pendant un envoi
 
   const frame = useMemo<GcodeJob | null>(() => {
@@ -66,7 +69,7 @@ export function useLaserMachine(items: LaserItem[], area: Area = { W: MACHINE_AR
 
   return {
     grbl, job, settings, setSettings, open, setOpen, items: all, itemIndex: index, setItemIndex, item, area: { W, H },
-    sMax, laserMode, cut, program, progress, frame, idle, canCut, canFrame,
+    sMax, laserMode, cut, program, setResumeJob, dismissJob, progress, frame, idle, canCut, canFrame,
     /** Messages de l'import du G-code choisi (commandes retirées, plafond appliqué…). */
     importWarnings: imported?.warnings ?? [],
   };

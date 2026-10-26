@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Btn, ConfirmDialog, Hint, Notice, ProgressBar } from '../../ui';
 import { formatDuration } from '../../grbl';
+import { resumeFrom, type Resume } from '../../job';
 import type { LaserMachine } from '../../hooks/useLaserMachine';
 import { StopButton } from '../StopButton';
 import { blockers, JOB_LABEL, PHASE_LABEL } from './helpers';
@@ -9,6 +10,8 @@ import { blockers, JOB_LABEL, PHASE_LABEL } from './helpers';
 export function SendPanel({ m }: { m: LaserMachine }) {
   const { job, program } = m;
   const [ask, setAsk] = useState(false); // confirmation simple, au cas où on clique par inadvertance
+  const [askResume, setAskResume] = useState(false);
+  const [resume, setResume] = useState<Resume | null>(null);
   const { view } = job;
   const snap = view.snap;
   const why = blockers(m);
@@ -39,7 +42,7 @@ export function SendPanel({ m }: { m: LaserMachine }) {
               ? <Btn block={false} variant="primary" onClick={() => void job.resume()}>▶ Reprendre</Btn>
               : <Btn block={false} variant="warn" disabled={snap?.phase !== 'running'} onClick={() => void job.pause()}>❚❚ Pause</Btn>)}
             {(job.running || snap?.phase === 'error') && <StopButton onStop={() => void job.stop()} />}
-            {finished && <Btn block={false} onClick={job.dismiss}>Fermer le résultat</Btn>}
+            {finished && <Btn block={false} onClick={m.dismissJob}>Fermer le résultat</Btn>}
           </div>
         </div>
       )}
@@ -47,13 +50,38 @@ export function SendPanel({ m }: { m: LaserMachine }) {
         <>
           <Btn variant="danger" className="py-2 text-sm" disabled={!m.canCut || !program} onClick={() => setAsk(true)}>Lancer la découpe…</Btn>
           {!m.canCut && why.length > 0 && <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-stone-500">{why.map((w) => <li key={w}>{w}</li>)}</ul>}
+          <Btn variant="warn" disabled={!m.canCut || !m.cut || !m.grbl.status} onClick={() => {
+            const head = m.grbl.status?.wpos;
+            setResume(m.cut && head ? resumeFrom(m.cut, head) : null);
+            setAskResume(true);
+          }}>Reprendre après une coupure…</Btn>
           <Hint>Rien ne part sans ton clic et une confirmation. En cours de route : Pause (!) / Reprendre (~) / Arrêt (pause, réinitialisation, M5).</Hint>
         </>
+      )}
+      {askResume && (
+        <ConfirmDialog
+          title="Reprendre la découpe ?" confirmLabel="Reprendre" danger={!resume} onCancel={() => setAskResume(false)}
+          onConfirm={() => {
+            setAskResume(false);
+            if (!resume) return;
+            m.setResumeJob(resume.job);
+            job.start(kind, resume.job);
+          }}
+        >
+          {!resume ? 'Impossible de situer la tête sur le tracé de cette planche.' : (
+            <>
+              La tête est à {resume.gapMm.toFixed(1)} mm du tracé ; la reprise recommence au contour en cours{resume.piece ? ` (${resume.piece})` : ''}, ligne {resume.fromLine} du programme,
+              environ {formatDuration(resume.job.stats.seconds)}.
+              {resume.gapMm > 3 && <strong className="block text-rose-700">Écart important : l'origine a peut-être été perdue (machine éteinte, planche déplacée). Vérifie avant de continuer.</strong>}
+              {' '}La tête va d'abord rejoindre le début de ce contour, laser éteint.
+            </>
+          )}
+        </ConfirmDialog>
       )}
       {ask && program && (
         <ConfirmDialog
           title="Lancer la découpe ?" confirmLabel="Lancer" danger onCancel={() => setAsk(false)}
-          onConfirm={() => { setAsk(false); job.start(kind, program); }}
+          onConfirm={() => { setAsk(false); m.setResumeJob(null); job.start(kind, m.cut ?? program); }}
         >
           {m.item?.label ?? 'Programme'} — environ {formatDuration(program.stats.seconds)}. Couvercle fermé, arrêt d'urgence à portée de main.
         </ConfirmDialog>

@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // Dossiers de pièces exportées par les projets 3D, lus par le serveur de dev (variable CNC_PARTS_DIR, séparés par « ; »).
-const PARTS_DIRS = (process.env.CNC_PARTS_DIR ?? 'C:/projet/testBrick/cutparts').split(';').filter(Boolean)
+const PARTS_DIRS = (process.env.CNC_PARTS_DIR ?? 'C:/projet/testBrick/cutparts;C:/Users/julli/Desktop/projects/cnc-laser-test/cutparts').split(';').filter(Boolean)
 
 /** `GET /api/library` : liste des .json des dossiers ; `GET /api/library/<nom>` : le contenu d'un fichier. Dev seulement (le build statique n'a pas de serveur : le panneau se masque). */
 const partsLibrary = (): Plugin => ({
