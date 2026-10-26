@@ -62,6 +62,7 @@ Bouton « Ajouter à la découpe (remplace tout) » : les pièces du modèle **r
 | `select(id)` | choisit un modèle |
 | `setParams({ width: 150 })` | change des réglages |
 | `addToCut()` | envoie les planches à la découpe |
+| `hide(i)`, `hideGroup('BO')`, `showAll()` | cache une planche ou un groupe (toutes les planches dont l'id a les mêmes lettres), remet tout |
 | `fit()`, `explode(0..1)`, `screenshot()` | cadrage, éclaté, image PNG (data URL) |
 
 ## Skill

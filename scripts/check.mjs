@@ -244,11 +244,12 @@ try {
   const { markPiece } = await server.ssrLoadModule('/src/core/marking.ts')
   const slanted = snugPanel({ id: 'X', thickness: 3, outer: plateOutline(100, 50, { right: { d: 3 }, left: { d: -3 } }), position: [0, 0, 0] })
   check(panelIssues(slanted).length === 0, 'serrage : languettes et encoches gardent des parois droites (aucun trait en biais)')
-  check(panelIssues({ id: 'X', thickness: 3, outer: [[0, 0], [10, 0], [10, 0.2], [10.2, 0.3], [0, 10]], position: [0, 0, 0] }).some((i) => i.kind === 'biais'), 'contrôle : un segment en biais est repéré')
+  check(panelIssues({ id: 'X', thickness: 3, outer: [[0, 0], [10, 0], [10, 5], [10.2, 5.3], [20, 5.3], [20, 10], [0, 10]], position: [0, 0, 0] }).some((i) => i.kind === 'biais'), 'contrôle : un segment en biais est repéré')
 
   // vue 3D : arêtes depuis les contours, jamais EdgesGeometry (faux traits noirs entre fenêtres alignées)
   const { readFileSync: e3_rf } = await import('node:fs')
   check(!/EdgesGeometry/.test(e3_rf(new URL('../src/models/viewer3d.ts', import.meta.url), 'utf8').replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '')), 'vue 3D : pas de EdgesGeometry')
+  check(/EDGE_SHADE = 0\.[0-9]+/.test(e3_rf(new URL('../src/models/viewer3d.ts', import.meta.url), 'utf8')) && /\[faceMat, sideMat\]/.test(e3_rf(new URL('../src/models/viewer3d.ts', import.meta.url), 'utf8')), 'vue 3D : tranche des planches plus foncée que les faces')
   const { contourEdges } = await server.ssrLoadModule('/src/models/edges.ts')
   const e3_sq = (x, y) => [[x, y], [x + 3, y], [x + 3, y + 3], [x, y + 3]]
   const e3_eg = contourEdges({ id: 'X', thickness: 3, outer: [[0, 0], [100, 0], [100, 50], [0, 50]], holes: [e3_sq(10, 10), e3_sq(40, 10), e3_sq(70, 10)], position: [0, 0, 0] }, 50, 25)
@@ -263,6 +264,13 @@ try {
   const { MODELS } = await server.ssrLoadModule('/src/models/registry.ts')
   const { panelsToCutParts, finishPanels, numberPanels } = await server.ssrLoadModule('/src/models/toCutParts.ts')
   const { defaultParams } = await server.ssrLoadModule('/src/models/types.ts')
+  // mangeoire V3 : pièces de iris.js de testBrick sans la planche de plafond du bac ni les plaques du bas et du haut du boîtier sans goujons (45 planches, 36 pièces différentes), aux cotes de testBrick
+  const v3 = MODELS.find((m) => m.id === 'mangeoire-v3')
+  const v3p = v3 ? finishPanels(v3.build(defaultParams(v3)).panels) : []
+  check(v3p.length === 45 && new Set(v3p.map((q) => q.id)).size === 36, `mangeoire V3 : ${v3p.length} planches, ${new Set(v3p.map((q) => q.id)).size} pièces différentes (testBrick : 52 et 39, moins la planche de plafond, 2 plaques du boîtier et les goujons)`)
+  const v3box = v3p.find((q) => q.category === 'Boîtier')
+  check(!!v3box && Math.abs(Math.max(...v3box.outer.map((q) => q[0])) - Math.min(...v3box.outer.map((q) => q[0])) - 143) < 0.01, 'mangeoire V3 : boîtier de 143 mm de côté')
+
   check(MODELS.length >= 1 && new Set(MODELS.map((m) => m.id)).size === MODELS.length, `${MODELS.length} modèles, ids uniques`)
   for (const m of MODELS) {
     const lo = Object.fromEntries(m.params.map((d) => [d.key, d.type === 'number' ? d.min : d.default]))

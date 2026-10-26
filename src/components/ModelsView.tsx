@@ -9,6 +9,10 @@ import { saveText } from '../laser'
 
 const KEY = 'cnc-modeles-v1'
 
+/** Un groupe = toutes les planches dont l'id a les mêmes lettres (BO-01, BO-02 → « BO »). */
+const groupName = (id: string) => id.replace(/-?\d+$/, '')
+const groupOf = (panels: Panel[], index: number) => panels.flatMap((p, i) => (groupName(p.id) === groupName(panels[index].id) ? [i] : []))
+
 interface Saved {
   model: string
   params: Record<string, Params>
@@ -160,6 +164,8 @@ export function ModelsView({ onReplace }: { onReplace: (files: { name: string; t
       explode: (k: number) => setExplode(k),
       /** Cache la planche d'indice i (vue seulement) / remet tout. */
       hide: (i: number) => viewer.current?.hide(i),
+      /** Cache toutes les planches dont l'id commence par ces lettres (« BO »). */
+      hideGroup: (letters: string) => viewer.current?.hideMany((api.current.result?.view ?? []).flatMap((p, i) => (groupName(p.id) === letters ? [i] : []))),
       showAll: () => viewer.current?.showAll(),
       /** Image PNG de la vue (data URL). */
       screenshot: () => viewer.current?.screenshot(),
@@ -225,6 +231,11 @@ export function ModelsView({ onReplace }: { onReplace: (files: { name: string; t
               <li>
                 <button className="w-full px-3 py-1.5 text-left hover:bg-stone-100" onClick={() => { viewer.current?.hide(menu.index); setMenu(null) }}>
                   Cacher {result.panels[menu.index].id}
+                </button>
+              </li>
+              <li>
+                <button className="w-full px-3 py-1.5 text-left hover:bg-stone-100" onClick={() => { viewer.current?.hideMany(groupOf(result.view, menu.index)); setMenu(null) }}>
+                  Cacher le groupe {groupName(result.view[menu.index].id)} ({groupOf(result.view, menu.index).length})
                 </button>
               </li>
             </ul>

@@ -32,7 +32,7 @@ const fmt = (p: Pt) => `(${Math.round(p[0] * 100) / 100}, ${Math.round(p[1] * 10
 /**
  * Traits résiduels d'une planche :
  * - `minuscule` : segment de moins de 0,05 mm ;
- * - `biais` : segment ni horizontal ni vertical mais presque (écart < 1 mm) — un cran dont un coin a bougé seul, la paroi penche ;
+ * - `biais` : segment presque horizontal ou vertical (écart < 1 mm) entre deux segments bien alignés — un cran dont un coin a bougé seul, la paroi penche (les cercles, faits de petits segments obliques, ne comptent pas) ;
  * - `point-inutile` : point aligné sur ses deux voisins (trait fantôme dans la découpe) ;
  * - `doublon` : deux points identiques qui se suivent ;
  * - `croisement` : deux traits qui se croisent (contour ou fenêtre).
@@ -43,15 +43,17 @@ export const panelIssues = (p: Panel): Issue[] => {
   const add = (kind: Issue['kind'], where: string) => out.push({ panel: p.id, kind, where })
   rings.forEach((r, ring) => {
     const name = ring === 0 ? 'contour' : `fenêtre ${ring}`
+    const aligned = (a: Pt, b: Pt) => Math.abs(b[0] - a[0]) < EPS || Math.abs(b[1] - a[1]) < EPS
     r.forEach((a, i) => {
       const b = r[(i + 1) % r.length]
       const prev = r[(i + r.length - 1) % r.length]
+      const next = r[(i + 2) % r.length]
       const dx = Math.abs(b[0] - a[0])
       const dy = Math.abs(b[1] - a[1])
       const len = Math.hypot(dx, dy)
       if (len < EPS) add('doublon', `${name} ${fmt(a)}`)
       else if (len < 0.05) add('minuscule', `${name} ${fmt(a)} → ${fmt(b)}`)
-      else if (dx > EPS && dy > EPS && Math.min(dx, dy) < 1) add('biais', `${name} ${fmt(a)} → ${fmt(b)} (écart ${Math.round(Math.min(dx, dy) * 100) / 100} mm)`)
+      else if (dx > EPS && dy > EPS && Math.min(dx, dy) < 1 && aligned(prev, a) && aligned(b, next)) add('biais', `${name} ${fmt(a)} → ${fmt(b)} (écart ${Math.round(Math.min(dx, dy) * 100) / 100} mm)`)
       if (len >= EPS && Math.abs(cross(prev, a, b)) < 1e-9) add('point-inutile', `${name} ${fmt(a)}`)
     })
   })

@@ -21,7 +21,11 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
   for (const h of p.holes ?? []) shape.holes.push(path(new THREE.Path(), h))
   const geo = new THREE.ExtrudeGeometry(shape, { depth: p.thickness, bevelEnabled: false })
   geo.translate(0, 0, -p.thickness / 2)
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }))
+  // faces (avant / arrière) à la couleur de la famille, tranche (le tour de la planche) légèrement plus foncée : ExtrudeGeometry range les faces en groupe 0, la tranche en groupe 1
+  const faceMat = new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })
+  const sideMat = faceMat.clone()
+  sideMat.color.multiplyScalar(EDGE_SHADE)
+  const mesh = new THREE.Mesh(geo, [faceMat, sideMat])
   // arêtes tracées depuis les contours (voir edges.ts : jamais EdgesGeometry)
   const lines = contourEdges(p, cx, cy)
   const edgeGeo = new THREE.BufferGeometry()
@@ -34,18 +38,18 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
   const h = Math.max(...ys) - Math.min(...ys)
   const rects = markPiece({ x: Math.min(...xs), y: Math.min(...ys), w, h, outer: p.outer, holes: p.holes ?? [] }, p.id)
   if (rects.length) {
-    const parts = rects.map((r) => new THREE.ShapeGeometry(path(new THREE.Shape(), r)))
-    const mark = new THREE.Mesh(
-      mergeGeometries(parts),
-      new THREE.MeshBasicMaterial({ color: 0x2b1a0c, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
-    )
-    mark.position.z = p.thickness / 2 + 0.02
-    // même numéro sur la face arrière, retourné pour se lire de ce côté
-    const back = mark.clone()
-    back.position.z = -(p.thickness / 2 + 0.02)
-    back.rotation.y = Math.PI
-    g.add(mark, back)
-    parts.forEach((x) => x.dispose())
+    const markMat = new THREE.MeshBasicMaterial({ color: 0x2b1a0c, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
+    const build = (list: [number, number][][], z: number) => {
+      const parts = list.map((r) => new THREE.ShapeGeometry(path(new THREE.Shape(), r)))
+      const mesh = new THREE.Mesh(mergeGeometries(parts), markMat)
+      mesh.position.z = z
+      parts.forEach((x) => x.dispose())
+      return mesh
+    }
+    // face arrière : le même nom au MÊME endroit (jamais un reflet de la planche, qui le poserait dans un trou), glyphes retournés autour du centre du nom pour se lire de ce côté
+    const mx = rects.flat().map((q) => q[0])
+    const flipX = Math.min(...mx) + Math.max(...mx)
+    g.add(build(rects, p.thickness / 2 + 0.02), build(rects.map((r) => r.map(([x, y]): [number, number] => [flipX - x, y])), -(p.thickness / 2 + 0.02)))
   }
   g.position.set(...p.position)
   const [rx, ry, rz] = (p.rotation ?? [0, 0, 0]).map((d) => THREE.MathUtils.degToRad(d))
@@ -74,6 +78,9 @@ export interface Measure {
 
 const SNAP_PX = 16
 
+/** Part de la couleur de la face gardée pour la tranche (0,8 = 20 % plus foncée). */
+export const EDGE_SHADE = 0.8
+
 /** Vue 3D d'un modèle : orbite, éclairage, éclaté, sélection d'une planche. Aucune interface ici. */
 export class Viewer3D {
   private renderer: THREE.WebGLRenderer
@@ -81,7 +88,7 @@ export class Viewer3D {
   private camera = new THREE.PerspectiveCamera(40, 1, 1, 20000)
   private controls: OrbitControls
   private root = new THREE.Group()
-  private objects: { group: THREE.Group; origin: THREE.Vector3; material: THREE.MeshStandardMaterial }[] = []
+  private objects: { group: THREE.Group; origin: THREE.Vector3; materials: THREE.MeshStandardMaterial[] }[] = []
   private selected = -1
   private explode = 0
   private raf = 0
@@ -286,6 +293,13 @@ export class Viewer3D {
     this.applyHidden()
   }
 
+  /** Cache plusieurs planches d'un coup (un groupe). */
+  hideMany(indices: number[]) {
+    for (const i of indices) if (i >= 0 && i < this.objects.length) this.hidden.add(i)
+    if (this.hidden.has(this.selected)) this.select(-1)
+    this.applyHidden()
+  }
+
   showAll() {
     this.hidden.clear()
     this.applyHidden()
@@ -298,7 +312,7 @@ export class Viewer3D {
 
   select(i: number) {
     this.selected = i
-    this.objects.forEach((o, k) => o.material.emissive.setHex(k === i ? 0x2a6f4b : 0x000000))
+    this.objects.forEach((o, k) => o.materials.forEach((m) => m.emissive.setHex(k === i ? 0x2a6f4b : 0x000000)))
   }
 
   setPanels(panels: Panel[], keepView = true, reset = !keepView) {
@@ -309,7 +323,7 @@ export class Viewer3D {
     this.objects = panels.map((p) => {
       const group = panelObject(p, categoryHex(p.category ?? ''))
       this.root.add(group)
-      return { group, origin: group.position.clone(), material: (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial }
+      return { group, origin: group.position.clone(), materials: (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial[] }
     })
     this.selected = -1
     this.hidden = new Set([...this.hidden].filter((i) => i < panels.length && !reset))
@@ -322,7 +336,7 @@ export class Viewer3D {
     g.traverse((o) => {
       const m = o as THREE.Mesh
       m.geometry?.dispose()
-      ;(m.material as THREE.Material | undefined)?.dispose()
+      for (const mat of [m.material].flat()) (mat as THREE.Material | undefined)?.dispose()
     })
   }
 

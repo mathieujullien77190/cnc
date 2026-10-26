@@ -32,6 +32,12 @@ Référence complète : `docs/MODELES.md`. Exemple : `src/models/library/etagere
    Corriger jusqu'au vert. Ne pas ouvrir de navigateur : l'utilisateur teste lui-même la vue 3D. Contrôler à la place par le calcul que les tenons tombent bien dans leurs fentes (positions monde des deux côtés).
 8. **Conclure** : dire le nom du modèle, ses réglages et ses planches (id, quantité, taille) ; rappeler qu'il apparaît dans l'onglet « Modèles 3D ». Ne pas commiter sans demande.
 
+## Rendu 3D (automatique, rien à faire dans le modèle)
+
+- La couleur d'une planche vient de sa `category` (la même couleur en vue planche et en vue 3D, `src/core/colors.ts`) : donner une `category` claire à chaque planche, ne jamais coder une couleur.
+- La **tranche** de chaque planche (le tour de l'épaisseur) est automatiquement plus foncée que les faces (`EDGE_SHADE` dans `viewer3d.ts`, 20 % de moins) pour lire l'épaisseur du bois. Une pièce créée par un modèle l'a donc sans rien ajouter ; ne pas la contourner (matériau unique, couleur imposée) et la garder pour toute nouvelle sorte de pièce dans la vue 3D.
+- Les arêtes noires sont tracées depuis les contours et le nom est gravé sur les deux faces (voir `cranter-plaques`, étape 8).
+
 ## Gabarit
 
 ```ts
