@@ -113,7 +113,7 @@ export function parseGcode(text: string, opt: GcodeImportOptions): GcodeImport {
   const has = Number.isFinite(minX);
   const eps = 1e-6;
   const stats = {
-    contours, lines: lines.length, cutMm, rapidMm, seconds: t,
+    contours, lines: lines.length, cutMm, engraveMm: 0, rapidMm, seconds: t, cutSeconds: t, engraveSeconds: 0, rapidSeconds: 0, // un G-code importé n'est pas détaillé par sorte de mouvement
     bounds: has ? { minX, minY, maxX, maxY } : null,
     outOfBounds: has && (minX < -eps || minY < -eps || maxX > W + eps || maxY > H + eps),
     maxS, clamped,

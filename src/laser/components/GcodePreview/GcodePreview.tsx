@@ -3,6 +3,7 @@ import { Btn, Chip, Notice } from '../../ui';
 import { saveText } from '../../lib';
 import { MACHINE_AREA, formatDuration, gcodeText } from '../../grbl';
 import type { LaserMachine } from '../../hooks/useLaserMachine';
+import { JobStats } from '../JobStats';
 import { finishedSegments, panView, segmentGroups, segmentsPath, zoomView, type View } from './helpers';
 
 const PAD = 12;
@@ -98,11 +99,7 @@ export function GcodePreview({ m }: { m: LaserMachine }) {
       <p className="text-[11px] text-stone-500">
         Rouge = coupe (une pièce passe en pointillé rouge quand elle est finie, pendant l'envoi), bleu = gravure, pointillés gris = déplacements rapides (laser éteint), cadre bleu = « Cadre à vide », rond vert = origine (X0 Y0), croix orange = la tête. Pointillés noirs = zone de la machine {MACHINE_AREA.W} × {MACHINE_AREA.H} mm.
       </p>
-      {st && (
-        <p className="text-[11px] text-stone-700">
-          {st.contours} contours · {st.lines} lignes de G-code · coupe {(st.cutMm / 1000).toFixed(2)} m · durée estimée <b>{formatDuration(st.seconds)}</b> (vitesses réelles ; le tracé de la machine simulée va plus vite).
-        </p>
-      )}
+      {program && <JobStats program={program} settings={m.settings} extra={m.item?.extra} />}
       {st?.outOfBounds && <Notice kind="error">Une partie du tracé sort de la planche ({W} × {H} mm) : une pièce est plus grande que la planche.</Notice>}
       {m.item?.notice && <Notice kind="info">{m.item.notice}</Notice>}
       {m.importWarnings.map((w) => <Notice key={w} kind="warn">{w}</Notice>)}

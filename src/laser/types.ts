@@ -21,3 +21,13 @@ export interface MachineSettings {
   /** Cadre : autour des pièces ou de la planche entière. */
   frameMode: 'pieces' | 'sheet';
 }
+
+/** Ce que l'application hôte sait en plus du G-code : nombre de pièces, taille et remplissage de la planche, parcours comparé au plus proche voisin. */
+export interface JobExtra {
+  pieces?: number;
+  sheetMm?: { w: number; h: number };
+  /** Remplissage de la planche (0 à 1). */
+  fill?: number;
+  /** Déplacements à vide avec l'ordre optimisé et avec le seul plus proche voisin (mm). */
+  travel?: { mm: number; baselineMm: number };
+}

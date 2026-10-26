@@ -4,7 +4,8 @@ import type { MachineSettings } from '../../laser'
 import { Btn, Notice } from '../../laser/ui'
 import type { Project } from '../../state/useProject'
 import { MarkingToggles } from '../MarkingToggles'
-import { SheetActions, rejectedText } from '../SheetCard'
+import { DoneToggle, SheetActions, rejectedText } from '../SheetCard'
+import { SheetStats } from '../SheetStats'
 import { SheetPreview } from '../SheetPreview'
 import { SizePicker } from '../SizePicker'
 
@@ -15,7 +16,7 @@ const mm = (v: number) => Math.round(v * 10) / 10
  * (et combien), l'app les range ; on peut ensuite les déplacer à la main (glisser) ou les tourner (R).
  */
 export function BoardsView({ project, machine, onLaser }: { project: Project; machine: MachineSettings; onLaser: (key: string) => void }) {
-  const { parts, boards, boardSheets, addBoard, updateBoard, removeBoard, setBoardQty, setOverride } = project
+  const { parts, boards, boardSheets, addBoard, updateBoard, removeBoard, setBoardQty, setOverride, done, setDone } = project
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const thicknesses = [...new Set(parts.map((p) => p.thickness))].sort((a, b) => a - b)
@@ -46,7 +47,7 @@ export function BoardsView({ project, machine, onLaser }: { project: Project; ma
                 onClick={() => { setCurrentId(b.id); setSelected(null) }}
                 className={`flex w-full items-baseline justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs ${i === idx ? 'border-emerald-600 bg-emerald-50 font-semibold text-emerald-900' : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-100'}`}
               >
-                <span className="truncate">{b.name}</span>
+                <span className="truncate">{done[`perso-${b.id}`] ? '✓ ' : ''}{b.name}</span>
                 <span className="text-[10px] font-normal text-stone-500">{b.thickness} mm · {boardSheets[i].items.length} p.</span>
               </button>
             </li>
@@ -98,7 +99,7 @@ export function BoardsView({ project, machine, onLaser }: { project: Project; ma
               </ul>
             </section>
 
-            <section className="min-w-0 space-y-2.5 rounded-lg border border-stone-200 bg-white p-3">
+            <section className={`min-w-0 space-y-2.5 rounded-lg border p-3 transition-colors ${done[sheet.key] ? 'border-emerald-300 bg-emerald-50' : 'border-stone-200 bg-white'}`}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="text-sm font-semibold text-stone-800">{board.name}</h3>
                 <span className="text-[11px] text-stone-500">{sheet.items.length} pièces · {Math.round(sheet.fill * 100)} % rempli</span>
@@ -123,7 +124,11 @@ export function BoardsView({ project, machine, onLaser }: { project: Project; ma
                 <Btn block={false} variant="ghost" disabled={!Object.keys(board.overrides).length} onClick={() => updateBoard(board.id, { overrides: {} })}>Tout replacer auto</Btn>
               </div>
               <MarkingToggles value={board.marking} onChange={(patch) => updateBoard(board.id, { marking: { ...board.marking, ...patch } })} />
-              <SheetActions sheet={sheet} marking={board.marking} machine={machine} onLaser={() => onLaser(sheet.key)} />
+              <SheetStats sheet={sheet} marking={board.marking} machine={machine} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <SheetActions sheet={sheet} marking={board.marking} machine={machine} onLaser={() => onLaser(sheet.key)} />
+                <DoneToggle done={!!done[sheet.key]} onChange={(v) => setDone(sheet.key, v)} />
+              </div>
             </section>
           </div>
         </div>

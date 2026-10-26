@@ -139,6 +139,10 @@ export const laserItems = (sheets: { sheet: Sheet; marking: Marking }[]): LaserI
     .map(({ sheet, marking }) => {
       const item = { label: sheet.label, fileName: sheet.key, notice: NOTICE } as LaserItem
       Object.defineProperty(item, 'job', { enumerable: true, get: () => sheetToJob(sheet, marking) })
+      Object.defineProperty(item, 'extra', {
+        enumerable: true,
+        get: () => ({ pieces: sheet.items.length, sheetMm: { w: sheet.width, h: sheet.height }, fill: sheet.fill, travel: travelOf(sheetToJob(sheet, marking)) }),
+      })
       return item
     })
 

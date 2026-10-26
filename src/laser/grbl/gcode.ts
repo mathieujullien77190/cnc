@@ -47,11 +47,17 @@ export interface GcodeStats {
   contours: number;
   /** Nombre de lignes envoyées. */
   lines: number;
-  /** Longueur coupée, passes comprises (mm). */
+  /** Longueur coupée, passes comprises (mm), sans la gravure. */
   cutMm: number;
+  /** Longueur gravée (cadre, noms), laser allumé à bas régime (mm). */
+  engraveMm: number;
+  /** Déplacements à vide, laser éteint (mm). */
   rapidMm: number;
-  /** Durée estimée (s). */
+  /** Durée estimée (s) : total, puis par sorte de mouvement. */
   seconds: number;
+  cutSeconds: number;
+  engraveSeconds: number;
+  rapidSeconds: number;
   bounds: { minX: number; minY: number; maxX: number; maxY: number } | null;
   /** Une partie du tracé sort de la planche. */
   outOfBounds: boolean;
@@ -100,24 +106,25 @@ export class Writer {
   segLines: number[] = [];
   x = 0; y = 0;
   t = 0;
-  cutMm = 0; rapidMm = 0; maxS = 0;
+  cutMm = 0; engraveMm = 0; rapidMm = 0; maxS = 0;
+  cutSeconds = 0; engraveSeconds = 0; rapidSeconds = 0;
   minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity;
   /** Déplacements, dans l'ordre, avec la ligne qui les écrit : la durée est calculée à la fin comme le fait le planificateur de GRBL (`motion.ts`). */
-  private blocks: { line: number; b: MotionBlock }[] = [];
+  private blocks: { line: number; b: MotionBlock; kind: 'cut' | 'engrave' | 'rapid' }[] = [];
   /** Temps ajouté à la main par ligne (pauses, jog) en plus des déplacements. */
   private dts: number[] = [];
   private done = false;
   constructor(private rapidFeed: number, private W: number, private H: number, private motion: MotionParams = E1_MOTION) {}
   raw(line: string, dt = 0) { this.lines.push(line); this.dts.push(dt); this.t += dt; this.lineTimes.push(this.t); this.done = false; }
   private bound(x: number, y: number) { this.minX = Math.min(this.minX, x); this.minY = Math.min(this.minY, y); this.maxX = Math.max(this.maxX, x); this.maxY = Math.max(this.maxY, y); }
-  private move(x: number, y: number, feed: number) { this.blocks.push({ line: this.lines.length - 1, b: { dx: x - this.x, dy: y - this.y, feed } }); }
+  private move(x: number, y: number, feed: number, kind: 'cut' | 'engrave' | 'rapid') { this.blocks.push({ line: this.lines.length - 1, b: { dx: x - this.x, dy: y - this.y, feed }, kind }); }
   private segment(s: Segment) { this.segments.push(s); this.segLines.push(this.lines.length - 1); }
   /** Déplacement rapide (laser éteint : G0 en mode laser). Rien si on y est déjà. */
   rapid(x: number, y: number, record: boolean) {
     if (Math.abs(x - this.x) < 1e-6 && Math.abs(y - this.y) < 1e-6) return;
     const d = Math.hypot(x - this.x, y - this.y);
     this.raw(`G0 X${num(x)} Y${num(y)}`);
-    this.move(x, y, this.rapidFeed);
+    this.move(x, y, this.rapidFeed, 'rapid');
     this.rapidMm += d;
     if (record) this.segment({ x0: this.x, y0: this.y, x1: x, y1: y, cut: false });
     this.x = x; this.y = y;
@@ -130,8 +137,8 @@ export class Writer {
     seq.forEach(([x, y], i) => {
       const d = Math.hypot(x - this.x, y - this.y);
       this.raw(i === 0 ? `G1 X${num(x)} Y${num(y)} F${num(feed)} S${s}` : `G1 X${num(x)} Y${num(y)}`);
-      this.move(x, y, feed);
-      this.cutMm += d;
+      this.move(x, y, feed, engrave ? 'engrave' : 'cut');
+      if (engrave) this.engraveMm += d; else this.cutMm += d;
       this.maxS = Math.max(this.maxS, s);
       this.bound(x, y);
       if (record) this.segment({ x0: this.x, y0: this.y, x1: x, y1: y, cut: true, ...(engrave ? { engrave: true } : {}), ...(piece ? { piece } : {}) });
@@ -145,8 +152,8 @@ export class Writer {
     pts.slice(1).forEach(([x, y], i) => {
       const d = Math.hypot(x - this.x, y - this.y);
       this.raw(i === 0 ? `G1 X${num(x)} Y${num(y)} F${num(feed)} S${s}` : `G1 X${num(x)} Y${num(y)}`);
-      this.move(x, y, feed);
-      this.cutMm += d;
+      this.move(x, y, feed, 'engrave');
+      this.engraveMm += d;
       this.maxS = Math.max(this.maxS, s);
       this.bound(x, y);
       if (record) this.segment({ x0: this.x, y0: this.y, x1: x, y1: y, cut: true, engrave: true });
@@ -161,6 +168,8 @@ export class Writer {
     let t = 0;
     this.lineTimes = this.lines.map((_, i) => (t += this.dts[i] + (byLine.get(i) ?? 0)));
     this.t = t;
+    this.cutSeconds = this.engraveSeconds = this.rapidSeconds = 0;
+    this.blocks.forEach((q, i) => { if (q.kind === 'cut') this.cutSeconds += times[i]; else if (q.kind === 'engrave') this.engraveSeconds += times[i]; else this.rapidSeconds += times[i]; });
     this.done = true;
   }
   stats(contours: number, clamped: boolean): GcodeStats {
@@ -168,7 +177,8 @@ export class Writer {
     const has = Number.isFinite(this.minX);
     const eps = 1e-6;
     return {
-      contours, lines: this.lines.length, cutMm: this.cutMm, rapidMm: this.rapidMm, seconds: this.t,
+      contours, lines: this.lines.length, cutMm: this.cutMm, engraveMm: this.engraveMm, rapidMm: this.rapidMm, seconds: this.t,
+      cutSeconds: this.cutSeconds, engraveSeconds: this.engraveSeconds, rapidSeconds: this.rapidSeconds,
       bounds: has ? { minX: this.minX, minY: this.minY, maxX: this.maxX, maxY: this.maxY } : null,
       outOfBounds: has && (this.minX < -eps || this.minY < -eps || this.maxX > this.W + eps || this.maxY > this.H + eps),
       maxS: this.maxS, clamped,

@@ -6,7 +6,7 @@ import { SheetCard } from '../SheetCard'
 
 /** Planches automatiques : toutes les pièces importées, rangées par épaisseur. */
 export function AutoView({ project, machine, onLaser }: { project: Project; machine: MachineSettings; onLaser: (key: string) => void }) {
-  const { autoSheets, entries, setAutoMarking } = project
+  const { autoSheets, entries, setAutoMarking, done, setDone } = project
   if (!autoSheets.length) {
     return (
       <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-8 text-center text-sm text-stone-500">
@@ -27,7 +27,7 @@ export function AutoView({ project, machine, onLaser }: { project: Project; mach
             </h2>
             <div className="grid gap-3 xl:grid-cols-2">
               {list.map((s) => (
-                <SheetCard key={s.key} sheet={s} marking={markingOf(s)} onMarking={(patch) => setAutoMarking(s.key, patch)} machine={machine} onLaser={() => onLaser(s.key)} />
+                <SheetCard key={s.key} sheet={s} marking={markingOf(s)} onMarking={(patch) => setAutoMarking(s.key, patch)} machine={machine} onLaser={() => onLaser(s.key)} done={!!done[s.key]} onDone={(v) => setDone(s.key, v)} />
               ))}
             </div>
           </section>

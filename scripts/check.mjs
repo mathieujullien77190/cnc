@@ -183,6 +183,14 @@ try {
   const gj = sheetGcode(tight[0], { names: true, frame: true })
   const tj = travelOf(sheetToJob(tight[0], { names: true, frame: true }))
   check(Math.abs(gj.job.stats.rapidMm - tj.mm) < 1, `G-code : ${gj.job.stats.rapidMm.toFixed(0)} mm à vide = parcours calculé ${tj.mm.toFixed(0)} mm`)
+
+  // statistiques : coupe, gravure et déplacements séparés, temps qui s'additionnent
+  const sg = sheetGcode(sheets[0], { names: true, frame: true }).job.stats
+  const sn = sheetGcode(sheets[0], { names: false, frame: false }).job.stats
+  check(sg.engraveMm > 0 && sn.engraveMm === 0, `gravure comptée à part : ${sg.engraveMm.toFixed(0)} mm avec cases, ${sn.engraveMm} sans`)
+  check(Math.abs(sg.cutMm - sn.cutMm) < 1e-6, `distance de coupe identique avec ou sans gravure (${sg.cutMm.toFixed(0)} mm)`)
+  check(Math.abs(sg.cutSeconds + sg.engraveSeconds + sg.rapidSeconds - sg.seconds) < 0.01 * sg.seconds + 0.5, `temps : ${sg.cutSeconds.toFixed(0)} + ${sg.engraveSeconds.toFixed(0)} + ${sg.rapidSeconds.toFixed(0)} ≈ ${sg.seconds.toFixed(0)} s`)
+  check(sg.rapidMm > 0 && sg.lines > 0 && sg.contours > 0, `${sg.lines} lignes, ${sg.contours} contours, ${sg.rapidMm.toFixed(0)} mm à vide`)
 } finally {
   await server.close()
 }

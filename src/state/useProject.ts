@@ -14,9 +14,11 @@ interface Stored {
   /** Cases cochées par planche automatique (clé de planche). */
   autoMarking: Record<string, Marking>
   boards: CustomBoard[]
+  /** Planches marquées « fait » (clé de planche). */
+  done: Record<string, boolean>
 }
 
-const EMPTY: Stored = { parts: [], settings: DEFAULT_SETTINGS, autoMarking: {}, boards: [] }
+const EMPTY: Stored = { parts: [], settings: DEFAULT_SETTINGS, autoMarking: {}, boards: [], done: {} }
 
 const load = (): Stored => {
   try {
@@ -46,7 +48,7 @@ export interface ImportReport {
 /** État du projet : catalogue de pièces, réglages de planche, planches automatiques et personnalisées. Gardé dans localStorage. */
 export function useProject() {
   const [state, setState] = useState<Stored>(load)
-  const { parts, settings, autoMarking, boards } = state
+  const { parts, settings, autoMarking, boards, done } = state
 
   useEffect(() => {
     try {
@@ -112,6 +114,17 @@ export function useProject() {
   const setSettings = useCallback((patch: Partial<SheetSettings>) => update((s) => ({ ...s, settings: { ...s.settings, ...patch } })), [update])
   const setAutoMarking = useCallback((key: string, patch: Partial<Marking>) => update((s) => ({ ...s, autoMarking: { ...s.autoMarking, [key]: { ...(s.autoMarking[key] ?? DEFAULT_MARKING), ...patch } } })), [update])
 
+  const setDone = useCallback(
+    (key: string, value: boolean) =>
+      update((s) => {
+        const next = { ...s.done }
+        if (value) next[key] = true
+        else delete next[key]
+        return { ...s, done: next }
+      }),
+    [update],
+  )
+
   const addBoard = useCallback(
     (thickness: number): string => {
       const id = uid()
@@ -163,7 +176,7 @@ export function useProject() {
   )
 
   return {
-    parts, settings, boards, autoSheets, boardSheets, entries,
+    parts, settings, boards, done, setDone, autoSheets, boardSheets, entries,
     importFiles, importTexts, addParts, setQty, removePart, removeProject, clearAll, setSettings, setAutoMarking,
     addBoard, updateBoard, removeBoard, setBoardQty, setOverride,
   }
