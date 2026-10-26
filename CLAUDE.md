@@ -40,3 +40,4 @@ node scripts/make-example.mjs   # régénère examples/exemple.cutparts.json
 - Réglages de coupe (vitesse, puissance, passes) globaux, gardés par `useLaserMachine` ; pas encore de réglages par épaisseur.
 - Test visuel : l'utilisateur teste lui-même dans son navigateur.
 - Modèles 3D : un modèle décrit des planches 2D + position/rotation (pas de three.js dans le modèle) ; la vue et la découpe en sortent. Nouveau modèle = nouveau fichier dans `src/models/library`, et `npm run check` doit rester vert (bornes comprises).
+- Crans : identiques à testBrick (impair, 16 mm visés, profondeur = épaisseur, serrage de 0,4 mm appliqué par `finishPanels`) ; skill `cranter-plaques`. Couleurs par famille communes à la vue planche et à la vue 3D (`src/core/colors.ts`).

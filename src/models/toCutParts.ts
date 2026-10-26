@@ -1,4 +1,5 @@
 import type { Pt } from '../core/types'
+import { snugPanel } from './snug'
 import type { Panel } from './types'
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000
@@ -39,6 +40,9 @@ export const numberPanels = (panels: Panel[]): Panel[] => {
     return { ...p, id }
   })
 }
+
+/** Passage obligé après `build` : serrage des crans (comme testBrick) puis numérotation. */
+export const finishPanels = (panels: Panel[]): Panel[] => numberPanels(panels.map(snugPanel))
 
 export interface CutPartsResult {
   file: { format: 'cnc-parts'; version: 1; project: string; unit: 'mm'; parts: object[] }

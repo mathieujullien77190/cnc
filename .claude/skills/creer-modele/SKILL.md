@@ -20,7 +20,7 @@ Référence complète : `docs/MODELES.md`. Exemple : `src/models/library/etagere
 3. **Écrire le fichier** avec `defineModel` : `id` (kebab-case, unique, = nom du fichier), `name`, `description`, `params` (bornes `min`/`max` qui gardent chaque pièce dans **290 × 290 mm**), `build`.
 4. **Identifiants** : donner seulement le **préfixe de famille** (`E`, `B`, `CX`, lettres A-Z). La numérotation est automatique (`E-01`, `E-02`…) : un numéro par contour distinct, planches identiques = même numéro (comptées en `qty`). Ne pas numéroter à la main.
 5. **Règles de découpe** :
-   - tenon et fente de même largeur (le trait du laser donne le jeu) ;
+   - assemblages : utiliser le skill `cranter-plaques` (crans impairs de 16 mm, mêmes que testBrick ; le serrage de 0,4 mm est ajouté tout seul, ne pas ajouter de jeu) ;
    - un trou reste strictement dans le contour (≥ 4,5 mm de bois autour) ;
    - nom gravé : garder la place pour un nom court sur la plus grande face.
 6. **Remarques** : `notes` signale les réglages douteux (pièces trop proches, boîte trop étroite…). `build` ne lève pas d'erreur pour un réglage permis.

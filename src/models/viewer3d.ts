@@ -1,10 +1,9 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import { categoryHex } from '../core/colors'
 import { markPiece } from '../core/marking'
 import type { Panel } from './types'
-
-const PALETTE = [0xd9b98a, 0xa9c4a0, 0x9fb4d6, 0xd6a5b8, 0xd8d08a, 0xb6a4d6]
 
 /** Planche → maillage extrudé, centré sur sa boîte englobante. Repère : voir `Panel`. */
 const panelObject = (p: Panel, color: number): THREE.Group => {
@@ -302,9 +301,8 @@ export class Viewer3D {
     this.root.clear()
     this.corners = panels.map(cornersOf)
     this.clearMeasure()
-    const cats = [...new Set(panels.map((p) => p.category ?? ''))]
     this.objects = panels.map((p) => {
-      const group = panelObject(p, PALETTE[cats.indexOf(p.category ?? '') % PALETTE.length])
+      const group = panelObject(p, categoryHex(p.category ?? ''))
       this.root.add(group)
       return { group, origin: group.position.clone(), material: (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial }
     })

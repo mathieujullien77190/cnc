@@ -29,3 +29,6 @@ export const JOG_STEPS = [0.1, 1, 10, 50] as const;
 
 /** Vitesse de coupe : bornes du curseur (mm/min). */
 export const FEED_RANGE = { min: 20, max: 6000 } as const;
+
+/** Planche d'essai intégrée à la liste des planches : 6 vitesses (colonnes) × 6 puissances (lignes) de carrés de 10 mm, valeurs gravées à côté. */
+export const TEST_CARD = { speedMin: 300, speedMax: 1200, speedCount: 6, powerMin: 40, powerMax: 100, powerCount: 6, size: 10, gap: 3, passes: 1 } as const;

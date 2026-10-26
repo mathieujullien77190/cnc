@@ -1,9 +1,9 @@
+import { categoryCss } from '../../core/colors'
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type PointerEvent } from 'react'
 import { frameRect } from '../../core/job'
 import { marksFor } from '../../core/sheets'
 import type { Marking, Override, Pt, Sheet } from '../../core/types'
 
-const PALETTE = ['#e3d4b5', '#d9c3a0', '#c9d8c5', '#cdd5e3', '#e3cdd5', '#e0d9a8']
 const f = (v: number) => Math.round(v * 1000) / 1000
 const path = (pts: Pt[]) => `M${pts.map(([x, y]) => `${f(x)} ${f(y)}`).join('L')}Z`
 const round1 = (v: number) => Math.round(v * 10) / 10
@@ -61,7 +61,6 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
   const ratio = sheet.height / sheet.width
   const vh = view.w * ratio
   const zoomed = Math.abs(view.w - sheet.width) > 1e-6
-  const cats = [...new Set(sheet.items.map((it) => it.part.category))]
   const frame = marking.frame ? frameRect(sheet) : null
   const marks = marking.names ? marksFor(sheet) : null
   const selected = interact?.selected ?? null
@@ -188,13 +187,12 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
         {sheet.items.map((it) => {
           const d = drag?.uid === it.uid ? drag : null
           const isBad = bad?.has(it.uid)
-          const fs = Math.max(3, Math.min(10, Math.min(it.w, it.h) * 0.35))
           return (
             <g key={it.uid} transform={d ? `translate(${f(d.dx)} ${f(d.dy)})` : undefined} onPointerDown={(e) => downPiece(e, it.uid)} className={interact ? 'cursor-move' : ''}>
               <path
                 d={[it.outer, ...it.holes].map(path).join('')}
                 fillRule="evenodd"
-                fill={isBad ? '#f3a6a6' : PALETTE[cats.indexOf(it.part.category) % PALETTE.length]}
+                fill={isBad ? '#f3a6a6' : categoryCss(it.part.category)}
                 stroke={selected === it.uid ? '#047857' : '#ff0000'}
                 strokeWidth={selected === it.uid ? 1.2 : 0.6}
                 strokeLinejoin="round"
@@ -202,9 +200,6 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
                 <title>{`${it.part.id}${it.part.category ? ` · ${it.part.category}` : ''}`}</title>
               </path>
               {(marks?.get(it.uid) ?? []).map((r, i) => <path key={i} d={path(r)} fill="none" stroke="#2563eb" strokeWidth={0.3} />)}
-              <text x={f(it.x + it.w / 2)} y={f(it.y + it.h / 2)} fontSize={f(fs)} textAnchor="middle" dominantBaseline="central" fill="#1c1917" pointerEvents="none">
-                {it.part.id}
-              </text>
             </g>
           )
         })}

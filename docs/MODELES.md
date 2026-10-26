@@ -42,7 +42,9 @@ Pas besoin d'importer three.js : le modèle décrit des **planches** (`Panel`, `
 - `build` est pur et rapide (rappelé à chaque mouvement de curseur).
 - Les valeurs des réglages arrivent déjà bornées par `min` / `max`.
 - Garder les pièces dans 290 × 290 mm (planche 300 × 300, marge 5) sauf besoin contraire ; `npm run check` le vérifie aux réglages par défaut, minimum et maximum.
-- Bois autour d'un trou ≥ 4,5 mm, 1,2 mm autour d'un nom gravé ; tenons et fentes de même largeur (le trait du laser donne le jeu).
+- Crans : mêmes règles que testBrick, via `plateOutline` / `windowsFor` (`helpers.ts`) — nombre de crans impair, dent visée 16 mm, profondeur = épaisseur ; le serrage de 0,4 mm (`snug.ts`) est appliqué tout seul après `build`. Voir le skill `cranter-plaques`. Le bouton « Tester le crantage » (colonne de gauche) crée une planche perso avec 2 mini plaques à emboîter.
+- Au moins 4,5 mm de bois autour d'un trou, 1,2 mm autour d'un nom gravé.
+
 - Un trou doit rester strictement à l'intérieur du contour (pas de fente ouverte sur le bord, sinon c'est un contour à part).
 
 ## Envoyer à la découpe

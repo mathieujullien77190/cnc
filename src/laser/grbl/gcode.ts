@@ -233,6 +233,79 @@ export function buildFrame(box: FrameBox, feed = 3000): GcodeJob {
   return { lines: w.lines, lineTimes: w.lineTimes, segments: w.segments, stats, header: ['Cadre à vide : laser éteint (M5), déplacements $J= uniquement'] };
 }
 
+export interface TestCardOptions {
+  W: number; H: number;
+  speeds: number[];
+  powers: number[];
+  /** Côté d'un carré (mm). */
+  size: number;
+  /** Espace entre carrés (mm). */
+  gap: number;
+  passes: number;
+  sMax: number;
+  capPct: number;
+  rapidFeed?: number;
+  /** Accélération, coins, vitesse maximale de la machine (durée estimée juste). */
+  motion?: MotionParams;
+  /** Assistance d'air (`M8` / `M9`). */
+  air?: boolean;
+  /** Écrit les valeurs à côté des carrés (puissance en % à gauche de chaque ligne, vitesse au-dessus de chaque colonne), gravées à ce régime AVANT la coupe : la grille se décale pour leur faire de la place. */
+  labels?: { feed: number; powerPct: number };
+}
+
+export interface TestCell { speed: number; power: number; s: number; x: number; y: number; clamped: boolean }
+
+export interface TestCardResult { job: GcodeJob; cells: TestCell[]; fits: boolean }
+
+/** Marge entre le bord de la planche et la grille d'essai (mm). */
+export const TEST_MARGIN = 2;
+
+/** Hauteur des chiffres gravés (mm), place laissée à gauche pour la puissance (« 100% ») et au-dessus des carrés pour la vitesse. */
+export const LABEL_HEIGHT = 4;
+export const LABEL_LEFT = 14;
+export const LABEL_TOP = 8;
+
+/**
+ * Planche d'essai : un petit carré découpé par couple (vitesse, puissance). Colonnes = vitesses, lignes = puissances (de bas en haut, en
+ * partant de l'origine). Coordonnées (x, y) = coin bas-gauche de chaque carré, dans le repère de travail. Rien n'est gravé, sauf avec `labels` :
+ * la puissance (« 80% ») est alors écrite à gauche de chaque ligne et la vitesse au-dessus de chaque colonne, pour lire la planche sans le tableau.
+ */
+export function buildTestCard(o: TestCardOptions): TestCardResult {
+  const w = new Writer(o.rapidFeed ?? DEFAULT_RAPID, o.W, o.H, o.motion);
+  const cells: TestCell[] = [];
+  let clamped = false;
+  prologue(w, o.air);
+  const left = o.labels ? LABEL_LEFT : 0, pitch = o.size + o.gap;
+  if (o.labels) { // les valeurs d'abord, à bas régime : la coupe des carrés vient ensuite
+    const sl = powerToS(o.labels.powerPct, o.sMax, o.capPct), feed = Math.max(1, o.labels.feed);
+    const write = (text: string, x: number, y: number) => { for (const st of textStrokes(text, x, y, LABEL_HEIGHT)) w.stroke(st, feed, sl, true); };
+    o.powers.forEach((power, r) => write(`${power}%`, TEST_MARGIN, TEST_MARGIN + r * pitch + (o.size - LABEL_HEIGHT) / 2));
+    o.speeds.forEach((speed, c) => write(`${speed}`, TEST_MARGIN + left + c * pitch, TEST_MARGIN + o.powers.length * pitch - o.gap + 2));
+  }
+  o.powers.forEach((power, r) => o.speeds.forEach((speed, c) => {
+    const x = TEST_MARGIN + left + c * pitch, y = TEST_MARGIN + r * pitch;
+    const s = powerToS(power, o.sMax, o.capPct);
+    const cl = power > o.capPct || power > 100;
+    clamped = clamped || cl;
+    cells.push({ speed, power, s, x, y, clamped: cl });
+    const sq: [number, number][] = [[x, y], [x + o.size, y], [x + o.size, y + o.size], [x, y + o.size]];
+    for (let p = 0; p < Math.max(1, Math.round(o.passes)); p++) w.cut(sq, Math.max(1, speed), s, p === 0);
+  }));
+  epilogue(w, o.air);
+  const stats = w.stats(cells.length, clamped);
+  const job: GcodeJob = {
+    lines: w.lines, lineTimes: w.lineTimes, segments: w.segments, segLines: w.segLines, stats,
+    header: ['Planche d\'essai : carrés par vitesse (colonnes) et puissance (lignes)', ...cells.map((c) => `X${num(c.x)} Y${num(c.y)} : F${c.speed} S${c.s} (${c.power} %)`)],
+  };
+  return { job, cells, fits: !stats.outOfBounds };
+}
+
+/** Valeurs régulièrement réparties entre `min` et `max` (arrondies). */
+export function spread(min: number, max: number, count: number): number[] {
+  if (count <= 1) return [Math.round(min)];
+  return Array.from({ length: count }, (_, i) => Math.round(min + ((max - min) * i) / (count - 1)));
+}
+
 /** Texte du fichier .gcode (en-tête commenté + lignes). */
 export function gcodeText(job: GcodeJob): string {
   return [...job.header.map((h) => `; ${h}`), ...job.lines].join('\n') + '\n';

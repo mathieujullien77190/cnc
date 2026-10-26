@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MACHINE_SETTINGS_KEY } from '../constants';
-import { MACHINE_AREA, buildFrame, motionFrom, type GcodeJob } from '../grbl';
+import { MACHINE_SETTINGS_KEY, TEST_CARD } from '../constants';
+import { MACHINE_AREA, buildFrame, buildTestCard, motionFrom, spread, type GcodeJob } from '../grbl';
 import { parseMachineSettings } from '../helpers';
 import { buildGcode, jobBox, parseGcode, type LaserItem } from '../job';
 import { useGcodeJob } from './useGcodeJob';
@@ -23,10 +23,25 @@ export function useLaserMachine(items: LaserItem[], area: Area = { W: MACHINE_AR
   const [settings, setSettings] = usePersistentState(MACHINE_SETTINGS_KEY, parseMachineSettings);
   const [open, setOpen] = useState(false);
   const [itemIndex, setItemIndex] = useState(0);
+  const [testOn, setTestOn] = useState(false); // planche d'essai puissance × vitesse : dans la liste le temps de l'essai seulement
+  useEffect(() => {
+    if (!open) setTestOn(false);
+  }, [open]);
 
   const sMax = grbl.settings[30] ?? 1000;
   const motion = useMemo(() => motionFrom(grbl.settings), [grbl.settings]); // accélération, coins et vitesses de la machine (`$$`) : durée estimée juste
-  const all = items;
+  const test = useMemo(() => {
+    const t = TEST_CARD;
+    const passes = settings.passes; // la planche d'essai suit le nombre de passes choisi, et ses vitesses sont multipliées par ce nombre (2 passes à 1200 = autant d'énergie qu'une passe à 600)
+    return buildTestCard({ W: area.W, H: area.H, speeds: spread(t.speedMin * passes, t.speedMax * passes, t.speedCount), powers: spread(t.powerMin, t.powerMax, t.powerCount), size: t.size, gap: t.gap, passes, sMax, capPct: settings.capPct, air: settings.air, motion, labels: { feed: settings.engraveFeed, powerPct: settings.engravePower } });
+  }, [area.W, area.H, sMax, motion, settings.passes, settings.capPct, settings.air, settings.engraveFeed, settings.engravePower]);
+  const all = useMemo<LaserItem[]>(() => (testOn ? [...items, testItem(test.job)] : items), [items, test, testOn]);
+  /** Ouvre le pilotage sur la planche d'essai puissance × vitesse. */
+  const startTest = () => {
+    setTestOn(true);
+    setItemIndex(items.length);
+    setOpen(true);
+  };
 
   const index = Math.min(itemIndex, Math.max(0, all.length - 1));
   const item = all[index] ?? null;
@@ -68,7 +83,7 @@ export function useLaserMachine(items: LaserItem[], area: Area = { W: MACHINE_AR
   const canFrame = idle && !!frame;
 
   return {
-    grbl, job, settings, setSettings, open, setOpen, items: all, itemIndex: index, setItemIndex, item, area: { W, H },
+    grbl, job, settings, setSettings, open, setOpen, startTest, items: all, itemIndex: index, setItemIndex, item, area: { W, H },
     sMax, laserMode, cut, program, setResumeJob, dismissJob, progress, frame, idle, canCut, canFrame,
     /** Messages de l'import du G-code choisi (commandes retirées, plafond appliqué…). */
     importWarnings: imported?.warnings ?? [],
@@ -77,3 +92,10 @@ export function useLaserMachine(items: LaserItem[], area: Area = { W: MACHINE_AR
 
 export type LaserMachine = ReturnType<typeof useLaserMachine>;
 
+/** La planche d'essai dans la liste des planches : programme déjà construit, non retirable. */
+function testItem(program: GcodeJob): LaserItem {
+  return {
+    label: "Essai puissance × vitesse", fileName: 'essai-puissance-vitesse', program, test: true,
+    notice: "Planche d'essai : un carré par couple. Colonnes = vitesses (mm/min, écrites au-dessus), lignes = puissances (%, écrites à gauche, la plus faible en bas). Origine dans le coin bas-gauche d'une chute du même matériau. Garde le carré qui se détache proprement avec le moins de brûlure.",
+  };
+}

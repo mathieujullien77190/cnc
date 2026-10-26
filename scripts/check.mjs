@@ -205,9 +205,43 @@ try {
   const engNone = sheetToJob(sheets[0], { names: false, frame: false }).layers.engrave
   check(eng >= boardMark(sheets[0]).length && !engNone, 'numéro gravé avec la case « noms », absent sans')
 
+  // crans : mêmes règles que testBrick (impair, 16 mm visés, serrage de 0,4 mm sur les fenêtres, languettes intactes)
+  const { fingerCount, fingerSpans, plateOutline } = await server.ssrLoadModule('/src/models/helpers.ts')
+  const { snugPanel } = await server.ssrLoadModule('/src/models/snug.ts')
+  check([20, 60, 120, 200, 260].every((l) => fingerCount(l) % 2 === 1 && fingerCount(l) >= 3), 'nombre de crans impair, 3 au moins')
+  check(fingerCount(120) === 7 && fingerCount(50) === 3 && fingerCount(260) === 17, 'nombre de crans comme testBrick (120 mm → 7, 50 → 3, 260 → 17)')
+  const cr_win = [[10, 20], [27.1, 20], [27.1, 23], [10, 23]]
+  const cr_sn = snugPanel({ id: 'X', thickness: 3, outer: [[0, 0], [100, 0], [100, 100], [0, 100]], holes: [cr_win], position: [0, 0, 0] })
+  const cr_wx = cr_sn.holes[0].map((q) => q[0])
+  check(Math.abs(Math.max(...cr_wx) - Math.min(...cr_wx) - (17.1 - 0.4)) < 1e-6, 'fenêtre de languette raccourcie de 0,4 mm')
+  const cr_tong = plateOutline(100, 50, { right: { d: 3 } })
+  const cr_ts = snugPanel({ id: 'X', thickness: 3, outer: cr_tong, position: [0, 0, 0] })
+  const cr_sp = fingerSpans(50)
+  check(cr_sp.length === 1 && Math.abs(cr_sp[0].u1 - cr_sp[0].u0 - 50 / 3) < 1e-9, 'une languette de 50 mm : 3 crans, languette au milieu')
+  const cr_tw = cr_ts.outer.filter((q) => Math.abs(q[0] - 103) < 1e-6).map((q) => q[1])
+  check(cr_tw.length === 2 && Math.abs(Math.abs(cr_tw[1] - cr_tw[0]) - 50 / 3) < 1e-6, 'languette gardée à sa largeur (pas de serrage)')
+  const cr_notch = plateOutline(100, 50, { right: { d: -3 } })
+  const cr_ns = snugPanel({ id: 'X', thickness: 3, outer: cr_notch, position: [0, 0, 0] })
+  const cr_nw = cr_ns.outer.filter((q) => Math.abs(q[0] - 97) < 1e-6).map((q) => q[1])
+  check(cr_nw.length === 2 && Math.abs(Math.abs(cr_nw[1] - cr_nw[0]) - (50 / 3 - 0.4)) < 1e-6, 'encoche resserrée de 0,4 mm')
+
+  // essai de crantage : 2 plaques serrées dans le coin de l'origine machine (bas-gauche), sans conflit
+  const { crenelTestSheet } = await server.ssrLoadModule('/src/models/crenelTest.ts')
+  const ct = crenelTestSheet(3, 300, 300).sheet
+  const cmax = Math.max(...ct.items.map((i) => i.x + i.w))
+  const cmin = Math.min(...ct.items.map((i) => i.y))
+  check(ct.items.length === 2 && conflicts(ct).size === 0 && ct.rejected.length === 0, 'essai de crantage : 2 plaques, sans conflit')
+  check(cmax < 90 && cmin > 300 - 100, `essai de crantage : regroupé contre l'origine (x max ${cmax.toFixed(0)} mm, y haut ${cmin.toFixed(0)} mm sur 300)`)
+
+  // planche d'essai puissance × vitesse
+  const { buildTestCard, spread } = await server.ssrLoadModule('/src/laser/grbl/gcode.ts')
+  const card = buildTestCard({ W: 300, H: 300, speeds: spread(300, 1200, 6), powers: spread(40, 100, 6), size: 10, gap: 5, passes: 1, sMax: 1000, capPct: 100, labels: { feed: 1500, powerPct: 20 } })
+  check(card.cells.length === 36 && card.fits, `planche d'essai : ${card.cells.length} carrés dans la zone (${card.job.stats.lines} lignes, ${Math.round(card.job.stats.seconds)} s)`)
+  check(new Set(card.cells.map((c) => `${c.speed}/${c.power}`)).size === 36, "planche d'essai : 36 couples vitesse / puissance distincts")
+
   // modèles 3D : chaque modèle de la bibliothèque donne des planches valides, aux réglages par défaut et aux bornes
   const { MODELS } = await server.ssrLoadModule('/src/models/registry.ts')
-  const { panelsToCutParts, numberPanels } = await server.ssrLoadModule('/src/models/toCutParts.ts')
+  const { panelsToCutParts, finishPanels, numberPanels } = await server.ssrLoadModule('/src/models/toCutParts.ts')
   const { defaultParams } = await server.ssrLoadModule('/src/models/types.ts')
   check(MODELS.length >= 1 && new Set(MODELS.map((m) => m.id)).size === MODELS.length, `${MODELS.length} modèles, ids uniques`)
   for (const m of MODELS) {
@@ -217,7 +251,7 @@ try {
       let res
       try {
         res = m.build(p)
-        res = { ...res, panels: numberPanels(res.panels) }
+        res = { ...res, panels: finishPanels(res.panels) }
       } catch (e) {
         check(false, `${m.id} (${label}) : plante : ${e.message}`)
         continue

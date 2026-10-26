@@ -14,7 +14,7 @@ function SheetPicker({ m }: { m: LaserMachine }) {
 }
 
 /** Fenêtre de pilotage de la laser. Reste montée tant que la machine est utilisée : la connexion et un envoi en cours survivent à la fermeture. */
-export function LaserDialog({ m }: { m: LaserMachine }) {
+export function LaserDialog({ m, lowered, setLowered }: { m: LaserMachine; lowered: boolean; setLowered: (v: boolean) => void }) {
   if (!m.open) return null
-  return <LaserMachineModal m={m} top={<SheetPicker m={m} />} />
+  return <LaserMachineModal m={m} top={<SheetPicker m={m} />} lowered={lowered} setLowered={setLowered} />
 }

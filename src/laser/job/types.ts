@@ -45,4 +45,6 @@ export interface LaserItem {
   extra?: JobExtra;
   /** Programme déjà construit : envoyé tel quel, sans passer par `buildGcode`. */
   program?: GcodeJob;
+  /** Planche d'essai puissance × vitesse. */
+  test?: boolean;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MODELS, modelById } from '../models/registry'
-import { numberPanels, panelsToCutParts } from '../models/toCutParts'
+import { finishPanels, panelsToCutParts } from '../models/toCutParts'
 import { cleanParams, defaultParams, type ModelDef, type ModelResult, type ParamDef, type Params } from '../models/types'
 import { Viewer3D } from '../models/viewer3d'
 import { Btn, Notice } from '../laser/ui'
@@ -27,7 +27,7 @@ const load = (): Saved => {
 const build = (m: ModelDef, p: Params): { result: ModelResult | null; error: string } => {
   try {
     const r = m.build(p)
-    return { result: { ...r, panels: numberPanels(r.panels) }, error: '' }
+    return { result: { ...r, panels: finishPanels(r.panels) }, error: '' }
   } catch (e) {
     return { result: null, error: e instanceof Error ? e.message : String(e) }
   }
