@@ -12,6 +12,8 @@ export interface Part {
   material: string
   outer: Pt[]
   holes: Pt[][]
+  /** Textes gravés en plus du nom (rectangles fermés dans le repère de la pièce, comme `outer`). */
+  labels?: Pt[][]
   /** Quantité demandée par le fichier ; modifiable dans l'app. */
   qty: number
   rotate: 'any90' | 'none'
@@ -34,6 +36,8 @@ export interface Placed {
   angle?: number
   outer: Pt[]
   holes: Pt[][]
+  /** Textes gravés de la pièce, posés comme le contour. */
+  labels?: Pt[][]
 }
 
 export interface Sheet {

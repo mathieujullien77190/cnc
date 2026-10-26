@@ -31,6 +31,7 @@ Fichier d'échange entre un projet 3D (three.js) et l'app de découpe. Il ne con
 | `thickness` | oui | Épaisseur du matériau en mm. L'app ne mélange jamais deux épaisseurs sur une planche. |
 | `outer` | oui | Contour extérieur : points `[x, y]` en mm, reliés dans l'ordre, fermé automatiquement (ne pas répéter le premier point). 3 points au moins. |
 | `holes` | non | Trous : liste de contours, même écriture. |
+| `labels` | non | Textes gravés en plus du nom (« BOIS », « 2.5 »…) : rectangles fermés dans le repère de `outer`, comme les lettres du nom (voir `digitRects` dans `src/core/marking.ts`). Gravés avec le nom ; le nom se pose ailleurs. |
 | `qty` | non (1) | Nombre d'exemplaires identiques. |
 | `category` | non | Famille (« Nervure »…). Sert à la couleur de l'aperçu. |
 | `material` | non | `contreplaque` par défaut. |

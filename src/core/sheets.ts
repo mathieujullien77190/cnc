@@ -40,7 +40,7 @@ const turnAny = (part: Part, deg: number) => {
   const x0 = Math.min(...outer.map((p) => p[0]))
   const y0 = Math.min(...outer.map((p) => p[1]))
   const shift = (pts: Pt[]): Pt[] => pts.map(([x, y]) => [x - x0, y - y0])
-  return { outer: shift(outer), holes: part.holes.map((h) => shift(rot(h))), w: Math.max(...outer.map((p) => p[0])) - x0, h: Math.max(...outer.map((p) => p[1])) - y0 }
+  return { outer: shift(outer), holes: part.holes.map((h) => shift(rot(h))), labels: part.labels?.map((l) => shift(rot(l))), w: Math.max(...outer.map((p) => p[0])) - x0, h: Math.max(...outer.map((p) => p[1])) - y0 }
 }
 
 /** Angle actuel d'une pièce posée (degrés). */
@@ -59,10 +59,10 @@ export const placePart = (inst: Instance, x: number, y: number, rot: boolean, n:
   if (angle !== undefined) {
     const t = turnAny(part, angle)
     const move = (pts: Pt[]): Pt[] => pts.map(([px, py]) => [r3(px + x), r3(py + y)])
-    return { uid: inst.uid, part, n, x: r3(x), y: r3(y), w: r3(t.w), h: r3(t.h), rot: false, angle, outer: move(t.outer), holes: t.holes.map(move) }
+    return { uid: inst.uid, part, n, x: r3(x), y: r3(y), w: r3(t.w), h: r3(t.h), rot: false, angle, outer: move(t.outer), holes: t.holes.map(move), ...(t.labels ? { labels: t.labels.map(move) } : {}) }
   }
   const move = (pts: Pt[]): Pt[] => (rot ? turn90(pts, part.h) : pts).map(([px, py]) => [r3(px + x), r3(py + y)])
-  return { uid: inst.uid, part, n, x: r3(x), y: r3(y), w: rot ? part.h : part.w, h: rot ? part.w : part.h, rot, outer: move(part.outer), holes: part.holes.map(move) }
+  return { uid: inst.uid, part, n, x: r3(x), y: r3(y), w: rot ? part.h : part.w, h: rot ? part.w : part.h, rot, outer: move(part.outer), holes: part.holes.map(move), ...(part.labels ? { labels: part.labels.map(move) } : {}) }
 }
 
 const toItem = (inst: Instance, idx: number): PackItem => ({ w: inst.part.w, h: inst.part.h, idx, noRotate: inst.part.rotate === 'none', holes: rectHoles(inst.part) })
@@ -229,10 +229,12 @@ export const marksOf = (it: Placed): Pt[][] => {
   let local = markCache.get(key)
   if (!local) {
     const mv = (pts: Pt[]): Pt[] => pts.map(([x, y]) => [x - it.x, y - it.y])
-    local = markPiece({ x: 0, y: 0, w: it.w, h: it.h, outer: mv(it.outer), holes: it.holes.map(mv) }, it.part.id)
+    // les textes gravés en plus du nom sont des obstacles : le nom ne se pose pas dessus
+    local = markPiece({ x: 0, y: 0, w: it.w, h: it.h, outer: mv(it.outer), holes: [...it.holes, ...(it.labels ?? [])].map(mv) }, it.part.id)
     markCache.set(key, local)
   }
-  return local.map((r) => r.map(([x, y]): Pt => [r3(x + it.x), r3(y + it.y)]))
+  const placed = local.map((r) => r.map(([x, y]): Pt => [r3(x + it.x), r3(y + it.y)]))
+  return it.labels?.length ? [...placed, ...it.labels] : placed
 }
 
 const marksForCache = new WeakMap<Sheet, Map<string, Pt[][]>>()

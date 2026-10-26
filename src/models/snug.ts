@@ -21,7 +21,10 @@ const clean = (pts: Pt[]): Pt[] => {
   })
 }
 
-const snugOuter = (pts: Pt[], T: number): Pt[] => {
+/** Profondeur de cran à serrer : T, ou un multiple de T (`depths`, en nombre d'épaisseurs). */
+const isDepth = (len: number, T: number, depths: number[]) => depths.some((k) => near(len, k * T))
+
+const snugOuter = (pts: Pt[], T: number, depths: number[]): Pt[] => {
   const n = pts.length
   if (n < 4) return pts
   const area = pts.reduce((s, p, i) => s + p[0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * p[1], 0)
@@ -33,7 +36,7 @@ const snugOuter = (pts: Pt[], T: number): Pt[] => {
     const d2: Pt = [p2[0] - p1[0], p2[1] - p1[1]]
     const d3: Pt = [p3[0] - p2[0], p3[1] - p2[1]]
     const l2 = Math.hypot(d2[0], d2[1])
-    if (!axis(d1) || !axis(d2) || !near(Math.hypot(d1[0], d1[1]), T) || l2 < SNUG_MIN) continue
+    if (!axis(d1) || !axis(d2) || !isDepth(Math.hypot(d1[0], d1[1]), T, depths) || l2 < SNUG_MIN) continue
     if (!near(d3[0], -d1[0]) || !near(d3[1], -d1[1]) || Math.abs(d1[0] * d2[0] + d1[1] * d2[1]) > 1e-6) continue
     if ((d1[0] * d2[1] - d1[1] * d2[0]) * area >= 0) continue // coins saillants : une dent, pas un cran
     const k = -CRENEL_SNUG / 2
@@ -54,17 +57,20 @@ const snugOuter = (pts: Pt[], T: number): Pt[] => {
 /** Le segment a → b est parallèle à d (même axe). */
 const collinearDir = (a: Pt, b: Pt, d: Pt) => Math.abs((b[0] - a[0]) * d[1] - (b[1] - a[1]) * d[0]) < 1e-6 && Math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-6
 
-const snugHole = (pts: Pt[], T: number): Pt[] => {
+const snugHole = (pts: Pt[], T: number, depths: number[]): Pt[] => {
   if (pts.length !== 4) return pts
   const xs = pts.map((p) => p[0])
   const ys = pts.map((p) => p[1])
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
   if (!pts.every((p) => (near(p[0], x0) || near(p[0], x1)) && (near(p[1], y0) || near(p[1], y1)))) return pts
   const k = -CRENEL_SNUG / 2
-  if (near(y1 - y0, T) && x1 - x0 >= SNUG_MIN) return pts.map(([x, y]): Pt => [near(x, x0) ? x + k : x - k, y])
-  if (near(x1 - x0, T) && y1 - y0 >= SNUG_MIN) return pts.map(([x, y]): Pt => [x, near(y, y0) ? y + k : y - k])
+  if (isDepth(y1 - y0, T, depths) && x1 - x0 >= SNUG_MIN) return pts.map(([x, y]): Pt => [near(x, x0) ? x + k : x - k, y])
+  if (isDepth(x1 - x0, T, depths) && y1 - y0 >= SNUG_MIN) return pts.map(([x, y]): Pt => [x, near(y, y0) ? y + k : y - k])
   return pts
 }
 
 /** Serrage de testBrick appliqué à une planche (crans et fenêtres de l'épaisseur du matériau). */
-export const snugPanel = (p: Panel): Panel => ({ ...p, outer: snugOuter(clean(p.outer), p.thickness), holes: (p.holes ?? []).map((h) => snugHole(clean(h), p.thickness)) })
+export const snugPanel = (p: Panel): Panel => {
+  const depths = p.snugDepths ?? [1]
+  return { ...p, outer: snugOuter(clean(p.outer), p.thickness, depths), holes: (p.holes ?? []).map((h) => snugHole(clean(h), p.thickness, depths)) }
+}

@@ -30,6 +30,22 @@ export interface Panel {
   /** `none` : sens du fil imposé. */
   rotate?: 'any90' | 'none'
   material?: string
+  /** Textes gravés en plus du nom (« BOIS »…) : coin haut-gauche (x, y) dans le repère de la planche, hauteur de lettre h (mm). Ils doivent tenir sur du bois plein. */
+  labels?: PanelLabel[]
+  /** Traits gravés (lignes d'un tableau, dessins…) : `[x0, y0, x1, y1]` dans le repère de la planche, tracés en rectangle fin (`RULE_W`). */
+  rules?: [number, number, number, number][]
+  /** Profondeurs de cran à serrer, en multiples de l'épaisseur (défaut [1]) : [1, 3] si une encoche reçoit trois plaques empilées. */
+  snugDepths?: number[]
+}
+
+/** Largeur d'un trait gravé (mm). */
+export const RULE_W = 0.6
+
+export interface PanelLabel {
+  text: string
+  x: number
+  y: number
+  h: number
 }
 
 export interface ModelResult {

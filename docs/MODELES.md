@@ -31,6 +31,7 @@ Pas besoin d'importer three.js : le modèle décrit des **planches** (`Panel`, `
 ## Une planche
 
 - `outer`, `holes` : contours 2D en mm, **u vers la droite, v vers le bas** (comme le `.cutparts.json`). Cercles déjà en segments (`circle()` dans `helpers.ts`).
+- `labels` (option) : textes gravés en plus du nom, `{ text, x, y, h }` (coin haut-gauche dans le repère de la planche, hauteur de lettre en mm ; majuscules, chiffres, `-` et `.`). Ils doivent tenir sur du bois plein ; le nom de la planche se pose ailleurs. Exemple : `range-meches.model.ts`.
 - `thickness` : épaisseur du matériau ; c'est aussi l'épaisseur de l'extrusion.
 - `position` : centre de la boîte englobante de la planche dans le monde (x droite, y haut, z vers l'avant).
 - `rotation` : Euler en degrés, ordre XYZ. Sans rotation, la planche est dans le plan XY (u → x, v → -y). Debout dans le plan YZ : `[0, -90, 0]` (u → z). Couchée : `[-90, 0, 0]` (u → x, v → z).

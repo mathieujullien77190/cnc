@@ -21,6 +21,8 @@ export interface CutPartEntry {
   rotate?: 'any90' | 'none'
   outer: Pt[]
   holes?: Pt[][]
+  /** Textes gravés en plus du nom : rectangles fermés (le laser grave les contours bleus fermés), même repère que `outer`. */
+  labels?: Pt[][]
 }
 
 export interface ParseResult {
@@ -103,6 +105,8 @@ export function parseCutParts(text: string): ParseResult {
     if (!isPoly(e.outer)) return void errors.push(`${where} : « outer » doit contenir au moins 3 points [x, y].`)
     const holes = e.holes ?? []
     if (!Array.isArray(holes) || !holes.every(isPoly)) return void errors.push(`${where} : « holes » invalide.`)
+    const labels = e.labels ?? []
+    if (!Array.isArray(labels) || !labels.every(isPoly)) return void errors.push(`${where} : « labels » invalide.`)
     const key = `${project}/${e.id.trim()}`
     if (seen.has(key)) return void errors.push(`${where} : identifiant en double.`)
     seen.add(key)
@@ -120,6 +124,7 @@ export function parseCutParts(text: string): ParseResult {
       material: typeof e.material === 'string' && e.material ? e.material : 'contreplaque',
       outer: mv(e.outer),
       holes: holes.map(mv),
+      ...(labels.length ? { labels: labels.map(mv) } : {}),
       qty: Number.isInteger(e.qty) && (e.qty as number) >= 0 ? (e.qty as number) : 1,
       rotate: e.rotate === 'none' ? 'none' : 'any90',
       w: r3(Math.max(...xs) - x0),

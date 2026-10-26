@@ -267,6 +267,7 @@ try {
   // modèles 3D : chaque modèle de la bibliothèque donne des planches valides, aux réglages par défaut et aux bornes
   const { MODELS } = await server.ssrLoadModule('/src/models/registry.ts')
   const { panelsToCutParts, finishPanels, numberPanels } = await server.ssrLoadModule('/src/models/toCutParts.ts')
+  const { inside: lbInside } = await server.ssrLoadModule('/src/laser/job/geometry.ts')
   const { defaultParams } = await server.ssrLoadModule('/src/models/types.ts')
   // mangeoire V3 : pièces de iris.js de testBrick sans la planche de plafond du bac ni les plaques du bas et du haut du boîtier avec 4 goujons carrés (49 planches, 37 pièces différentes), aux cotes de testBrick
   const v3 = MODELS.find((m) => m.id === 'mangeoire-v3')
@@ -302,6 +303,12 @@ try {
       check(!issues.length, `${m.id} (${label}) : aucun trait résiduel${issues.length ? ' : ' + issues.slice(0, 3).map((i) => `${i.panel} ${i.kind} ${i.where}`).join(' ; ') : ''}`)
       const holesInside = back.parts.every((pt) => pt.holes.every((h) => h.every((q) => q[0] > 0 && q[1] > 0 && q[0] < pt.w && q[1] < pt.h)))
       check(holesInside, `${m.id} (${label}) : les trous restent à l’intérieur du contour`)
+      // textes gravés (labels) : sur du bois plein, et le nom de la pièce ne les touche pas
+      const labelBad = back.parts.filter((pt) => pt.labels?.length).flatMap((pt) => {
+        const bad = pt.labels.filter((r) => r.some((q) => !lbInside(q, pt.outer) || pt.holes.some((h) => lbInside(q, h))))
+        return bad.length ? [pt.id] : []
+      })
+      check(!labelBad.length, `${m.id} (${label}) : textes gravés sur du bois plein${labelBad.length ? ' : ' + labelBad.join(' ') : ''}`)
       const laid = buildAutoSheets(back.parts, { width: 300, height: 300, margin: 5, gap: 1 })
       check(laid.every((sh) => sh.rejected.length === 0), `${m.id} (${label}) : toutes les pièces tiennent sur du 300 × 300`)
     }

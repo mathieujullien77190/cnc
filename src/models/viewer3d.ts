@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { categoryHex } from '../core/colors'
-import { markPiece } from '../core/marking'
+import { digitRects, markPiece } from '../core/marking'
+import { ruleRect } from './toCutParts'
 import { contourEdges } from './edges'
 import type { Panel } from './types'
 
@@ -25,6 +26,8 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
   const faceMat = new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })
   const sideMat = faceMat.clone()
   sideMat.color.multiplyScalar(EDGE_SHADE)
+  // la paroi d'un trou sort de ExtrudeGeometry tournée vers le bois : sans double face elle est cachée et on voit à travers
+  sideMat.side = THREE.DoubleSide
   const mesh = new THREE.Mesh(geo, [faceMat, sideMat])
   // arêtes tracées depuis les contours (voir edges.ts : jamais EdgesGeometry)
   const lines = contourEdges(p, cx, cy)
@@ -36,8 +39,10 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
   // numéro gravé : les mêmes rectangles que ceux de la découpe (markPiece), posés sur la face avant
   const w = Math.max(...xs) - Math.min(...xs)
   const h = Math.max(...ys) - Math.min(...ys)
-  const rects = markPiece({ x: Math.min(...xs), y: Math.min(...ys), w, h, outer: p.outer, holes: p.holes ?? [] }, p.id)
-  if (rects.length) {
+  // les textes gravés en plus du nom (labels) sont aussi des obstacles pour le nom
+  const words = [...(p.labels ?? []).map((l) => digitRects(l.text, l.x, l.y, l.h)), ...(p.rules ?? []).map((r) => [ruleRect(r)])]
+  const rects = markPiece({ x: Math.min(...xs), y: Math.min(...ys), w, h, outer: p.outer, holes: [...(p.holes ?? []), ...words.flat()] }, p.id)
+  if (rects.length || words.length) {
     const markMat = new THREE.MeshBasicMaterial({ color: 0x2b1a0c, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
     const build = (list: [number, number][][], z: number) => {
       const parts = list.map((r) => new THREE.ShapeGeometry(path(new THREE.Shape(), r)))
@@ -49,7 +54,14 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
     // face arrière : le même nom au MÊME endroit (jamais un reflet de la planche, qui le poserait dans un trou), glyphes retournés autour du centre du nom pour se lire de ce côté
     const mx = rects.flat().map((q) => q[0])
     const flipX = Math.min(...mx) + Math.max(...mx)
-    g.add(build(rects, p.thickness / 2 + 0.02), build(rects.map((r) => r.map(([x, y]): [number, number] => [flipX - x, y])), -(p.thickness / 2 + 0.02)))
+    const front = p.thickness / 2 + 0.02
+    // chaque texte est retourné autour de son propre centre sur la face arrière
+    const flipped = (list: [number, number][][]) => {
+      const fx = Math.min(...list.flat().map((q) => q[0])) + Math.max(...list.flat().map((q) => q[0]))
+      return list.map((r) => r.map(([x, y]): [number, number] => [fx - x, y]))
+    }
+    if (rects.length) g.add(build(rects, front), build(rects.map((r) => r.map(([x, y]): [number, number] => [flipX - x, y])), -front))
+    for (const wd of words) g.add(build(wd, front), build(flipped(wd), -front))
   }
   g.position.set(...p.position)
   const [rx, ry, rz] = (p.rotation ?? [0, 0, 0]).map((d) => THREE.MathUtils.degToRad(d))
