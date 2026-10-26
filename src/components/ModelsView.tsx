@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MODELS, modelById } from '../models/registry'
 import { finishPanels, panelsToCutParts } from '../models/toCutParts'
-import { cleanParams, defaultParams, type ModelDef, type ModelResult, type ParamDef, type Params } from '../models/types'
+import { cleanParams, defaultParams, type ModelDef, type ModelResult, type Panel, type ParamDef, type Params } from '../models/types'
 import { Viewer3D } from '../models/viewer3d'
 import { Btn, Notice } from '../laser/ui'
 import type { ImportReport } from '../state/useProject'
@@ -24,10 +24,14 @@ const load = (): Saved => {
   return { model: MODELS[0]?.id ?? '', params: {} }
 }
 
-const build = (m: ModelDef, p: Params): { result: ModelResult | null; error: string } => {
+/** Planches pour la découpe (serrage des crans appliqué) et planches pour la vue 3D (cotes nominales : sans serrage, les languettes ne mordent pas dans les flancs, pas de traits qui se superposent). */
+type Built = ModelResult & { view: Panel[] }
+
+const build = (m: ModelDef, p: Params): { result: Built | null; error: string } => {
   try {
     const r = m.build(p)
-    return { result: { ...r, panels: finishPanels(r.panels) }, error: '' }
+    const panels = finishPanels(r.panels)
+    return { result: { ...r, panels, view: r.panels.map((q, i) => ({ ...q, id: panels[i].id })) }, error: '' }
   } catch (e) {
     return { result: null, error: e instanceof Error ? e.message : String(e) }
   }
@@ -115,7 +119,7 @@ export function ModelsView({ onReplace }: { onReplace: (files: { name: string; t
   const lastModel = useRef('')
   useEffect(() => {
     if (!viewer.current) return
-    viewer.current.setPanels(result?.panels ?? [], !(firstView.current || lastModel.current !== model?.id))
+    viewer.current.setPanels(result?.view ?? [], !(firstView.current || lastModel.current !== model?.id))
     firstView.current = false
     lastModel.current = model?.id ?? ''
     setSelected(-1)

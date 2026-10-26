@@ -4,7 +4,7 @@ import type { Panel } from './types'
 // Serrage des crans, repris à l'identique de testBrick (`CRENEL_SNUG` de beam.js).
 // Le trait du laser enlève 0,1 à 0,2 mm : avec un jeu de 0 les plaques glissaient sans tenir. Chaque cran de profondeur T (deux coins rentrants, ≥ 4 mm de large)
 // est donc resserré de 0,4 mm (0,2 de chaque côté), et chaque fenêtre de languette (rectangle de T de large, ≥ 4 mm de long) raccourcie de 0,4 mm : la dent entre en force.
-// Un cran qui touche le coin de la plaque, la profondeur et la largeur de T ne bougent pas. Les languettes (dents saillantes) gardent leur largeur.
+// Un cran qui touche le coin de la plaque, la profondeur et la largeur de T ne bougent pas. Les parois restent droites (aucun trait en biais). Les languettes (dents saillantes) gardent leur largeur.
 export const CRENEL_SNUG = -0.4
 export const SNUG_MIN = 4
 
@@ -37,11 +37,22 @@ const snugOuter = (pts: Pt[], T: number): Pt[] => {
     if (!near(d3[0], -d1[0]) || !near(d3[1], -d1[1]) || Math.abs(d1[0] * d2[0] + d1[1] * d2[1]) > 1e-6) continue
     if ((d1[0] * d2[1] - d1[1] * d2[0]) * area >= 0) continue // coins saillants : une dent, pas un cran
     const k = -CRENEL_SNUG / 2
-    out[(i + 1) % n] = [p1[0] + (d2[0] / l2) * k, p1[1] + (d2[1] / l2) * k]
-    out[(i + 2) % n] = [p2[0] - (d2[0] / l2) * k, p2[1] - (d2[1] / l2) * k]
+    const ux = (d2[0] / l2) * k
+    const uy = (d2[1] / l2) * k
+    out[(i + 1) % n] = [p1[0] + ux, p1[1] + uy]
+    out[(i + 2) % n] = [p2[0] - ux, p2[1] - uy]
+    // les parois du cran restent droites : leur bout sur le bord de la plaque suit, si ce bord est aligné avec le fond du cran
+    // (sinon, cran au coin de la plaque, le bout reste en place pour ne pas pencher le bord voisin)
+    const pm = pts[(i + n - 1) % n]
+    const p4 = pts[(i + 4) % n]
+    if (collinearDir(pm, p0, d2)) out[i] = [p0[0] + ux, p0[1] + uy]
+    if (collinearDir(p3, p4, d2)) out[(i + 3) % n] = [p3[0] - ux, p3[1] - uy]
   }
   return out
 }
+
+/** Le segment a → b est parallèle à d (même axe). */
+const collinearDir = (a: Pt, b: Pt, d: Pt) => Math.abs((b[0] - a[0]) * d[1] - (b[1] - a[1]) * d[0]) < 1e-6 && Math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-6
 
 const snugHole = (pts: Pt[], T: number): Pt[] => {
   if (pts.length !== 4) return pts

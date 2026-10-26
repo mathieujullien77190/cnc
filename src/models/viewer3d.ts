@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { categoryHex } from '../core/colors'
 import { markPiece } from '../core/marking'
+import { contourEdges } from './edges'
 import type { Panel } from './types'
 
 /** Planche → maillage extrudé, centré sur sa boîte englobante. Repère : voir `Panel`. */
@@ -20,8 +21,12 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
   for (const h of p.holes ?? []) shape.holes.push(path(new THREE.Path(), h))
   const geo = new THREE.ExtrudeGeometry(shape, { depth: p.thickness, bevelEnabled: false })
   geo.translate(0, 0, -p.thickness / 2)
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0 }))
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x3a2e1f }))
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }))
+  // arêtes tracées depuis les contours (voir edges.ts : jamais EdgesGeometry)
+  const lines = contourEdges(p, cx, cy)
+  const edgeGeo = new THREE.BufferGeometry()
+  edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3))
+  const edges = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: 0x3a2e1f }))
   const g = new THREE.Group()
   g.add(mesh, edges)
   // numéro gravé : les mêmes rectangles que ceux de la découpe (markPiece), posés sur la face avant

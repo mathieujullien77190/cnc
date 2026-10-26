@@ -239,6 +239,26 @@ try {
   check(card.cells.length === 36 && card.fits, `planche d'essai : ${card.cells.length} carrés dans la zone (${card.job.stats.lines} lignes, ${Math.round(card.job.stats.seconds)} s)`)
   check(new Set(card.cells.map((c) => `${c.speed}/${c.power}`)).size === 36, "planche d'essai : 36 couples vitesse / puissance distincts")
 
+  // traits résiduels : aucun contour cranté ne doit avoir de segment en biais, minuscule, doublon, point inutile ou croisement ; le nom gravé reste hors des fenêtres
+  const { panelIssues, markIssues } = await server.ssrLoadModule('/src/models/validate.ts')
+  const { markPiece } = await server.ssrLoadModule('/src/core/marking.ts')
+  const slanted = snugPanel({ id: 'X', thickness: 3, outer: plateOutline(100, 50, { right: { d: 3 }, left: { d: -3 } }), position: [0, 0, 0] })
+  check(panelIssues(slanted).length === 0, 'serrage : languettes et encoches gardent des parois droites (aucun trait en biais)')
+  check(panelIssues({ id: 'X', thickness: 3, outer: [[0, 0], [10, 0], [10, 0.2], [10.2, 0.3], [0, 10]], position: [0, 0, 0] }).some((i) => i.kind === 'biais'), 'contrôle : un segment en biais est repéré')
+
+  // vue 3D : arêtes depuis les contours, jamais EdgesGeometry (faux traits noirs entre fenêtres alignées)
+  const { readFileSync: e3_rf } = await import('node:fs')
+  check(!/EdgesGeometry/.test(e3_rf(new URL('../src/models/viewer3d.ts', import.meta.url), 'utf8').replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '')), 'vue 3D : pas de EdgesGeometry')
+  const { contourEdges } = await server.ssrLoadModule('/src/models/edges.ts')
+  const e3_sq = (x, y) => [[x, y], [x + 3, y], [x + 3, y + 3], [x, y + 3]]
+  const e3_eg = contourEdges({ id: 'X', thickness: 3, outer: [[0, 0], [100, 0], [100, 50], [0, 50]], holes: [e3_sq(10, 10), e3_sq(40, 10), e3_sq(70, 10)], position: [0, 0, 0] }, 50, 25)
+  const e3_segsN = e3_eg.length / 6
+  const e3_ringsN = 4 + 3 * 4
+  check(e3_segsN === e3_ringsN * 3, `arêtes 3D : ${e3_segsN} traits = 2 faces + 1 arête verticale par angle (aucun trait entre fenêtres)`)
+  const e3_linked = []
+  for (let i = 0; i < e3_eg.length; i += 6) if (Math.abs(e3_eg[i + 2] - e3_eg[i + 5]) < 1e-9) e3_linked.push(Math.hypot(e3_eg[i + 3] - e3_eg[i], e3_eg[i + 4] - e3_eg[i + 1]))
+  check(e3_linked.every((l) => [3, 50, 100].some((c) => Math.abs(l - c) < 1e-9)), 'arêtes 3D : chaque trait de face est un côté de contour')
+
   // modèles 3D : chaque modèle de la bibliothèque donne des planches valides, aux réglages par défaut et aux bornes
   const { MODELS } = await server.ssrLoadModule('/src/models/registry.ts')
   const { panelsToCutParts, finishPanels, numberPanels } = await server.ssrLoadModule('/src/models/toCutParts.ts')
@@ -260,6 +280,14 @@ try {
       const { file, warnings } = panelsToCutParts(res.panels, m.id)
       const back = parseCutParts(JSON.stringify(file))
       check(!warnings.length && !back.errors.length && back.parts.length === file.parts.length, `${m.id} (${label}) : ${res.panels.length} planches, ${file.parts.length} pièces, fichier cnc-parts valide (${[...warnings, ...back.errors].join(' | ')})`)
+      const fin = finishPanels(res.panels)
+      const issues = [...new Map(fin.map((q) => [q.id, q])).values()].flatMap((q) => {
+        const xs = q.outer.map((v) => v[0])
+        const ys = q.outer.map((v) => v[1])
+        const marks = markPiece({ x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys), outer: q.outer, holes: q.holes ?? [] }, q.id)
+        return [...panelIssues(q), ...markIssues(q, marks)]
+      })
+      check(!issues.length, `${m.id} (${label}) : aucun trait résiduel${issues.length ? ' : ' + issues.slice(0, 3).map((i) => `${i.panel} ${i.kind} ${i.where}`).join(' ; ') : ''}`)
       const holesInside = back.parts.every((pt) => pt.holes.every((h) => h.every((q) => q[0] > 0 && q[1] > 0 && q[0] < pt.w && q[1] < pt.h)))
       check(holesInside, `${m.id} (${label}) : les trous restent à l’intérieur du contour`)
       const laid = buildAutoSheets(back.parts, { width: 300, height: 300, margin: 5, gap: 1 })

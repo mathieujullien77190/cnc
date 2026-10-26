@@ -10,15 +10,15 @@ import { useProject, type ImportReport } from './state/useProject'
 type Tab = 'auto' | 'perso' | 'modeles'
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'modeles', label: 'Modèles 3D' },
   { id: 'auto', label: 'Planches automatiques' },
   { id: 'perso', label: 'Planches perso' },
-  { id: 'modeles', label: 'Modèles 3D' },
 ]
 
 export default function App() {
   const project = useProject()
   const { parts, settings, entries, importFiles, importTexts } = project
-  const [tab, setTab] = useState<Tab>('auto')
+  const [tab, setTab] = useState<Tab>('modeles')
   const [reports, setReports] = useState<ImportReport[]>([])
   const [over, setOver] = useState(false)
   const [lowered, setLowered] = useState(false)
