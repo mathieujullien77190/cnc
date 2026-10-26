@@ -1,4 +1,5 @@
-import { markPiece } from './marking'
+import { frameBox } from './job'
+import { digitRects, markPiece, markSize } from './marking'
 import { pack, type Box, type PackItem, type PackPlace } from './nesting'
 import type { CustomBoard, Part, Placed, Pt, Sheet, SheetSettings } from './types'
 
@@ -96,7 +97,9 @@ export const buildAutoSheets = (parts: Part[], s: SheetSettings): Sheet[] => {
       else out.push({ key: `auto-${t}-0`, label: `${t} mm · rien ne tient`, thickness: t, width: s.width, height: s.height, items: [], rejected: lost, custom: false, fill: 0 })
     }
   }
-  return out
+  // numéro de planche unique sur tout le travail, toutes épaisseurs confondues
+  let n = 0
+  return out.map((sh) => (sh.items.length ? { ...sh, mark: String(++n), label: `planche ${n} · ${sh.thickness} mm` } : sh))
 }
 
 /** Une planche personnalisée : les pièces demandées sur une seule planche ; celles déplacées à la main restent où elles sont. */
@@ -157,6 +160,35 @@ export const marksOf = (it: Placed): Pt[][] => {
     markCache.set(key, local)
   }
   return local.map((r) => r.map(([x, y]): Pt => [r3(x + it.x), r3(y + it.y)]))
+}
+
+/** Hauteur du numéro de planche gravé (mm). */
+const BOARD_MARK_H = 2.8
+
+/**
+ * Numéro de la planche (`sheet.mark`) en rectangles à graver, deux fois : en haut et en bas de la planche (à gauche, sinon à droite),
+ * hors des pièces et du cadre. Un emplacement sans place (marge trop petite) est sauté. [] s'il n'y a pas de numéro.
+ */
+export const boardMark = (sheet: Sheet): Pt[][] => {
+  if (!sheet.mark) return []
+  const h = BOARD_MARK_H
+  const { w } = markSize(sheet.mark, h)
+  const g = 0.8
+  const f = frameBox(sheet)
+  type Box = { x0: number; y0: number; x1: number; y1: number }
+  const hit = (a: Box, b: Box) => a.x0 < b.x1 + 0.5 && a.x1 > b.x0 - 0.5 && a.y0 < b.y1 + 0.5 && a.y1 > b.y0 - 0.5
+  const free = (x: number, y: number) => {
+    const box = { x0: x, y0: y, x1: x + w, y1: y + h }
+    if (box.x0 < 0 || box.y0 < 0 || box.x1 > sheet.width || box.y1 > sheet.height) return false
+    if (sheet.items.some((it) => hit(box, { x0: it.x, y0: it.y, x1: it.x + it.w, y1: it.y + it.h }))) return false
+    return !(f && hit(box, f))
+  }
+  const out: Pt[][] = []
+  for (const y of [g, sheet.height - h - g]) {
+    const x = [g, sheet.width - w - g].find((x) => free(x, y))
+    if (x !== undefined) out.push(...digitRects(sheet.mark, x, y, h, 2))
+  }
+  return out
 }
 
 const marksForCache = new WeakMap<Sheet, Map<string, Pt[][]>>()

@@ -1,5 +1,5 @@
 import { frameRect } from './job'
-import { marksFor } from './sheets'
+import { boardMark, marksFor } from './sheets'
 import type { Marking, Pt, Sheet } from './types'
 
 const f = (v: number) => Math.round(v * 1000) / 1000
@@ -25,7 +25,7 @@ export const sheetSvg = (sheet: Sheet, { marking, preview = false, bad = new Set
     })
     .join('\n')
   const frame = marking.frame ? frameRect(sheet) : null
-  const marks = [...(frame ? [frame] : []), ...(marking.names ? [...marksFor(sheet).values()].flat() : [])].map((r) => `<path d="${path(r)}"/>`).join('')
+  const marks = [...(frame ? [frame] : []), ...(marking.names ? [...boardMark(sheet), ...[...marksFor(sheet).values()].flat()] : [])].map((r) => `<path d="${path(r)}"/>`).join('')
   const labels = preview
     ? sheet.items
         .map((it) => {

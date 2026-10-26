@@ -11,7 +11,7 @@ const check = (ok, msg) => {
 
 try {
   const { parseCutParts } = await server.ssrLoadModule('/src/core/format.ts')
-  const { buildAutoSheets, buildCustomSheet, conflicts, marksOf, marksFor } = await server.ssrLoadModule('/src/core/sheets.ts')
+  const { buildAutoSheets, buildCustomSheet, conflicts, marksOf, marksFor, boardMark } = await server.ssrLoadModule('/src/core/sheets.ts')
   const { sheetToJob, sheetGcode, travelOf } = await server.ssrLoadModule('/src/core/job.ts')
   const { sheetSvg } = await server.ssrLoadModule('/src/core/svg.ts')
 
@@ -48,7 +48,7 @@ try {
   const onlyNames = sheetToJob(sheet, { names: true, frame: false })
   check(!none.layers.engrave, 'sans case cochée : aucune gravure')
   check(onlyFrame.layers.engrave?.length === 1, 'contour seul : 1 tracé gravé')
-  check((onlyNames.layers.engrave?.length ?? 0) > 0 && onlyNames.layers.engrave.length === [...marksFor(sheet).values()].reduce((s, m) => s + m.length, 0), 'noms seuls : un rectangle par trait')
+  check((onlyNames.layers.engrave?.length ?? 0) > 0 && onlyNames.layers.engrave.length === boardMark(sheet).length + [...marksFor(sheet).values()].reduce((s, m) => s + m.length, 0), 'noms seuls : un rectangle par trait')
   check(both.layers.engrave.length === onlyFrame.layers.engrave.length + onlyNames.layers.engrave.length, 'les deux cases : contour + noms')
   check(both.layers.cut.length === none.layers.cut.length && both.layers.cut.length > 0, 'la coupe ne dépend pas des cases')
 
@@ -191,6 +191,47 @@ try {
   check(Math.abs(sg.cutMm - sn.cutMm) < 1e-6, `distance de coupe identique avec ou sans gravure (${sg.cutMm.toFixed(0)} mm)`)
   check(Math.abs(sg.cutSeconds + sg.engraveSeconds + sg.rapidSeconds - sg.seconds) < 0.01 * sg.seconds + 0.5, `temps : ${sg.cutSeconds.toFixed(0)} + ${sg.engraveSeconds.toFixed(0)} + ${sg.rapidSeconds.toFixed(0)} ≈ ${sg.seconds.toFixed(0)} s`)
   check(sg.rapidMm > 0 && sg.lines > 0 && sg.contours > 0, `${sg.lines} lignes, ${sg.contours} contours, ${sg.rapidMm.toFixed(0)} mm à vide`)
+
+  // numéro de planche : unique, gravé en haut et en bas, hors des pièces
+  const nums = sheets.filter((sh) => sh.items.length).map((sh) => sh.mark)
+  check(nums.length > 1 && new Set(nums).size === nums.length && nums.join() === nums.map((_, i) => i + 1).join(), `planches numérotées ${nums.join(' ')}`)
+  for (const sh of sheets.filter((x) => x.items.length)) {
+    const bm = boardMark(sh)
+    const ys = bm.map((r) => r[0][1])
+    check(bm.length > 0 && Math.min(...ys) < sh.height / 2 && Math.max(...ys) > sh.height / 2, `${sh.label} : numéro gravé en haut et en bas`)
+    check(bm.every((r) => r.every(([x, y]) => x >= 0 && y >= 0 && x <= sh.width && y <= sh.height)), `${sh.label} : numéro dans la planche`)
+  }
+  const eng = sheetToJob(sheets[0], { names: true, frame: false }).layers.engrave.length
+  const engNone = sheetToJob(sheets[0], { names: false, frame: false }).layers.engrave
+  check(eng >= boardMark(sheets[0]).length && !engNone, 'numéro gravé avec la case « noms », absent sans')
+
+  // modèles 3D : chaque modèle de la bibliothèque donne des planches valides, aux réglages par défaut et aux bornes
+  const { MODELS } = await server.ssrLoadModule('/src/models/registry.ts')
+  const { panelsToCutParts, numberPanels } = await server.ssrLoadModule('/src/models/toCutParts.ts')
+  const { defaultParams } = await server.ssrLoadModule('/src/models/types.ts')
+  check(MODELS.length >= 1 && new Set(MODELS.map((m) => m.id)).size === MODELS.length, `${MODELS.length} modèles, ids uniques`)
+  for (const m of MODELS) {
+    const lo = Object.fromEntries(m.params.map((d) => [d.key, d.type === 'number' ? d.min : d.default]))
+    const hi = Object.fromEntries(m.params.map((d) => [d.key, d.type === 'number' ? d.max : d.default]))
+    for (const [label, p] of [['défaut', defaultParams(m)], ['minimum', lo], ['maximum', hi]]) {
+      let res
+      try {
+        res = m.build(p)
+        res = { ...res, panels: numberPanels(res.panels) }
+      } catch (e) {
+        check(false, `${m.id} (${label}) : plante : ${e.message}`)
+        continue
+      }
+      check(res.panels.every((q) => /^[A-Z]+-\d\d+$/.test(q.id)), `${m.id} (${label}) : toutes les planches numérotées (${[...new Set(res.panels.map((q) => q.id))].join(' ')})`)
+      const { file, warnings } = panelsToCutParts(res.panels, m.id)
+      const back = parseCutParts(JSON.stringify(file))
+      check(!warnings.length && !back.errors.length && back.parts.length === file.parts.length, `${m.id} (${label}) : ${res.panels.length} planches, ${file.parts.length} pièces, fichier cnc-parts valide (${[...warnings, ...back.errors].join(' | ')})`)
+      const holesInside = back.parts.every((pt) => pt.holes.every((h) => h.every((q) => q[0] > 0 && q[1] > 0 && q[0] < pt.w && q[1] < pt.h)))
+      check(holesInside, `${m.id} (${label}) : les trous restent à l’intérieur du contour`)
+      const laid = buildAutoSheets(back.parts, { width: 300, height: 300, margin: 5, gap: 1 })
+      check(laid.every((sh) => sh.rejected.length === 0), `${m.id} (${label}) : toutes les pièces tiennent sur du 300 × 300`)
+    }
+  }
 } finally {
   await server.close()
 }

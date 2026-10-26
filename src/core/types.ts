@@ -38,6 +38,8 @@ export interface Sheet {
   /** `auto-3-1`, `perso-ab12`… */
   key: string
   label: string
+  /** Numéro gravé dans un coin de la planche (« 3 », « P1 ») pour la reconnaître après la coupe. */
+  mark?: string
   thickness: number
   width: number
   height: number

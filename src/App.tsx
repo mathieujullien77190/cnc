@@ -1,15 +1,16 @@
 import { useCallback, useMemo, useState, type DragEvent } from 'react'
-import { AutoView, BoardsView, LaserDialog, LibraryPanel, PartsPanel, SettingsPanel } from './components'
+import { AutoView, BoardsView, LaserDialog, ModelsView, PartsPanel, SettingsPanel } from './components'
 import { laserItems } from './core/job'
 import { useLaserMachine } from './laser'
 import { Btn } from './laser/ui'
 import { useProject, type ImportReport } from './state/useProject'
 
-type Tab = 'auto' | 'perso'
+type Tab = 'auto' | 'perso' | 'modeles'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'auto', label: 'Planches automatiques' },
   { id: 'perso', label: 'Planches perso' },
+  { id: 'modeles', label: 'Modèles 3D' },
 ]
 
 export default function App() {
@@ -19,7 +20,6 @@ export default function App() {
   const [reports, setReports] = useState<ImportReport[]>([])
   const [over, setOver] = useState(false)
 
-  const known = useMemo(() => new Set(parts.map((p) => p.key)), [parts])
   const items = useMemo(() => laserItems(entries), [entries])
   const m = useLaserMachine(items, { W: settings.width, H: settings.height })
 
@@ -68,14 +68,17 @@ export default function App() {
         <Btn block={false} onClick={() => m.setOpen(true)}>Piloter la laser</Btn>
       </header>
 
-      <div className="grid flex-1 gap-4 p-4 lg:grid-cols-[20rem_1fr]">
+      <div className={`grid flex-1 gap-4 p-4 ${tab === 'modeles' ? '' : 'lg:grid-cols-[20rem_1fr]'}`}>
+        {tab !== 'modeles' && (
         <aside className="space-y-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto">
-          <LibraryPanel known={known} onAddParts={project.addParts} onRemovePart={project.removePart} onAdd={(files) => setReports(importTexts(files))} />
           <PartsPanel parts={parts} reports={reports} onFiles={(f) => void onFiles(f)} onQty={project.setQty} onRemove={project.removePart} onRemoveProject={project.removeProject} onClear={project.clearAll} />
           <SettingsPanel settings={settings} onChange={project.setSettings} />
         </aside>
+        )}
         <main className="min-w-0">
-          {tab === 'auto' ? <AutoView project={project} machine={m.settings} onLaser={sendToLaser} /> : <BoardsView project={project} machine={m.settings} onLaser={sendToLaser} />}
+          {tab === 'auto' && <AutoView project={project} machine={m.settings} onLaser={sendToLaser} />}
+          {tab === 'perso' && <BoardsView project={project} machine={m.settings} onLaser={sendToLaser} />}
+          {tab === 'modeles' && <ModelsView onReplace={project.replaceTexts} />}
         </main>
       </div>
 

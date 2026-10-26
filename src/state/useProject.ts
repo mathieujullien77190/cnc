@@ -86,6 +86,22 @@ export function useProject() {
   )
   const importFiles = useCallback(async (files: File[]) => importTexts(await Promise.all(files.map(async (f) => ({ name: f.name, text: await f.text() })))), [importTexts])
 
+  /** Remplace tout le catalogue par le contenu de ces fichiers : l'ancien catalogue, les quantités des planches perso et les cases « Fait » repartent à zéro (réglages et cases de gravure gardés). */
+  const replaceTexts = useCallback(
+    (files: { name: string; text: string }[]): ImportReport[] => {
+      const reports: ImportReport[] = []
+      const incoming: Part[] = []
+      for (const f of files) {
+        const r = parseCutParts(f.text)
+        reports.push({ file: f.name, added: r.parts.length, replaced: 0, errors: r.errors })
+        incoming.push(...r.parts)
+      }
+      update((s) => ({ ...s, parts: incoming, done: {}, boards: s.boards.map((b) => ({ ...b, qty: {}, overrides: {} })) }))
+      return reports
+    },
+    [update],
+  )
+
   /** Ajoute des pièces déjà lues (bibliothèque) ; une pièce connue garde sa quantité choisie. */
   const addParts = useCallback(
     (list: Part[]) =>
@@ -166,7 +182,7 @@ export function useProject() {
   }, [update])
 
   const autoSheets = useMemo(() => buildAutoSheets(parts, settings), [parts, settings])
-  const boardSheets = useMemo(() => boards.map((b) => buildCustomSheet(b, parts, settings.margin, settings.gap, !!settings.spread)), [boards, parts, settings.margin, settings.gap, settings.spread])
+  const boardSheets = useMemo(() => boards.map((b, i) => ({ ...buildCustomSheet(b, parts, settings.margin, settings.gap, !!settings.spread), mark: `P${i + 1}` })), [boards, parts, settings.margin, settings.gap, settings.spread])
   const entries = useMemo<SheetEntry[]>(
     () => [
       ...autoSheets.map((sheet) => ({ sheet, marking: autoMarking[sheet.key] ?? DEFAULT_MARKING })),
@@ -177,7 +193,7 @@ export function useProject() {
 
   return {
     parts, settings, boards, done, setDone, autoSheets, boardSheets, entries,
-    importFiles, importTexts, addParts, setQty, removePart, removeProject, clearAll, setSettings, setAutoMarking,
+    importFiles, importTexts, replaceTexts, addParts, setQty, removePart, removeProject, clearAll, setSettings, setAutoMarking,
     addBoard, updateBoard, removeBoard, setBoardQty, setOverride,
   }
 }

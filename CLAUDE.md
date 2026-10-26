@@ -25,6 +25,8 @@ node scripts/make-example.mjs   # régénère examples/exemple.cutparts.json
 | `src/core/svg.ts` | Export SVG (calque coupe rouge, calque gravure bleu) |
 | `src/state/useProject.ts` | État du projet (localStorage `cnc-projet-v1`) : catalogue, réglages, cases, planches perso |
 | `src/components/` | `PartsPanel`, `SettingsPanel`, `AutoView`, `BoardsView`, `SheetCard`, `SheetPreview` (glisser / R), `LaserDialog`… |
+| `src/models/` | Modèles 3D three.js : `library/*.model.ts` (un fichier = un modèle, `defineModel`), `registry.ts` (glob), `viewer3d.ts` (scène), `toCutParts.ts` (planches → `cnc-parts`). Voir `docs/MODELES.md` |
+| `src/components/ModelsView.tsx` | Onglet « Modèles 3D » : liste, réglages, vue, envoi à la découpe, API `window.cnc3d` |
 | `src/laser/` | Pilotage GRBL (connexion, déplacements, cadre à vide, envoi, webcam), copié de testBrick ; sans planche d'essai ni machine simulée |
 | `export/exportParts.js` | Module à copier dans un projet three.js pour produire le fichier |
 
@@ -37,3 +39,4 @@ node scripts/make-example.mjs   # régénère examples/exemple.cutparts.json
 - Gravure avant coupe, dans cet ordre : cadre (case « Mettre un contour »), puis noms (case « Mettre le nom des pièces »). La coupe ne dépend pas des cases.
 - Réglages de coupe (vitesse, puissance, passes) globaux, gardés par `useLaserMachine` ; pas encore de réglages par épaisseur.
 - Test visuel : l'utilisateur teste lui-même dans son navigateur.
+- Modèles 3D : un modèle décrit des planches 2D + position/rotation (pas de three.js dans le modèle) ; la vue et la découpe en sortent. Nouveau modèle = nouveau fichier dans `src/models/library`, et `npm run check` doit rester vert (bornes comprises).
