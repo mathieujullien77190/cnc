@@ -10,5 +10,5 @@ export const DEFAULT_MODEL_ID = 'nichoir'
 /** Délai avant d'écrire le projet dans localStorage (ms) : les rafales d'actions ne font qu'une écriture. */
 export const PERSIST_DELAY = 250
 
-export const DEFAULT_SETTINGS: SheetSettings = { width: 300, height: 300, margin: 5, gap: 1, spread: false }
+export const DEFAULT_SETTINGS: SheetSettings = { width: 300, height: 300, margin: 0, gap: 2, spread: false }
 export const DEFAULT_MARKING: Marking = { names: true, frame: true, drawings: true }
