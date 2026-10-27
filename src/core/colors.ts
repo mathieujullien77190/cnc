@@ -1,6 +1,10 @@
 // Couleur par famille de pièces, commune à la vue planche et à la vue 3D : une famille garde la même couleur partout.
 // Chaque famille reçoit la couleur suivante de la palette la première fois qu'une vue la demande.
 
+/** Traits gravés dans l'aperçu : les noms des pièces en bleu, les dessins du modèle (textes, traits, tableaux) en violet. */
+export const NAME_COLOR = '#2563eb'
+export const DRAWING_COLOR = '#9333ea'
+
 export const PALETTE = [0xd9b98a, 0xa9c4a0, 0x9fb4d6, 0xd6a5b8, 0xd8d08a, 0xb6a4d6]
 
 const order = new Map<string, number>()

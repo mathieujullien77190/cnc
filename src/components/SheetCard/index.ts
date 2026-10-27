@@ -1,1 +1,1 @@
-export * from './SheetCard'
+export { SheetCard as default } from './SheetCard'

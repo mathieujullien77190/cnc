@@ -1,6 +1,6 @@
 import { buildGcode, gcodeText, DEFAULT_MACHINE_SETTINGS, MACHINE_AREA, type GcodeJob, type LaserJob, type LaserItem, type MachineSettings } from '../laser'
 import { planRoute, type Before, type Group } from './route'
-import { marksFor } from './sheets'
+import { drawingsFor, marksFor } from './sheets'
 import type { Marking, Placed, Pt, Sheet } from './types'
 
 /** Débord du cadre autour des pièces (mm). */
@@ -52,12 +52,12 @@ const ROUTE_BUDGET_MS = 150
 const jobCache = new WeakMap<Sheet, Map<string, LaserJob>>()
 
 /**
- * Travail de découpe d'une planche. Gravure d'abord (matière intacte) : le cadre si `marking.frame`, puis les noms si `marking.names` ;
+ * Travail de découpe d'une planche. Gravure d'abord (matière intacte) : le cadre si `marking.frame`, puis les noms si `marking.names`, puis les dessins si `marking.drawings` ;
  * ensuite la coupe : une pièce n'est jamais coupée avant celles qui sont à l'intérieur de ses trous, trous avant le contour extérieur.
  * L'ordre des pièces et le point d'attaque de chaque contour sont choisis pour raccourcir les déplacements à vide (départ et retour en 0, 0).
  */
 export const sheetToJob = (sheet: Sheet, marking: Marking): LaserJob => {
-  const key = `${marking.names ? 1 : 0}${marking.frame ? 1 : 0}`
+  const key = `${marking.names ? 1 : 0}${marking.frame ? 1 : 0}${marking.drawings !== false ? 1 : 0}`
   const hit = jobCache.get(sheet)?.get(key)
   if (hit) return hit
   const job = buildJob(sheet, marking)
@@ -94,6 +94,18 @@ const buildJob = (sheet: Sheet, marking: Marking): LaserJob => {
     travel += r.travel
     baseline += r.baseline
     pos = r.end
+  }
+
+  if (marking.drawings !== false) {
+    const drawings = drawingsFor(sheet)
+    const groups: Group[] = sheet.items.flatMap((it) => ((drawings.get(it.uid)?.length ?? 0) ? [{ free: drawings.get(it.uid)!.map(flip) }] : []))
+    if (groups.length) {
+      const r = planRoute(groups, [], pos, { budgetMs: ROUTE_BUDGET_MS })
+      engrave.push(...r.steps.flatMap((st) => st.contours))
+      travel += r.travel
+      baseline += r.baseline
+      pos = r.end
+    }
   }
 
   // coupe : l'ordre garantit que les pièces d'un trou sont coupées avant la pièce qui l'entoure
@@ -140,10 +152,14 @@ export const laserItems = (sheets: { sheet: Sheet; marking: Marking }[]): LaserI
     .filter((s) => s.sheet.items.length)
     .map(({ sheet, marking }) => {
       const item = { label: sheet.label, fileName: sheet.key, notice: NOTICE } as LaserItem
-      Object.defineProperty(item, 'job', { enumerable: true, get: () => sheetToJob(sheet, marking) })
+      // calculé une seule fois, et seulement quand on le lit. Propriétés non énumérables : en développement, React lit toutes les propriétés
+      // des props pour afficher leurs différences, ce qui lançait le calcul du parcours à chaque rendu (plus d'une seconde par clic).
+      let job: ReturnType<typeof sheetToJob> | undefined
+      const jobOf = () => (job ??= sheetToJob(sheet, marking))
+      Object.defineProperty(item, 'job', { enumerable: false, get: jobOf })
       Object.defineProperty(item, 'extra', {
-        enumerable: true,
-        get: () => ({ pieces: sheet.items.length, sheetMm: { w: sheet.width, h: sheet.height }, fill: sheet.fill, travel: travelOf(sheetToJob(sheet, marking)) }),
+        enumerable: false,
+        get: () => ({ pieces: sheet.items.length, sheetMm: { w: sheet.width, h: sheet.height }, fill: sheet.fill, travel: travelOf(jobOf()) }),
       })
       return item
     })

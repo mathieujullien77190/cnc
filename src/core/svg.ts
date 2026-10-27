@@ -1,6 +1,6 @@
-import { categoryCss } from './colors'
+import { categoryCss, DRAWING_COLOR } from './colors'
 import { frameRect } from './job'
-import { marksFor } from './sheets'
+import { drawingsFor, marksFor } from './sheets'
 import type { Marking, Pt, Sheet } from './types'
 
 const f = (v: number) => Math.round(v * 1000) / 1000
@@ -24,12 +24,14 @@ export const sheetSvg = (sheet: Sheet, { marking, preview = false, bad = new Set
     .join('\n')
   const frame = marking.frame ? frameRect(sheet) : null
   const marks = [...(frame ? [frame] : []), ...(marking.names ? [...[...marksFor(sheet).values()].flat()] : [])].map((r) => `<path d="${path(r)}"/>`).join('')
+  const drawings = (marking.drawings !== false ? [...drawingsFor(sheet).values()].flat() : []).map((r) => `<path d="${path(r)}"/>`).join('')
   return `<svg xmlns="http://www.w3.org/2000/svg"${size} viewBox="0 0 ${W} ${H}">${preview ? '<defs><pattern id="hachure-conflit" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="3" fill="#fde2e2"/><line x1="0" y1="0" x2="0" y2="3" stroke="#dc2626" stroke-width="1.2"/></pattern></defs>' : ''}
 <rect id="planche" x="0" y="0" width="${W}" height="${H}" fill="${preview ? '#f7f0e2' : 'none'}" stroke="#888888" stroke-width="${preview ? 0.8 : 0.1}"/>
 <g id="coupe" fill="none" stroke="#ff0000" stroke-width="${preview ? 0.6 : 0.1}" stroke-linejoin="round">
 ${cutPaths}
 </g>
 <g id="gravure" fill="none" stroke="#0000ff" stroke-width="${preview ? 0.4 : 0.1}">${marks}</g>
+<g id="dessins" fill="none" stroke="${DRAWING_COLOR}" stroke-width="${preview ? 0.4 : 0.1}">${drawings}</g>
 </svg>
 `
 }

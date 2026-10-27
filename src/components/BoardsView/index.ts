@@ -1,1 +1,1 @@
-export * from './BoardsView'
+export { BoardsView as default } from './BoardsView'

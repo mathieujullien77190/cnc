@@ -1,12 +1,22 @@
-import type { Sheet } from '../../core/types'
-import type { MachineSettings } from '../../laser'
-import type { Project } from '../../state/useProject'
-import { DEFAULT_MARKING } from '../../state/useProject'
-import { SheetCard } from '../SheetCard'
+import { useEffect } from 'react'
+import type { Sheet } from '@/core/types'
+import { boardFromSheet } from '@/core/sheets'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { uiActions } from '@/store/uiSlice'
+import { DEFAULT_MARKING } from '@/constants'
+import SheetCard from '@/components/SheetCard'
+import type { AutoViewProps } from './types'
 
 /** Planches automatiques : toutes les pièces importées, rangées par épaisseur. */
-export function AutoView({ project, machine, onLaser }: { project: Project; machine: MachineSettings; onLaser: (key: string) => void }) {
-  const { autoSheets, entries, setAutoMarking, done, setDone } = project
+export const AutoView = ({ project, onLaser }: AutoViewProps) => {
+  const { autoSheets, entries, setAutoMarking, done, setDone, boards, addBoard, updateBoard } = project
+  const dispatch = useAppDispatch()
+  // pièce cliquée dans la liste : on affiche la planche qui la porte (défilement + cadre vert + pièce surlignée)
+  const focus = useAppSelector((s) => s.ui.focusedPart)
+  const focusedSheet = focus ? autoSheets.find((s) => s.items.some((i) => i.part.key === focus.key)) : undefined
+  useEffect(() => {
+    if (focusedSheet) document.getElementById(`sheet-${focusedSheet.key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [focus?.n]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!autoSheets.length) {
     return (
       <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-8 text-center text-sm text-stone-500">
@@ -16,6 +26,13 @@ export function AutoView({ project, machine, onLaser }: { project: Project; mach
   }
   const thicknesses = [...new Set(autoSheets.map((s) => s.thickness))]
   const markingOf = (s: Sheet) => entries.find((e) => e.sheet.key === s.key)?.marking ?? DEFAULT_MARKING
+  // « Modifier la planche » : la planche remplace la planche perso (la seule qui existe), puis on passe dans l'onglet perso
+  const edit = (s: Sheet) => {
+    const id = boards[0]?.id ?? addBoard(s.thickness)
+    updateBoard(id, boardFromSheet(s, markingOf(s)))
+    dispatch(uiActions.selectedPieceSet(null))
+    dispatch(uiActions.tabSet('perso'))
+  }
   return (
     <div className="space-y-6">
       {thicknesses.map((t) => {
@@ -27,7 +44,7 @@ export function AutoView({ project, machine, onLaser }: { project: Project; mach
             </h2>
             <div className="grid gap-3 xl:grid-cols-2">
               {list.map((s) => (
-                <SheetCard key={s.key} sheet={s} marking={markingOf(s)} onMarking={(patch) => setAutoMarking(s.key, patch)} machine={machine} onLaser={() => onLaser(s.key)} done={!!done[s.key]} onDone={(v) => setDone(s.key, v)} />
+                <SheetCard key={s.key} sheet={s} marking={markingOf(s)} onMarking={(patch) => setAutoMarking(s.key, patch)} onLaser={() => onLaser(s.key)} done={!!done[s.key]} onDone={(v) => setDone(s.key, v)} onEdit={() => edit(s)} highlight={focusedSheet?.key === s.key ? focus?.key : null} focused={focusedSheet?.key === s.key} />
               ))}
             </div>
           </section>

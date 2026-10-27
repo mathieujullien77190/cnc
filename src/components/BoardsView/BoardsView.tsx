@@ -1,24 +1,28 @@
-import { useEffect, useMemo, useState } from 'react'
-import { angleOf, conflicts, turnTo } from '../../core/sheets'
-import type { MachineSettings } from '../../laser'
-import { Btn, Notice } from '../../laser/ui'
-import type { Override } from '../../core/types'
-import type { Project } from '../../state/useProject'
-import { MarkingToggles } from '../MarkingToggles'
-import { DoneToggle, SheetActions, rejectedText } from '../SheetCard'
-import { SheetStats } from '../SheetStats'
-import { SheetPreview } from '../SheetPreview'
-import { SizePicker } from '../SizePicker'
-
-const mm = (v: number) => Math.round(v * 10) / 10
+import { useEffect, useMemo } from 'react'
+import { conflicts } from '@/core/sheets'
+import type { Override } from '@/core/types'
+import DoneToggle from '@/components/DoneToggle'
+import MarkingToggles from '@/components/MarkingToggles'
+import SheetActions from '@/components/SheetActions'
+import SheetPreview from '@/components/SheetPreview'
+import SizePicker from '@/components/SizePicker'
+import { rejectedText } from '@/helpers'
+import { Btn, Notice } from '@/laser/ui'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { uiActions } from '@/store/uiSlice'
+import PartQuantities from './PartQuantities'
+import PieceControls from './PieceControls'
+import type { BoardsViewProps } from './types'
 
 /**
  * Planche perso : une seule planche, créée toute seule, pour tester deux ou trois pièces avant la vraie découpe. On dit quelles pièces
  * (et combien), l'app les range ; on peut ensuite les déplacer à la main (glisser) ou les tourner (R).
  */
-export function BoardsView({ project, machine, onLaser }: { project: Project; machine: MachineSettings; onLaser: (key: string) => void }) {
+export const BoardsView = ({ project, onLaser }: BoardsViewProps) => {
   const { parts, boards, boardSheets, addBoard, updateBoard, setBoardQty, setOverride, done, setDone } = project
-  const [selected, setSelected] = useState<string | null>(null)
+  const dispatch = useAppDispatch()
+  const selected = useAppSelector((s) => s.ui.selectedPiece)
+  const setSelected = (uid: string | null) => dispatch(uiActions.selectedPieceSet(uid))
   const thicknesses = [...new Set(parts.map((p) => p.thickness))].sort((a, b) => a - b)
   const board = boards[0]
   const sheet = boardSheets[0]
@@ -63,26 +67,7 @@ export function BoardsView({ project, machine, onLaser }: { project: Project; ma
           </div>
 
           <div className="grid gap-3 xl:grid-cols-[18rem_1fr]">
-            <section className="rounded-lg border border-stone-200 bg-white p-3">
-              <h3 className="mb-2 text-xs font-semibold text-stone-700">Pièces à découper ({board.thickness} mm)</h3>
-              <ul className="space-y-1">
-                {choices.map((p) => {
-                  const n = board.qty[p.key] ?? 0
-                  return (
-                    <li key={p.key} className="flex items-center gap-2 text-xs">
-                      <span className="min-w-0 flex-1">
-                        <span className="font-semibold text-stone-800">{p.id}</span>
-                        <span className="ml-1.5 text-[11px] text-stone-500">{mm(p.w)} × {mm(p.h)}</span>
-                      </span>
-                      <button className="h-6 w-6 rounded border border-stone-300 bg-white leading-none hover:bg-stone-100 disabled:opacity-40" disabled={!n} onClick={() => setBoardQty(board.id, p.key, n - 1)} aria-label={`Une ${p.id} de moins`}>−</button>
-                      <span className="w-6 text-center tabular-nums">{n}</span>
-                      <button className="h-6 w-6 rounded border border-stone-300 bg-white leading-none hover:bg-stone-100" onClick={() => setBoardQty(board.id, p.key, n + 1)} aria-label={`Une ${p.id} de plus`}>+</button>
-                    </li>
-                  )
-                })}
-                {!choices.length && <li className="text-[11px] text-stone-500">Aucune pièce de {board.thickness} mm.</li>}
-              </ul>
-            </section>
+            <PartQuantities thickness={board.thickness} choices={choices} qty={board.qty} onQty={(key, n) => setBoardQty(board.id, key, n)} />
 
             <section className={`min-w-0 space-y-2.5 rounded-lg border p-3 transition-colors ${done[sheet.key] ? 'border-emerald-300 bg-emerald-50' : 'border-stone-200 bg-white'}`}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -98,32 +83,16 @@ export function BoardsView({ project, machine, onLaser }: { project: Project; ma
               <p className="text-[11px] text-stone-500">Glisse une pièce pour la placer, <kbd className="rounded border border-stone-300 px-1">R</kbd> pour la tourner.</p>
               {sheet.rejected.length > 0 && <Notice kind="warn">Ne tient pas sur la planche : {rejectedText(sheet)}.</Notice>}
               {bad.size > 0 && <Notice kind="error">{bad.size} pièce(s) se chevauchent ou sortent de la planche (hachurées en rouge).</Notice>}
-              <div className="flex flex-wrap items-center gap-2">
-                {sel && (
-                  <>
-                    <span className="text-xs font-semibold text-stone-700">{sel.part.id}</span>
-                    <Btn block={false} disabled={sel.part.rotate === 'none'} onClick={() => pin(sel.uid, turnTo(sel, angleOf(sel) + 90))}>↻ +90°</Btn>
-                    <label className="flex items-center gap-1 text-[11px] text-stone-600">
-                      Angle
-                      <input
-                        type="number"
-                        step={1}
-                        disabled={sel.part.rotate === 'none'}
-                        value={Math.round(angleOf(sel) * 100) / 100}
-                        onChange={(e) => Number.isFinite(e.target.valueAsNumber) && pin(sel.uid, turnTo(sel, e.target.valueAsNumber))}
-                        className="w-16 rounded border border-stone-300 bg-white px-1.5 py-1 text-xs text-stone-800"
-                      />
-                      °
-                    </label>
-                    <Btn block={false} disabled={!board.overrides[sel.uid]} onClick={() => setOverride(board.id, sel.uid, null)}>Replacer auto</Btn>
-                  </>
-                )}
-                <Btn block={false} variant="ghost" disabled={!Object.keys(board.overrides).length} onClick={() => updateBoard(board.id, { overrides: {} })}>Tout replacer auto</Btn>
-              </div>
+              <PieceControls
+                sel={sel}
+                overrides={board.overrides}
+                onPin={pin}
+                onReset={(uid) => setOverride(board.id, uid, null)}
+                onResetAll={() => updateBoard(board.id, { overrides: {} })}
+              />
               <MarkingToggles value={board.marking} onChange={(patch) => updateBoard(board.id, { marking: { ...board.marking, ...patch } })} />
-              <SheetStats sheet={sheet} marking={board.marking} machine={machine} />
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <SheetActions sheet={sheet} marking={board.marking} machine={machine} onLaser={() => onLaser(sheet.key)} />
+                <SheetActions sheet={sheet} marking={board.marking} onLaser={() => onLaser(sheet.key)} />
                 <DoneToggle done={!!done[sheet.key]} onChange={(v) => setDone(sheet.key, v)} />
               </div>
             </section>

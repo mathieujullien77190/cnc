@@ -1,7 +1,8 @@
+import { familyOf } from './family'
 import { frameBox } from './job'
 import { markPiece } from './marking'
 import { pack, type Box, type PackItem, type PackPlace } from './nesting'
-import type { CustomBoard, Override, Part, Placed, Pt, Sheet, SheetSettings } from './types'
+import type { CustomBoard, Marking, Override, Part, Placed, Pt, Sheet, SheetSettings } from './types'
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000
 
@@ -114,29 +115,52 @@ const fillOf = (items: Placed[], w: number, h: number) => items.reduce((s, it) =
 const numbered = (rows: { inst: Instance; x: number; y: number; rot: boolean; angle?: number }[]) =>
   rows.sort((a, b) => a.y - b.y || a.x - b.x).map((r, i) => placePart(r.inst, r.x, r.y, r.rot, i + 1, r.angle))
 
-/** Planches automatiques : une série par épaisseur, jamais deux épaisseurs sur la même planche. */
+/** Planches automatiques : une série par épaisseur (et par famille de pièces avec `byType`), jamais deux épaisseurs sur la même planche. */
 export const buildAutoSheets = (parts: Part[], s: SheetSettings): Sheet[] => {
   const W = s.width - 2 * s.margin
   const H = s.height - 2 * s.margin
   const out: Sheet[] = []
+  const families = new Map<string, string>() // clé de planche -> famille (avec `byType`)
   const thicknesses = [...new Set(parts.filter((p) => p.qty > 0).map((p) => p.thickness))].sort((a, b) => a - b)
   for (const t of thicknesses) {
-    const insts = instancesOf(parts.filter((p) => p.thickness === t), (p) => p.qty)
-    const { bins, rejected } = packSpread(insts, W, H, s.gap, !!s.spread, { multi: true })
-    bins.forEach((bin, bi) => {
-      const items = numbered(bin.map((pl) => ({ inst: insts[pl.idx], x: pl.x + s.margin, y: pl.y + s.margin, rot: pl.rot })))
-      out.push({ key: `auto-${t}-${bi + 1}`, label: `${t} mm · planche ${bi + 1}`, thickness: t, width: s.width, height: s.height, items, rejected: [], custom: false, fill: fillOf(items, s.width, s.height) })
-    })
-    if (rejected.length) {
-      const last = [...out].reverse().find((sh) => sh.thickness === t)
-      const lost = rejected.map((r) => insts[r.idx].part)
-      if (last) last.rejected = lost
-      else out.push({ key: `auto-${t}-0`, label: `${t} mm · rien ne tient`, thickness: t, width: s.width, height: s.height, items: [], rejected: lost, custom: false, fill: 0 })
+    const all = instancesOf(parts.filter((p) => p.thickness === t), (p) => p.qty)
+    // sans `byType` tout est rangé ensemble ; avec, chaque famille a ses propres planches
+    const groups = s.byType ? [...new Set(all.map((i) => familyOf(i.part.id)))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true })).map((family) => ({ family, insts: all.filter((i) => familyOf(i.part.id) === family) })) : [{ family: '', insts: all }]
+    for (const { family, insts } of groups) {
+      const stem = family ? `auto-${t}-${family}` : `auto-${t}`
+      const { bins, rejected } = packSpread(insts, W, H, s.gap, !!s.spread, { multi: true })
+      bins.forEach((bin, bi) => {
+        const items = numbered(bin.map((pl) => ({ inst: insts[pl.idx], x: pl.x + s.margin, y: pl.y + s.margin, rot: pl.rot })))
+        const key = `${stem}-${bi + 1}`
+        families.set(key, family)
+        out.push({ key, label: `${t} mm · planche ${bi + 1}`, thickness: t, width: s.width, height: s.height, items, rejected: [], custom: false, fill: fillOf(items, s.width, s.height) })
+      })
+      if (rejected.length) {
+        const last = [...out].reverse().find((sh) => sh.thickness === t && families.get(sh.key) === family)
+        const lost = rejected.map((r) => insts[r.idx].part)
+        if (last) last.rejected = lost
+        else {
+          families.set(`${stem}-0`, family)
+          out.push({ key: `${stem}-0`, label: `${t} mm · rien ne tient`, thickness: t, width: s.width, height: s.height, items: [], rejected: lost, custom: false, fill: 0 })
+        }
+      }
     }
   }
   // numéro de planche unique sur tout le travail, toutes épaisseurs confondues
   let n = 0
-  return out.map((sh) => (sh.items.length ? { ...sh, mark: String(++n), label: `planche ${n} · ${sh.thickness} mm` } : sh))
+  return out.map((sh) => (sh.items.length ? { ...sh, mark: String(++n), label: `planche ${n}${families.get(sh.key) ? ` · ${families.get(sh.key)}` : ''} · ${sh.thickness} mm` } : sh))
+}
+
+/** Une planche (automatique) reprise telle quelle comme planche perso : mêmes pièces, chacune à sa place. */
+export const boardFromSheet = (sheet: Sheet, marking: Marking): Pick<CustomBoard, 'name' | 'thickness' | 'width' | 'height' | 'qty' | 'overrides' | 'marking'> => {
+  const qty: Record<string, number> = {}
+  const overrides: Record<string, Override> = {}
+  for (const it of sheet.items) {
+    // les exemplaires d'une planche perso sont numérotés 1, 2, 3… par pièce, quelle que soit leur numérotation d'origine
+    const n = (qty[it.part.key] = (qty[it.part.key] ?? 0) + 1)
+    overrides[`${it.part.key}#${n}`] = { x: it.x, y: it.y, rot: it.rot, angle: it.angle }
+  }
+  return { name: sheet.label, thickness: sheet.thickness, width: sheet.width, height: sheet.height, qty, overrides, marking: { ...marking } }
 }
 
 /** Une planche personnalisée : les pièces demandées sur une seule planche ; celles déplacées à la main restent où elles sont. */
@@ -230,7 +254,7 @@ export const conflicts = (sheet: Sheet): Set<string> => {
 
 const markCache = new Map<string, Pt[][]>()
 
-/** Rectangles gravés du nom d'une pièce posée. Calculés une fois par pièce et orientation (dans le repère de la pièce), puis déplacés. */
+/** Rectangles gravés du NOM d'une pièce posée (les dessins sont à part : `drawingsOf`). Calculés une fois par pièce et orientation (dans le repère de la pièce), puis déplacés. */
 export const marksOf = (it: Placed): Pt[][] => {
   const key = `${it.part.key}|${it.rot ? 1 : 0}${it.angle ?? ''}|${it.part.id}|${it.part.w}x${it.part.h}|${it.part.outer.length}.${it.part.holes.length}`
   let local = markCache.get(key)
@@ -241,8 +265,14 @@ export const marksOf = (it: Placed): Pt[][] => {
     markCache.set(key, local)
   }
   const placed = local.map((r) => r.map(([x, y]): Pt => [r3(x + it.x), r3(y + it.y)]))
-  return it.labels?.length ? [...placed, ...it.labels] : placed
+  return placed
 }
+
+/** Dessins gravés d'une pièce posée (textes, traits, tableaux du modèle) : à part des noms, avec leur propre case et leur propre couleur. */
+export const drawingsOf = (it: Placed): Pt[][] => it.labels ?? []
+
+/** Dessins gravés de toutes les pièces d'une planche, par exemplaire. */
+export const drawingsFor = (sheet: Sheet): Map<string, Pt[][]> => new Map(sheet.items.filter((it) => it.labels?.length).map((it) => [it.uid, drawingsOf(it)]))
 
 const marksForCache = new WeakMap<Sheet, Map<string, Pt[][]>>()
 

@@ -50,7 +50,7 @@ Pas besoin d'importer three.js : le modèle décrit des **planches** (`Panel`, `
 
 ## Envoyer à la découpe
 
-Bouton « Ajouter à la découpe (remplace tout) » : les pièces du modèle **remplacent tout le catalogue** de l'app (anciennes pièces, quantités des planches perso et cases « Fait » repartent à zéro ; réglages de planche et cases de gravure gardés). Le bouton « .cutparts.json » télécharge le même fichier, pour le garder ou le réimporter.
+Choisir un modèle (ou changer l'un de ses réglages) envoie ses pièces à la découpe toute seule : elles **remplacent tout le catalogue** de l'app (anciennes pièces, quantités des planches perso et cases « Fait » repartent à zéro ; réglages de planche et cases de gravure gardés). Le bouton « .cutparts.json » télécharge le même fichier, pour le garder ou le réimporter.
 
 ## Piloter depuis le navigateur (IA)
 

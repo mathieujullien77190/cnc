@@ -313,6 +313,146 @@ try {
       check(laid.every((sh) => sh.rejected.length === 0), `${m.id} (${label}) : toutes les pièces tiennent sur du 300 × 300`)
     }
   }
+  // --- store Redux : reducers purs, planches calculées, format de sauvegarde, persistance ---
+  const mem = new Map()
+  let writes = 0
+  let failWrites = false
+  const fakeStorage = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => {
+      if (failWrites) throw new Error('plein')
+      writes++
+      mem.set(k, v)
+    },
+  }
+  Object.defineProperty(globalThis, 'localStorage', { value: fakeStorage, configurable: true, writable: true })
+  const { createAppStore, store: appStore } = await server.ssrLoadModule('/src/store/index.ts')
+  const { projectActions, emptyProject, loadProject, serializeProject } = await server.ssrLoadModule('/src/store/projectSlice.ts')
+  const { modelsActions, loadModels, serializeModels } = await server.ssrLoadModule('/src/store/modelsSlice.ts')
+  const { uiActions } = await server.ssrLoadModule('/src/store/uiSlice.ts')
+  const sel = await server.ssrLoadModule('/src/store/selectors.ts')
+  const { importTexts, replaceTexts } = await server.ssrLoadModule('/src/store/thunks.ts')
+  const { persistStore } = await server.ssrLoadModule('/src/store/persist.ts')
+  check(appStore.getState().project.parts.length === 0, 'store : le singleton se crée hors navigateur (projet vide)')
+
+  const st = createAppStore()
+  const rep = st.dispatch(importTexts([{ name: 'exemple.cutparts.json', text }]))
+  check(rep[0].added === parts.length && rep[0].replaced === 0 && st.getState().project.parts.length === parts.length, 'store : import des pièces, bilan « ajoutées »')
+  const rep2 = st.dispatch(importTexts([{ name: 'exemple.cutparts.json', text }]))
+  check(rep2[0].added === 0 && rep2[0].replaced === parts.length, 'store : réimport = pièces remplacées, pas doublées')
+
+  const k0 = parts[0].key
+  const before = st.getState().project.parts
+  st.dispatch(projectActions.qtySet({ key: k0, qty: 7.4 }))
+  const after = st.getState().project.parts
+  check(after.find((p) => p.key === k0).qty === 7 && after.length === before.length, 'store : quantité d’une pièce changée (arrondie)')
+  check(after.filter((p) => p.key !== k0).every((p) => before.find((q) => q.key === p.key) === p), 'store : les autres pièces gardent leur référence (pas de re-rendu global)')
+  st.dispatch(projectActions.qtySet({ key: k0, qty: -3 }))
+  check(st.getState().project.parts.find((p) => p.key === k0).qty === 0, 'store : quantité jamais négative')
+  st.dispatch(projectActions.qtySet({ key: k0, qty: parts[0].qty }))
+
+  // planche perso : exemplaires en trop, déplacement puis retrait de la pièce
+  const bAct = projectActions.boardAdded(3)
+  st.dispatch(bAct)
+  const bid = bAct.payload.id
+  const B = () => st.getState().project.boards.find((b) => b.id === bid)
+  check(B().width === 300 && B().marking.names && B().marking.frame, 'store : planche perso créée aux dimensions du projet')
+  st.dispatch(projectActions.boardQtySet({ id: bid, key: k0, qty: 3 }))
+  const uids = sel.selectBoardSheets(st.getState())[0].items.map((i) => i.uid)
+  check(uids.length === 3 && uids.every((u) => u.startsWith(`${k0}#`)), 'store : 3 exemplaires sur la planche perso')
+  for (const u of uids) st.dispatch(projectActions.overrideSet({ id: bid, instance: u, override: { x: 20, y: 20, rot: false } }))
+  check(Object.keys(B().overrides).length === 3, 'store : 3 pièces déplacées à la main')
+  st.dispatch(projectActions.boardQtySet({ id: bid, key: k0, qty: 1 }))
+  check(Object.keys(B().overrides).join() === `${k0}#1` && B().qty[k0] === 1, 'store : exemplaires en trop perdent leur position manuelle')
+  st.dispatch(projectActions.overrideSet({ id: bid, instance: `${k0}#1`, override: null }))
+  check(Object.keys(B().overrides).length === 0, 'store : une position manuelle se retire')
+  st.dispatch(projectActions.overrideSet({ id: bid, instance: `${k0}#1`, override: { x: 30, y: 30, rot: true } }))
+  st.dispatch(projectActions.partRemoved(k0))
+  check(!st.getState().project.parts.some((p) => p.key === k0) && !(k0 in B().qty) && Object.keys(B().overrides).length === 0, 'store : retirer une pièce vide ses quantités et positions en planche perso')
+
+  // onglet, sélection, modèles : ne touchent jamais aux planches
+  st.dispatch(projectActions.boardQtySet({ id: bid, key: parts[1].key, qty: 2 }))
+  const s0 = st.getState()
+  const auto0 = sel.selectAutoSheets(s0)
+  const board0 = sel.selectBoardSheets(s0)
+  const entries0 = sel.selectEntries(s0)
+  st.dispatch(uiActions.tabSet('perso'))
+  st.dispatch(uiActions.selectedPieceSet('x#1'))
+  st.dispatch(modelsActions.modelPicked('autre'))
+  st.dispatch(modelsActions.explodeSet(0.5))
+  const s1 = st.getState()
+  check(s1.ui.tab === 'perso' && s1.project === s0.project, 'store : changer d’onglet ne touche pas au projet')
+  check(sel.selectAutoSheets(s1) === auto0 && sel.selectBoardSheets(s1) === board0 && sel.selectEntries(s1) === entries0, 'store : planches calculées gardées telles quelles (mémoïsées)')
+  st.dispatch(projectActions.doneSet({ key: auto0[0].key, value: true }))
+  check(sel.selectAutoSheets(st.getState()) === auto0 && sel.selectBoardSheets(st.getState()) === board0, 'store : cocher « fait » ne recalcule aucune planche')
+  st.dispatch(projectActions.autoMarkingSet({ key: auto0[0].key, patch: { frame: false } }))
+  const e1 = sel.selectEntries(st.getState())
+  check(sel.selectAutoSheets(st.getState()) === auto0 && e1 !== entries0 && e1[0].marking.frame === false && e1[0].marking.names === true, 'store : une case de gravure ne change que les cases')
+  st.dispatch(projectActions.qtySet({ key: parts[1].key, qty: parts[1].qty + 1 }))
+  check(sel.selectAutoSheets(st.getState()) !== auto0, 'store : changer une quantité recalcule les planches automatiques')
+  const live = st.getState().project
+  const rebuilt = buildAutoSheets(live.parts, live.settings)
+  check(rebuilt.length > 0 && sel.selectBoardSheets(st.getState())[0].items.length > 0, 'store : état figé lisible par le calcul des planches (sans mutation)')
+
+  // modèles 3D : planches cachées par modèle
+  st.dispatch(modelsActions.hiddenSet({ modelId: 'a', indices: [1, 2] }))
+  st.dispatch(modelsActions.hiddenSet({ modelId: 'b', indices: [0] }))
+  st.dispatch(modelsActions.hiddenSet({ modelId: 'a', indices: [] }))
+  check(JSON.stringify(st.getState().models.hidden) === '{"b":[0]}', 'store : planches cachées gardées par modèle')
+
+  // catalogue remplacé : quantités perso et « fait » à zéro, réglages gardés
+  st.dispatch(projectActions.settingsSet({ width: 400 }))
+  st.dispatch(replaceTexts([{ name: 'exemple.cutparts.json', text }]))
+  const rp = st.getState().project
+  check(rp.settings.width === 400 && Object.keys(rp.done).length === 0 && rp.boards.every((b) => !Object.keys(b.qty).length && !Object.keys(b.overrides).length) && rp.parts.length === parts.length, 'store : remplacer le catalogue remet quantités perso et « fait » à zéro, garde les réglages')
+  st.dispatch(projectActions.cleared())
+  check(JSON.stringify(st.getState().project) === JSON.stringify(emptyProject()), 'store : tout effacer remet un projet vide')
+
+  // format de sauvegarde : identique à l’ancien (clés, ordre, valeurs)
+  check(Object.keys(emptyProject()).join() === 'parts,settings,autoMarking,boards,done' && Object.keys(emptyProject().settings).join() === 'width,height,margin,gap,spread', 'sauvegarde : mêmes clés qu’avant')
+  const legacy = JSON.stringify({ parts: parts.slice(0, 3), settings: { width: 600, height: 400, margin: 4, gap: 2, spread: true }, autoMarking: { 'k-1': { names: false, frame: true } }, boards: [{ ...board, qty: { [parts[0].key]: 2 } }], done: { 'k-1': true } })
+  mem.set('cnc-projet-v1', legacy)
+  check(serializeProject(loadProject()) === legacy, 'sauvegarde : une ancienne sauvegarde est relue puis réécrite à l’identique')
+  mem.set('cnc-projet-v1', JSON.stringify({ parts: [] }))
+  check(loadProject().settings.width === 300 && Object.keys(loadProject()).join() === 'parts,settings,autoMarking,boards,done', 'sauvegarde : champs manquants complétés')
+  mem.set('cnc-projet-v1', 'pas du json')
+  check(loadProject().parts.length === 0, 'sauvegarde : stockage illisible = projet vide')
+  mem.set('cnc-modeles-v1', JSON.stringify({ model: 'm', params: { m: { a: 1 } } }))
+  const lm = loadModels()
+  check(lm.model === 'm' && serializeModels({ ...lm, explode: 2, hidden: { m: [1] }, measuring: true }) === '{"model":"m","params":{"m":{"a":1}}}', 'sauvegarde : modèle choisi et réglages au même format, le reste en mémoire seulement')
+
+  // écriture dans localStorage : une seule, groupée, et seulement si la tranche a changé
+  const listeners = []
+  Object.defineProperty(globalThis, 'window', { value: { addEventListener: (_, f) => listeners.push(f), removeEventListener: () => {} }, configurable: true, writable: true })
+  Object.defineProperty(globalThis, 'document', { value: { addEventListener: () => {}, removeEventListener: () => {} }, configurable: true, writable: true })
+  const ps = createAppStore()
+  ps.dispatch(importTexts([{ name: 'e', text }]))
+  const stopPersist = persistStore(ps)
+  mem.delete('cnc-projet-v1')
+  writes = 0
+  for (let i = 0; i < 20; i++) ps.dispatch(projectActions.qtySet({ key: k0, qty: i }))
+  ps.dispatch(uiActions.tabSet('auto'))
+  check(writes === 0, 'persistance : rien n’est écrit à chaque action')
+  await new Promise((r) => setTimeout(r, 400))
+  check(writes === 1 && mem.get('cnc-projet-v1') === serializeProject(ps.getState().project), 'persistance : une seule écriture groupée, au format du projet')
+  writes = 0
+  ps.dispatch(uiActions.tabSet('perso'))
+  ps.dispatch(modelsActions.explodeSet(1))
+  await new Promise((r) => setTimeout(r, 400))
+  check(writes === 0, 'persistance : changer d’onglet ou l’éclaté n’écrit rien')
+  failWrites = true
+  ps.dispatch(projectActions.qtySet({ key: k0, qty: 99 }))
+  let tolerated = true
+  try {
+    listeners[0]()
+  } catch {
+    tolerated = false
+  }
+  failWrites = false
+  check(tolerated && ps.getState().project.parts.find((p) => p.key === k0).qty === 99, 'persistance : stockage plein toléré, l’état reste en mémoire')
+  stopPersist()
+  delete globalThis.window
+  delete globalThis.document
 } finally {
   await server.close()
 }

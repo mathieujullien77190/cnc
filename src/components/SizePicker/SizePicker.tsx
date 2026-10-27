@@ -1,23 +1,12 @@
 import { useState } from 'react'
-import { Chip } from '../../laser/ui'
-import { NumField } from '../../ui/NumField'
-
-/** Zone de travail de la E1 Pro (mm) : au-delà, la valeur passe en rouge. */
-const MAX_W = 400
-const MAX_H = 320
-/** Délai avant de transmettre une nouvelle taille (ms) : plusieurs clics sur les flèches ne font qu'un seul recalcul. */
-const SIZE_DEBOUNCE = 200
-
-/** Formats de planche proposés (largeur × hauteur, mm). */
-export const SHEET_FORMATS: readonly [number, number][] = [
-  [300, 300],
-  [400, 320],
-]
-
-const isPreset = (w: number, h: number) => SHEET_FORMATS.some(([pw, ph]) => pw === w && ph === h)
+import { Chip } from '@/laser/ui'
+import NumField from '@/components/ui/NumField'
+import { MAX_H, MAX_W, SHEET_FORMATS, SIZE_DEBOUNCE } from './constants'
+import { isPreset } from './helpers'
+import type { SizePickerProps } from './types'
 
 /** Choix du format de planche : 300 × 300, 400 × 320 (zone de la E1 Pro) ou personnalisé (largeur et hauteur libres). */
-export function SizePicker({ width, height, onChange }: { width: number; height: number; onChange: (w: number, h: number) => void }) {
+export const SizePicker = ({ width, height, onChange }: SizePickerProps) => {
   const [custom, setCustom] = useState(() => !isPreset(width, height))
   const showFields = custom || !isPreset(width, height)
   return (

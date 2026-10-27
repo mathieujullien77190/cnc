@@ -64,11 +64,16 @@ export interface SheetSettings {
   gap: number
   /** Desserre les petites pièces tant que cela ne demande pas de planche de plus. */
   spread?: boolean
+  /** Une série de planches par famille de pièces (R, S…) au lieu de tout mélanger. */
+  byType?: boolean
 }
 
 export interface Marking {
+  /** Nom de chaque pièce, gravé sur elle. */
   names: boolean
   frame: boolean
+  /** Dessins du modèle (textes, traits, tableaux) gravés sur les pièces : actifs sauf si `false`. */
+  drawings?: boolean
 }
 
 export interface Override {

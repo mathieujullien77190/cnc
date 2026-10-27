@@ -1,1 +1,1 @@
-export * from './LaserDialog'
+export { LaserDialog as default } from './LaserDialog'

@@ -44,7 +44,8 @@ export function useLaserMachine(items: LaserItem[], area: Area = { W: MACHINE_AR
   };
 
   const index = Math.min(itemIndex, Math.max(0, all.length - 1));
-  const item = all[index] ?? null;
+  // le travail de la planche (parcours de coupe, G-code) n'est calculé que pilotage ouvert : fermé, un changement de planche ne coûte rien
+  const item = open ? (all[index] ?? null) : null;
   const laserMode = grbl.settings[32]; // undefined tant que `$$` n'est pas lu
   /** Taille de la planche du programme choisi. */
   const W = item?.job?.widthMm ?? area.W, H = item?.job?.heightMm ?? area.H;

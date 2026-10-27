@@ -1,1 +1,1 @@
-export * from './AutoView'
+export { AutoView as default } from './AutoView'

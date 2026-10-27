@@ -63,7 +63,7 @@ export function JobStats({ program, settings, extra = {} }: { program: GcodeJob;
         {used && <Row label="Zone tracée" value={`${Math.round(used.w)} × ${Math.round(used.h)} mm`} />}
         {extra.pieces ? <Row label="Coupe par pièce" value={m(st.cutMm / extra.pieces)} /> : null}
         {extra.pieces ? <Row label="Temps par pièce" value={formatDuration(st.seconds / extra.pieces)} /> : null}
-        {extra.travel && <Row label="Gain de parcours" value={gain > 0 ? `${m(gain)} (−${Math.round((gain / extra.travel.baselineMm) * 100)} %)` : '—'} hint="Déplacements à vide économisés par rapport au plus proche voisin" />}
+        {extra.travel && <Row label="Gain de parcours" value={gain > 0 ? `−${Math.round((gain / extra.travel.baselineMm) * 100)} %` : '—'} hint="Déplacements à vide économisés par rapport au plus proche voisin" />}
         <Row label="Zone machine" value={st.outOfBounds || (b && (b.maxX > MACHINE_AREA.W || b.maxY > MACHINE_AREA.H)) ? 'dépassée !' : `ok (${MACHINE_AREA.W} × ${MACHINE_AREA.H})`} />
       </Group>
     </div>

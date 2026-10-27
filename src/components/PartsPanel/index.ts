@@ -1,1 +1,1 @@
-export * from './PartsPanel'
+export { PartsPanel as default } from './PartsPanel'

@@ -1,120 +1,30 @@
-import { categoryCss } from '../../core/colors'
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type PointerEvent } from 'react'
-import { frameRect } from '../../core/job'
-import { angleOf, marksFor, turnTo } from '../../core/sheets'
-import type { Marking, Override, Pt, Sheet } from '../../core/types'
-
-const f = (v: number) => Math.round(v * 1000) / 1000
-const path = (pts: Pt[]) => `M${pts.map(([x, y]) => `${f(x)} ${f(y)}`).join('L')}Z`
-const round1 = (v: number) => Math.round(v * 10) / 10
-
-/** Zoom maximal : la vue la plus serrée montre 1/MAX_ZOOM de la largeur de la planche. */
-const MAX_ZOOM = 40
-/** Dézoom maximal : la vue peut montrer jusqu'à MIN_ZOOM fois la planche (la planche paraît alors deux fois plus petite). */
-const MIN_ZOOM = 0.5
-const STEP = 1.25
-
-export interface Interaction {
-  selected: string | null
-  onSelect: (uid: string | null) => void
-  /** Position finale d'un exemplaire déplacé ou tourné à la main. */
-  onCommit: (uid: string, o: Override) => void
-}
-
-interface Drag {
-  uid: string
-  from: Pt
-  dx: number
-  dy: number
-}
-
-/** Fenêtre visible de la planche (mm) : x, y du coin haut-gauche et largeur ; la hauteur suit le rapport de la planche. */
-interface View {
-  x: number
-  y: number
-  w: number
-}
-
-interface Pan {
-  px: number
-  py: number
-  view: View
-}
-
-const ToolButton = ({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) => (
-  <button type="button" {...props} className="h-7 min-w-7 rounded border border-stone-300 bg-white/90 px-1.5 text-xs font-semibold text-stone-700 shadow-sm hover:bg-white disabled:opacity-40">
-    {children}
-  </button>
-)
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { frameRect } from '@/core/job'
+import { angleOf, drawingsFor, turnTo } from '@/core/sheets'
+import { round1 } from '@/helpers'
+import SheetPiece from './SheetPiece'
+import ToolButton from './ToolButton'
+import { MAX_ZOOM, MIN_ZOOM, STEP } from './constants'
+import { toMm } from './helpers'
+import { f, path } from './svgPath'
+import type { Drag, Pan, SheetPreviewProps } from './types'
+import { useMarks } from './useMarks'
+import { useSheetView } from './useSheetView'
 
 /**
  * Aperçu d'une planche en SVG, zoomable : molette pour zoomer vers le curseur, glisser le fond pour déplacer la vue, boutons + / − / ajuster, ⤢ pour agrandir en plein écran.
  * Avec `interact`, on déplace une pièce en la glissant et on la tourne avec la touche R.
  */
-export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; marking: Marking; bad?: Set<string>; interact?: Interaction }) {
+export const SheetPreview = ({ sheet, marking, bad, interact, highlight }: SheetPreviewProps) => {
   const svg = useRef<SVGSVGElement>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const [pan, setPan] = useState<Pan | null>(null)
   const [full, setFull] = useState(false)
-  const full0: View = { x: 0, y: 0, w: sheet.width }
-  const [view, setView] = useState<View>(full0)
-  const ratio = sheet.height / sheet.width
-  const vh = view.w * ratio
-  const zoomed = Math.abs(view.w - sheet.width) > 1e-6
+  const { view, setView, vh, zoomed, clamp, reset, zoomCenter } = useSheetView(sheet, svg)
   const frame = marking.frame ? frameRect(sheet) : null
-  const marks = marking.names ? marksFor(sheet) : null
+  const marks = useMarks(sheet, marking)
+  const drawings = useMemo(() => (marking.drawings !== false ? drawingsFor(sheet) : null), [sheet, marking.drawings])
   const selected = interact?.selected ?? null
-
-  // une autre taille de planche remet la vue entière
-  useEffect(() => setView({ x: 0, y: 0, w: sheet.width }), [sheet.width, sheet.height])
-
-  /** Garde la fenêtre près de la planche (un peu de marge autour). */
-  const clamp = (v: View): View => {
-    const w = Math.min(sheet.width / MIN_ZOOM, Math.max(sheet.width / MAX_ZOOM, v.w))
-    const h = w * ratio
-    const mx = sheet.width * 0.05
-    const my = sheet.height * 0.05
-    // plus large que la planche : elle reste centrée ; sinon on la parcourt avec un peu de marge autour
-    return {
-      w,
-      x: w >= sheet.width ? (sheet.width - w) / 2 : Math.min(Math.max(v.x, -mx), sheet.width + mx - w),
-      y: h >= sheet.height ? (sheet.height - h) / 2 : Math.min(Math.max(v.y, -my), sheet.height + my - h),
-    }
-  }
-
-  /** Zoom d'un facteur `k` (> 1 : on se rapproche) autour du point (cx, cy) de la planche. */
-  const zoomAt = (k: number, cx: number, cy: number) =>
-    setView((v) => {
-      const w = Math.min(sheet.width / MIN_ZOOM, Math.max(sheet.width / MAX_ZOOM, v.w / k))
-      const s = w / v.w
-      return clamp({ w, x: cx - (cx - v.x) * s, y: cy - (cy - v.y) * s })
-    })
-  const zoomCenter = (k: number) => zoomAt(k, view.x + view.w / 2, view.y + vh / 2)
-
-  const toMm = (e: { clientX: number; clientY: number }): Pt => {
-    const el = svg.current!
-    const p = el.createSVGPoint()
-    p.x = e.clientX
-    p.y = e.clientY
-    const q = p.matrixTransform(el.getScreenCTM()!.inverse())
-    return [q.x, q.y]
-  }
-
-  // molette : zoom vers le curseur (écouteur non passif pour garder la page immobile)
-  useEffect(() => {
-    const el = svg.current
-    if (!el) return
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      const p = el.createSVGPoint()
-      p.x = e.clientX
-      p.y = e.clientY
-      const q = p.matrixTransform(el.getScreenCTM()!.inverse())
-      zoomAt(e.deltaY < 0 ? STEP : 1 / STEP, q.x, q.y)
-    }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-  })
 
   // Échap ferme le plein écran
   useEffect(() => {
@@ -139,13 +49,17 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
     return () => window.removeEventListener('keydown', onKey)
   }, [interact, selected, sheet.items])
 
-  const downPiece = (e: PointerEvent<SVGGElement>, uid: string) => {
+  const downPieceNow = (e: PointerEvent<SVGGElement>, uid: string) => {
     if (!interact) return
     e.stopPropagation()
     interact.onSelect(uid)
     svg.current?.setPointerCapture(e.pointerId)
-    setDrag({ uid, from: toMm(e), dx: 0, dy: 0 })
+    setDrag({ uid, from: toMm(svg.current!, e), dx: 0, dy: 0 })
   }
+  // identité stable : les pièces inchangées ne sont pas redessinées
+  const downRef = useRef(downPieceNow)
+  downRef.current = downPieceNow
+  const downPiece = useCallback((e: PointerEvent<SVGGElement>, uid: string) => downRef.current(e, uid), [])
   const downBackground = (e: PointerEvent) => {
     interact?.onSelect(null)
     if (e.button !== 0) return
@@ -154,7 +68,7 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
   }
   const move = (e: PointerEvent) => {
     if (drag) {
-      const [x, y] = toMm(e)
+      const [x, y] = toMm(svg.current!, e)
       setDrag({ ...drag, dx: x - drag.from[0], dy: y - drag.from[1] })
     } else if (pan) {
       const mmPerPx = pan.view.w / svg.current!.getBoundingClientRect().width
@@ -180,7 +94,7 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
         onPointerUp={up}
         onPointerCancel={() => { setDrag(null); setPan(null) }}
         onPointerDown={downBackground}
-        onDoubleClick={() => setView({ x: 0, y: 0, w: sheet.width })}
+        onDoubleClick={reset}
       >
         <defs>
           <pattern id="hachure-conflit" width={3} height={3} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -190,31 +104,25 @@ export function SheetPreview({ sheet, marking, bad, interact }: { sheet: Sheet; 
         </defs>
         <rect x={0} y={0} width={sheet.width} height={sheet.height} fill="#fbf7ee" stroke="#a8a29e" strokeWidth={0.5} />
         {frame && <path d={path(frame)} fill="none" stroke="#2563eb" strokeWidth={0.5} strokeDasharray="3 2" />}
-        {sheet.items.map((it) => {
-          const d = drag?.uid === it.uid ? drag : null
-          const isBad = bad?.has(it.uid)
-          return (
-            <g key={it.uid} transform={d ? `translate(${f(d.dx)} ${f(d.dy)})` : undefined} onPointerDown={(e) => downPiece(e, it.uid)} className={interact ? 'cursor-move' : ''}>
-              <path
-                d={[it.outer, ...it.holes].map(path).join('')}
-                fillRule="evenodd"
-                fill={isBad ? 'url(#hachure-conflit)' : categoryCss(it.part.category)}
-                stroke={selected === it.uid ? '#047857' : '#ff0000'}
-                strokeWidth={selected === it.uid ? 1.2 : 0.6}
-                strokeLinejoin="round"
-              >
-                <title>{`${it.part.id}${it.part.category ? ` · ${it.part.category}` : ''}`}</title>
-              </path>
-              {(marks?.get(it.uid) ?? []).map((r, i) => <path key={i} d={path(r)} fill="none" stroke="#2563eb" strokeWidth={0.3} />)}
-            </g>
-          )
-        })}
+        {sheet.items.map((it) => (
+          <SheetPiece
+            key={it.uid}
+            it={it}
+            bad={!!bad?.has(it.uid)}
+            selected={selected === it.uid || (!!highlight && it.part.key === highlight)}
+            marks={marks?.get(it.uid) ?? null}
+            drawings={drawings?.get(it.uid) ?? null}
+            drag={drag?.uid === it.uid ? drag : null}
+            movable={!!interact}
+            onDown={downPiece}
+          />
+        ))}
       </svg>
       <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
         {zoomed && <span className="rounded bg-white/90 px-1.5 py-1 text-[10px] tabular-nums text-stone-600 shadow-sm">×{(sheet.width / view.w).toFixed(1)}</span>}
         <ToolButton onClick={() => zoomCenter(STEP)} disabled={view.w <= sheet.width / MAX_ZOOM + 1e-6} aria-label="Zoomer" title="Zoomer (molette)">+</ToolButton>
         <ToolButton onClick={() => zoomCenter(1 / STEP)} disabled={view.w >= sheet.width / MIN_ZOOM - 1e-6} aria-label="Dézoomer" title="Dézoomer (molette)">−</ToolButton>
-        <ToolButton onClick={() => setView({ x: 0, y: 0, w: sheet.width })} disabled={!zoomed} title="Voir toute la planche (double-clic)">Ajuster</ToolButton>
+        <ToolButton onClick={reset} disabled={!zoomed} title="Voir toute la planche (double-clic)">Ajuster</ToolButton>
         <ToolButton onClick={() => setFull((v) => !v)} aria-label={full ? 'Réduire' : 'Agrandir'} title={full ? 'Réduire (Échap)' : 'Plein écran'}>{full ? '✕' : '⤢'}</ToolButton>
       </div>
     </div>

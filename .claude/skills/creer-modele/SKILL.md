@@ -38,6 +38,10 @@ Référence complète : `docs/MODELES.md`. Exemple : `src/models/library/mangeoi
 - **Pas de réglages inutiles** : ne déclarer dans `params` que ce que l'utilisateur veut vraiment régler. Les modèles « étui » (`range-meches`, `embouts`) n'en ont aucun (`params: []`) : valeurs fixes en constantes en tête de fichier, plaque d'essai toujours produite.
 - **Vue éclatée** : le curseur « Éclaté » est toujours présent dans les réglages, pour tous les modèles, même sans `params`. C'est pratique pour vérifier l'assemblage : ne jamais le retirer, ne rien faire dans le modèle pour l'avoir.
 
+## Noms et dessins
+
+Le nom d'une pièce (`E-01`) est gravé par l'app ; un texte, un trait ou un tableau du modèle (`labels`, `rules`) est un **dessin**, avec sa propre case et sa propre couleur. Voir le skill `gravure-noms-dessins`.
+
 ## Rendu 3D (automatique, rien à faire dans le modèle)
 
 - La couleur d'une planche vient de sa `category` (la même couleur en vue planche et en vue 3D, `src/core/colors.ts`) : donner une `category` claire à chaque planche, ne jamais coder une couleur.
