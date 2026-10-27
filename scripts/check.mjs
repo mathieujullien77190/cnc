@@ -74,11 +74,11 @@ try {
   const p0 = b1.items[0]
   const turned = buildCustomSheet({ ...board, overrides: { [p0.uid]: { ...turnTo({ ...p0, x: 50, y: 50 }, 45) } } }, parts, 5, 1)
   const tr0 = turned.items.find((i) => i.uid === p0.uid)
-  check(tr0 && angleOf(tr0) === 45 && Math.abs(tr0.w + tr0.h - (p0.w + p0.h) * Math.SQRT2) < 0.2 && conflicts(turned).size === 0, 'rotation libre : 45° donne une boîte plus grande, centre gardé')
+  check(tr0 && angleOf(tr0) === 45 && Math.abs(tr0.w + tr0.h - (p0.w + p0.h) * Math.SQRT2) < 0.2 && turned.items.length === 2, 'rotation libre : 45° donne une boîte plus grande, centre gardé')
   const t90 = buildCustomSheet({ ...board, overrides: { [p0.uid]: turnTo(p0, 90) } }, parts, 5, 1).items.find((i) => i.uid === p0.uid)
   check(t90 && Math.abs(t90.w - p0.h) < 0.01 && Math.abs(t90.h - p0.w) < 0.01, 'rotation libre : 90° échange largeur et hauteur')
   const tiny = buildCustomSheet({ ...board, width: 30, height: 30, qty: { [parts[0].key]: 50 } }, parts, 5, 1)
-  check(tiny.rejected.length > 0 && tiny.items.length + tiny.rejected.length === 50, 'planche perso trop petite : le reste est signalé')
+  check(tiny.rejected.length === 0 && tiny.items.length === 50 && conflicts(tiny).size > 0, 'planche perso trop petite : les pièces en trop sont posées par-dessus une autre, signalées en conflit')
   const other = buildCustomSheet({ ...board, thickness: 99 }, parts, 5, 1)
   check(other.items.length === 0, 'planche perso : une autre épaisseur ne prend pas les pièces')
 

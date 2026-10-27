@@ -261,6 +261,9 @@ export const boardFromSheet = (sheet: Sheet, marking: Marking): Pick<CustomBoard
 }
 
 /** Une planche personnalisée : les pièces demandées sur une seule planche ; celles déplacées à la main restent où elles sont. */
+/** Décalage entre deux pièces qui ne rentrent pas et sont posées l'une sur l'autre (mm). */
+const OVERLAP_STEP = 4
+
 export const buildCustomSheet = (b: CustomBoard, catalog: Part[], margin: number, gap: number, spread = false): Sheet => {
   const insts = instancesOf(catalog.filter((p) => p.thickness === b.thickness), (p) => b.qty[p.key] ?? 0)
   const W = b.width - 2 * margin
@@ -279,9 +282,11 @@ export const buildCustomSheet = (b: CustomBoard, catalog: Part[], margin: number
   const rows = [
     ...fixedInsts.map((inst) => ({ inst, x: b.overrides[inst.uid].x, y: b.overrides[inst.uid].y, rot: b.overrides[inst.uid].rot, angle: b.overrides[inst.uid].angle })),
     ...(bins[0] ?? []).map((pl) => ({ inst: free[pl.idx], x: pl.x + margin, y: pl.y + margin, rot: pl.rot })),
+    // une pièce qui ne rentre pas n'est pas perdue : on la pose par-dessus une autre (coin haut-gauche, légèrement décalée), en conflit, à l'utilisateur de la déplacer
+    ...rejected.map((r, k) => ({ inst: free[r.idx], x: margin + k * OVERLAP_STEP, y: margin + k * OVERLAP_STEP, rot: false })),
   ]
   const items = numbered(rows)
-  return { key: `perso-${b.id}`, label: b.name, thickness: b.thickness, width: b.width, height: b.height, items, rejected: rejected.map((r) => free[r.idx].part), custom: true, fill: fillOf(items, b.width, b.height) }
+  return { key: `perso-${b.id}`, label: b.name, thickness: b.thickness, width: b.width, height: b.height, items, rejected: [], custom: true, fill: fillOf(items, b.width, b.height) }
 }
 
 const bbox = (pts: Pt[]) => {

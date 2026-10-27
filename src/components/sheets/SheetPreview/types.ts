@@ -19,6 +19,8 @@ export type SheetPreviewProps = {
   highlight?: string | null
   /** Clic sur une pièce (clé du catalogue et uid de l'exemplaire), ou sur le fond (deux `null`). */
   onPiece?: (partKey: string | null, uid: string | null) => void
+  /** Hauteur maximale de l'aperçu hors plein écran (CSS). Par défaut 75 % de la fenêtre ; la planche perso prend toute la hauteur disponible. */
+  maxHeight?: string
   /** Exemplaire au contour vert quand l'aperçu n'est pas interactif (planches automatiques). */
   selectedUid?: string | null
 }

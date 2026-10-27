@@ -74,7 +74,7 @@ export const useDeepSearch = (parts: Part[], settings: SheetSettings, onPlan: (p
 
   const cancel = useCallback(() => {
     stop()
-    setState({ phase: 'done', message: 'Recherche annulée : le rangement n’a pas changé.', sig: deepSignature(latest.current.parts, latest.current.settings) })
+    setState({ phase: 'idle' }) // annulée : rien à dire, le bouton redevient disponible
   }, [stop])
 
   const elapsedMs = state.phase === 'running' ? Math.max(0, now - state.startedAt) : 0

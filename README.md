@@ -32,7 +32,7 @@ Idée ──► IA (LLM) ──► Modèle 3D ──► Planches à plat ──�
 
 ### Planches
 - **Automatiques** : toutes les pièces importées, rangées au mieux (rotation à 90°, trous réutilisés), une série par épaisseur, jamais deux épaisseurs sur la même feuille.
-- **Optimiser mieux** (bouton du bloc « Planches ») : une recherche de quelques secondes, sans bloquer la page, qui essaie de ranger des pièces à l’intérieur des trous d’autres pièces (fenêtres, ronds, formes quelconques) pour gagner des planches ; le résultat est gardé avec le projet et se défait en recliquant sur un mode de rangement.
+- **Optimiser encore mieux** (bouton du bloc « Planches ») : une recherche de quelques secondes, sans bloquer la page, qui essaie de ranger des pièces à l’intérieur des trous d’autres pièces (fenêtres, ronds, formes quelconques) pour gagner des planches ; le résultat est gardé avec le projet et se défait en recliquant sur un mode de rangement.
 - **Perso** : on choisit les pièces et leur quantité sur une feuille (boutons − / +), on les déplace à la main, on les tourne (touche R ou angle libre). Les conflits sont signalés en rouge.
 - Aperçu zoomable, formats 300 × 300 et 400 × 320 mm (zone de la machine) ou taille libre.
 - Export SVG (calque coupe rouge, calque gravure bleu).

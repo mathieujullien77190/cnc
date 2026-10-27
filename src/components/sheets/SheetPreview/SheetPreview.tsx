@@ -15,7 +15,7 @@ import { useSheetView } from './useSheetView'
  * Aperçu d'une planche en SVG, zoomable : molette pour zoomer vers le curseur, glisser le fond pour déplacer la vue, boutons + / − / ajuster, ⤢ pour agrandir en plein écran.
  * Avec `interact`, on déplace une pièce en la glissant et on la tourne avec la touche R.
  */
-export const SheetPreview = ({ sheet, marking, bad, interact, highlight, onPiece, selectedUid }: SheetPreviewProps) => {
+export const SheetPreview = ({ sheet, marking, bad, interact, highlight, onPiece, selectedUid, maxHeight = '75vh' }: SheetPreviewProps) => {
   const svg = useRef<SVGSVGElement>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const [pan, setPan] = useState<Pan | null>(null)
@@ -97,7 +97,7 @@ export const SheetPreview = ({ sheet, marking, bad, interact, highlight, onPiece
         ref={svg}
         viewBox={`${f(view.x)} ${f(view.y)} ${f(view.w)} ${f(vh)}`}
         className={`block rounded border border-stone-300 bg-[#f7f0e2] select-none touch-none ${full ? 'max-h-full max-w-full' : 'h-auto w-full'} ${pan ? 'cursor-grabbing' : zoomed ? 'cursor-grab' : ''}`}
-        style={full ? { aspectRatio: `${sheet.width} / ${sheet.height}`, height: '100%' } : { maxHeight: '75vh' }}
+        style={full ? { aspectRatio: `${sheet.width} / ${sheet.height}`, height: '100%' } : { maxHeight }}
         onPointerMove={move}
         onPointerUp={up}
         onPointerCancel={() => { setDrag(null); setPan(null) }}

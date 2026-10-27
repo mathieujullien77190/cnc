@@ -4,7 +4,7 @@ import { Btn, Hint, ProgressBar } from '@/components/ui'
 import { useDeepSearch } from '@/state/useDeepSearch'
 import type { DeepOptimizerProps } from './types'
 
-/** « Optimiser mieux » : cherche pendant quelques secondes (sans bloquer la page) à ranger des pièces dans les trous d'autres pièces. Le résultat est gardé dans les réglages. */
+/** « Optimiser encore mieux » : cherche pendant quelques secondes (sans bloquer la page) à ranger des pièces dans les trous d'autres pièces. Le résultat est gardé dans les réglages. */
 export const DeepOptimizer = ({ parts, settings, onChange }: DeepOptimizerProps) => {
   const { state, elapsedMs, budgetMs, start, cancel } = useDeepSearch(parts, settings, (deep) => onChange({ deep }))
   const active = validDeep(parts, settings)
@@ -24,7 +24,7 @@ export const DeepOptimizer = ({ parts, settings, onChange }: DeepOptimizerProps)
 
   return (
     <div className="space-y-1.5">
-      <Btn onClick={start} disabled={!hasParts || !!active}>Optimiser mieux</Btn>
+      <Btn onClick={start} disabled={!hasParts || !!active}>Optimiser encore mieux</Btn>
       {active ? (
         <p className="text-[11px] text-emerald-800">
           Rangement optimisé : {active.before} → {active.after} planches.{' '}

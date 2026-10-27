@@ -9,10 +9,12 @@ const same = (a: SheetPieceProps, b: SheetPieceProps) =>
   a.bad === b.bad && a.selected === b.selected && a.movable === b.movable && a.onDown === b.onDown &&
   (a.marks === null) === (b.marks === null) && (a.drawings === null) === (b.drawings === null) && a.drag?.dx === b.drag?.dx && a.drag?.dy === b.drag?.dy
 
-/** Une pièce de la planche : contour et trous, noms gravés (un seul tracé). */
+/** Une pièce de la planche : contour et trous (avec une zone de prise sur tout le contour), noms et dessins gravés (un tracé chacun). */
 export const SheetPiece = memo(function SheetPiece({ it, bad, selected, marks, drawings, drag, movable, onDown }: SheetPieceProps) {
   return (
     <g transform={drag ? `translate(${f(drag.dx)} ${f(drag.dy)})` : undefined} onPointerDown={(e) => onDown(e, it.uid)} className={movable ? 'cursor-move' : ''}>
+      {/* zone de prise invisible sur tout le contour : on attrape la pièce même en cliquant dans un de ses trous (une pièce plus petite posée dessus passe avant, elle est dessinée au-dessus) */}
+      <path d={path(it.outer)} fill="transparent" stroke="none" />
       <path
         d={[it.outer, ...it.holes].map(path).join('')}
         fillRule="evenodd"

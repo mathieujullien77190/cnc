@@ -10,7 +10,7 @@ export const SheetActions = ({ sheet, marking, onLaser, onEdit }: SheetActionsPr
     <Toolbar className="gap-2">
       <Btn block={false} disabled={empty} onClick={() => saveSvg(sheetSvg(sheet, { marking }), `${sheet.key}.svg`)}>SVG</Btn>
       <Btn block={false} variant="primary" disabled={empty} onClick={onLaser}>Envoyer au laser</Btn>
-      {onEdit && <Btn block={false} disabled={empty} onClick={onEdit}>Modifier la planche</Btn>}
+      {onEdit && <Btn block={false} disabled={empty} onClick={onEdit}>Afficher dans planche perso</Btn>}
     </Toolbar>
   )
 }

@@ -14,6 +14,5 @@ export const ModelList = ({ models, currentId, onPick }: ModelListProps) => (
         </li>
       ))}
     </ul>
-    <p className="mt-2 text-[11px] text-stone-500">Clique de nouveau sur le modèle choisi pour n’en avoir aucun. Un modèle = un fichier <code>src/models/library/nom.model.ts</code>. Demande à Claude d’en écrire un : il apparaît ici tout seul.</p>
   </Card>
 )

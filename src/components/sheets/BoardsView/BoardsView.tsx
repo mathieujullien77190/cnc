@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { conflicts } from '@/core/sheets'
 import type { Override } from '@/core/types'
 import DoneToggle from '@/components/sheets/DoneToggle'
-import { Btn, Card, EmptyState, Field, Hint, Notice, Select, Title, Toolbar } from '@/components/ui'
+import { Btn, Card, EmptyState, Hint, Notice, Title, Toolbar } from '@/components/ui'
 import MarkingToggles from '@/components/sheets/MarkingToggles'
 import SheetActions from '@/components/sheets/SheetActions'
 import SheetPreview from '@/components/sheets/SheetPreview'
@@ -11,6 +11,7 @@ import { rejectedText } from '@/helpers'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { selectSelectedPartKey, uiActions } from '@/store/ui'
 import PartQuantities from './PartQuantities'
+import { PREVIEW_MAX_HEIGHT } from './constants'
 import PieceControls from './PieceControls'
 import type { BoardsViewProps } from './types'
 
@@ -44,6 +45,10 @@ export const BoardsView = ({ project, onLaser }: BoardsViewProps) => {
   useEffect(() => {
     if (parts.length && !boards.length) addBoard(thicknesses[0] ?? 3)
   }, [parts.length, boards.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  // l'épaisseur de la planche suit celle des pièces (pas de réglage) : si elle n'existe plus dans le catalogue, on prend la première
+  useEffect(() => {
+    if (board && thicknesses.length && !thicknesses.includes(board.thickness)) updateBoard(board.id, { thickness: thicknesses[0], qty: {}, overrides: {} })
+  }, [board?.thickness, thicknesses.join()]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!parts.length) {
     return <EmptyState>Importe d’abord des pièces : une planche perso en pioche dedans.</EmptyState>
@@ -54,15 +59,6 @@ export const BoardsView = ({ project, onLaser }: BoardsViewProps) => {
       {board && sheet && (
         <div className="min-w-0 space-y-3">
           <Card as="div" className="flex flex-wrap items-end gap-x-4 gap-y-2">
-            <Field label="Épaisseur">
-              <Select
-                value={board.thickness}
-                onChange={(v) => updateBoard(board.id, { thickness: Number(v), qty: {}, overrides: {} })}
-                className="px-1.5 py-1 text-xs text-stone-800"
-              >
-                {thicknesses.map((t) => <option key={t} value={t}>{t} mm</option>)}
-              </Select>
-            </Field>
             <SizePicker key={board.id} width={board.width} height={board.height} onChange={(width, height) => updateBoard(board.id, { width, height })} />
             <Btn block={false} variant="ghost" className="ml-auto" disabled={!Object.values(board.qty).some(Boolean)} onClick={() => { updateBoard(board.id, { qty: {}, overrides: {} }); setSelected(null) }}>Vider la planche</Btn>
           </Card>
@@ -80,6 +76,7 @@ export const BoardsView = ({ project, onLaser }: BoardsViewProps) => {
                 marking={board.marking}
                 bad={bad}
                 interact={{ selected, onSelect: setSelected, onCommit: (uid, o) => pin(uid, o) }}
+                maxHeight={PREVIEW_MAX_HEIGHT}
                 onPiece={(key) => key && dispatch(uiActions.partRevealed(key))}
               />
               <Hint>Glisse une pièce pour la placer, <kbd className="rounded border border-stone-300 px-1">R</kbd> pour la tourner.</Hint>

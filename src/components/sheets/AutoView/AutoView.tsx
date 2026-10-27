@@ -33,7 +33,7 @@ export const AutoView = ({ project, onLaser }: AutoViewProps) => {
   }
   const thicknesses = [...new Set(autoSheets.map((s) => s.thickness))]
   const markingOf = (s: Sheet) => entries.find((e) => e.sheet.key === s.key)?.marking ?? DEFAULT_MARKING
-  // « Modifier la planche » : la planche remplace la planche perso (la seule qui existe), puis on passe dans l'onglet perso
+  // « Afficher dans planche perso » : la planche remplace la planche perso (la seule qui existe), puis on passe dans l'onglet perso
   const edit = (s: Sheet) => {
     const id = boards[0]?.id ?? addBoard(s.thickness)
     updateBoard(id, boardFromSheet(s, markingOf(s)))
