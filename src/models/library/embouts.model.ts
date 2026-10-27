@@ -38,18 +38,18 @@ const offsetText = (o: number) => (o === 0 ? '0' : `${o > 0 ? '+' : '-'}${Math.a
 const TEST_H = 3.4
 const TEST_GAP = 5
 
+/** Réglages fixes : jeu des trous et épaisseur du bois (mm). */
+const CLEARANCE = 0.3
+const THICKNESS = 3
+
 export default defineModel({
   id: 'embouts',
   name: 'Étui à embouts',
   description: 'Boîte fermée pour embouts de visseuse 1/4" : 80 trous hexagonaux en 5 groupes de 16 (cruciforme PH, Torx, Torx troué, hexagonal, plat), le type dessiné devant chaque groupe. Trois plaques identiques empilées (9 mm de trou) sur un fond plein (trous borgnes), deux flancs et deux parois bas (12 mm), crantés.',
-  params: [
-    { key: 'clearance', label: 'Jeu des trous', type: 'number', default: 0.3, min: 0.1, max: 0.8, step: 0.05, unit: 'mm' },
-    { key: 'thickness', label: 'Épaisseur', type: 'number', default: 3, min: 2, max: 6, step: 0.5, unit: 'mm' },
-    { key: 'test', label: 'Plaque d’essai des trous', type: 'boolean', default: true },
-  ],
-  build: (p) => {
-    const clr = p.clearance as number
-    const t = p.thickness as number
+  params: [],
+  build: () => {
+    const clr = CLEARANCE
+    const t = THICKNESS
     // Les flancs et les parois montent jusqu'au haut des trois plaques : 4 épaisseurs (le fond vert en bas).
     const Hs = 4 * t
 
@@ -149,7 +149,7 @@ export default defineModel({
         side(sideX),
         wall(-wallZ),
         wall(wallZ),
-        ...(p.test ? [testPlate] : []),
+        testPlate,
       ],
       notes: WW > 300 || Dp + 2 * t > 300 ? ['Plaque trop grande pour une planche de 300 mm.'] : [],
     }

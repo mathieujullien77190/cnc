@@ -187,7 +187,6 @@ export function ModelsView({ onReplace }: { onReplace: (files: { name: string; t
               <li key={m.id}>
                 <button onClick={() => pick(m.id)} aria-current={m.id === model?.id} className={`w-full rounded-md border px-2 py-1.5 text-left text-xs ${m.id === model?.id ? 'border-emerald-700 bg-emerald-50' : 'border-stone-200 bg-white hover:bg-stone-50'}`}>
                   <span className="font-medium text-stone-800">{m.name}</span>
-                  <span className="block text-[11px] text-stone-500">{m.description}</span>
                 </button>
               </li>
             ))}

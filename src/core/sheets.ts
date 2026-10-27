@@ -81,7 +81,7 @@ interface PackOpts {
  * Range les pièces ; avec `spread`, desserre les petites : on cherche le plus grand espace supplémentaire autour d'elles qui ne demande
  * ni planche de plus ni pièce rejetée de plus que le rangement serré. Sans solution, on garde le rangement serré.
  */
-const packSpread = (insts: Instance[], W: number, H: number, gap: number, spread: boolean, o: PackOpts) => {
+const packSpreadTop = (insts: Instance[], W: number, H: number, gap: number, spread: boolean, o: PackOpts) => {
   const base = pack(insts.map(toItem), W, H, gap, o)
   if (!spread) return base
   const limit = Math.min(W, H) * SMALL_RATIO
@@ -100,6 +100,13 @@ const packSpread = (insts: Instance[], W: number, H: number, gap: number, spread
     return { bins, rejected: r.rejected }
   }
   return base
+}
+
+/** Le rangement part du coin bas-gauche de la planche (comme la machine) : on range depuis le haut dans un repère retourné, puis on retourne le résultat. */
+const packSpread = (insts: Instance[], W: number, H: number, gap: number, spread: boolean, o: PackOpts) => {
+  const flip = <T extends { y: number; h: number }>(p: T): T => ({ ...p, y: H - p.y - p.h })
+  const r = packSpreadTop(insts, W, H, gap, spread, { ...o, fixed: o.fixed?.map(flip) })
+  return { bins: r.bins.map((bin) => bin.map(flip)), rejected: r.rejected }
 }
 
 const fillOf = (items: Placed[], w: number, h: number) => items.reduce((s, it) => s + it.w * it.h, 0) / (w * h)

@@ -2,6 +2,12 @@ import { useState } from 'react'
 import { Chip } from '../../laser/ui'
 import { NumField } from '../../ui/NumField'
 
+/** Zone de travail de la E1 Pro (mm) : au-delà, la valeur passe en rouge. */
+const MAX_W = 400
+const MAX_H = 320
+/** Délai avant de transmettre une nouvelle taille (ms) : plusieurs clics sur les flèches ne font qu'un seul recalcul. */
+const SIZE_DEBOUNCE = 200
+
 /** Formats de planche proposés (largeur × hauteur, mm). */
 export const SHEET_FORMATS: readonly [number, number][] = [
   [300, 300],
@@ -26,8 +32,8 @@ export function SizePicker({ width, height, onChange }: { width: number; height:
       </div>
       {showFields && (
         <div className="flex flex-wrap gap-x-3 gap-y-2">
-          <NumField label="Largeur" value={width} min={20} onChange={(v) => onChange(v, height)} suffix="mm" />
-          <NumField label="Hauteur" value={height} min={20} onChange={(v) => onChange(width, v)} suffix="mm" />
+          <NumField label="Largeur" value={width} min={20} warnAbove={MAX_W} debounce={SIZE_DEBOUNCE} onChange={(v) => onChange(v, height)} suffix="mm" />
+          <NumField label="Hauteur" value={height} min={20} warnAbove={MAX_H} debounce={SIZE_DEBOUNCE} onChange={(v) => onChange(width, v)} suffix="mm" />
         </div>
       )}
     </div>

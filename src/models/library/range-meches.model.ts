@@ -25,22 +25,22 @@ const DIAM_H = 4.5
 const TEST_OFFSETS = [0, 0.1, 0.2, -0.1, -0.2]
 const offsetText = (o: number) => (o === 0 ? '0' : `${o > 0 ? '+' : '-'}${Math.abs(o)}`)
 
+/** Réglages fixes : mèches par diamètre et par lot, hauteur, jeu des trous et épaisseur du bois (mm). */
+const COUNT = 3
+const HEIGHT = 70
+const CLEARANCE = 0.5
+const THICKNESS = 3
+
 export default defineModel({
   id: 'range-meches',
   name: 'Étui à mèches',
   description: 'Range-mèches de perceuse de 2,5 à 10 mm en trois lots côte à côte (BOIS, METAL, BETON), plusieurs mèches par diamètre. Boîte fermée : deux plaques percées (haut à ras des flancs, et guidage), un fond, deux flancs et deux parois crantés.',
-  params: [
-    { key: 'count', label: 'Mèches par diamètre et par lot', type: 'number', default: 3, min: 1, max: 4, step: 1 },
-    { key: 'height', label: 'Hauteur', type: 'number', default: 70, min: 30, max: 120, step: 5, unit: 'mm' },
-    { key: 'clearance', label: 'Jeu des trous', type: 'number', default: 0.5, min: 0.2, max: 1.5, step: 0.1, unit: 'mm' },
-    { key: 'thickness', label: 'Épaisseur', type: 'number', default: 3, min: 2, max: 6, step: 0.5, unit: 'mm' },
-    { key: 'test', label: 'Plaque d’essai des trous', type: 'boolean', default: true },
-  ],
-  build: (p) => {
-    const n = p.count as number
-    const Hs = p.height as number
-    const clr = p.clearance as number
-    const t = p.thickness as number
+  params: [],
+  build: () => {
+    const n = COUNT
+    const Hs = HEIGHT
+    const clr = CLEARANCE
+    const t = THICKNESS
 
     // Plaque percée : corps W × Dp (entre les flancs et les parois). Tableau régulier gravé : les diamètres à gauche (hors tableau), puis un lot de trous par
     // matériau (nom en en-tête). Toutes les cases ont la même taille (celle du plus gros trou), chaque trou est centré dans sa case, les lignes
@@ -156,7 +156,7 @@ export default defineModel({
     const sideX = W / 2 + t / 2
     const wallZ = Dp / 2 + t / 2
     return {
-      panels: [plate('P', 'Plaque', yTop, true), plate('P', 'Plaque', yGuide, true), plate('S', 'Fond', yBase, false), side(-sideX), side(sideX), wall(-wallZ), wall(wallZ), ...(p.test ? [testPlate] : [])],
+      panels: [plate('P', 'Plaque', yTop, true), plate('P', 'Plaque', yGuide, true), plate('S', 'Fond', yBase, false), side(-sideX), side(sideX), wall(-wallZ), wall(wallZ), testPlate],
       notes: WW > 300 || Dp + 2 * t > 300 ? ['Plaque trop grande pour une planche de 300 mm : réduire le nombre de mèches.'] : [],
     }
   },
