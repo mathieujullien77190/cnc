@@ -182,7 +182,7 @@ export const ModelsView = () => {
       <div className="space-y-3">
         <ModelList models={MODELS} currentId={model?.id} onPick={toggle} />
         {model && <ModelSettings model={model} params={params} explode={explode} colored={colored} onColored={setColored} onParam={setParam} onReset={reset} onExplode={setExplode} />}
-        {cut && model && <CutActions report={report} onDownload={download} onDownloadModel={downloadModel} />}
+        {cut && model && <CutActions report={report} onRefresh={() => void toCut()} onDownload={download} onDownloadModel={downloadModel} />}
       </div>
 
       <div className="min-w-0 space-y-3">
