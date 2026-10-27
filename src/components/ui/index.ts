@@ -1,0 +1,12 @@
+/** Toutes les briques d'interface de l'app : `import { Btn, Card, Checkbox } from '@/components/ui'`. */
+export { default as Card } from './Card'
+export { default as Checkbox } from './Checkbox'
+export { default as EmptyState } from './EmptyState'
+export { default as Field } from './Field'
+export { default as NumField } from './NumField'
+export { default as PartTag } from './PartTag'
+export { default as Select } from './Select'
+export { default as Switch } from './Switch'
+export { default as Title } from './Title'
+export { default as Toolbar } from './Toolbar'
+export * from '@/laser/ui'

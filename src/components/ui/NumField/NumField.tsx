@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Field from '@/components/ui/Field'
 import type { NumFieldProps } from './types'
 
 /** Champ numérique : on peut effacer et retaper ; la valeur n'est transmise que si elle est valide (≥ min). Au-dessus de `warnAbove`, le texte passe en rouge. Avec `debounce` (ms), la valeur n'est transmise qu'une fois les clics ou la frappe terminés (flèches comprises) ; le champ, lui, suit tout de suite. */
@@ -19,8 +20,7 @@ export const NumField = ({ label, value, onChange, min = 0, step = 1, suffix, cl
     if (!pending.current) setText((t) => (Number(t) === value ? t : String(value)))
   }, [value])
   return (
-    <label className={`flex items-center gap-1.5 text-[11px] text-stone-600 ${className}`}>
-      {label && <span className="whitespace-nowrap">{label}</span>}
+    <Field label={label} className={className}>
       <input
         type="number"
         inputMode="decimal"
@@ -39,6 +39,6 @@ export const NumField = ({ label, value, onChange, min = 0, step = 1, suffix, cl
         className={`w-16 rounded border bg-white px-1.5 py-1 text-right text-xs tabular-nums ${over ? 'border-red-400 font-semibold text-red-600' : 'border-stone-300 text-stone-800'}`}
       />
       {suffix && <span className="text-stone-400">{suffix}</span>}
-    </label>
+    </Field>
   )
 }

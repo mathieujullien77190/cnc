@@ -24,22 +24,26 @@ export interface PackPlace extends PackItem {
   rot: boolean
 }
 
+/** Règle de choix de la place libre : meilleur petit côté restant (défaut), meilleur grand côté, meilleure surface, ou le plus bas puis le plus à gauche (repère y vers le bas : le plus haut). */
+export type Rule = 'bssf' | 'blsf' | 'baf' | 'bl'
+
 export class Bin {
   free: Box[]
   items: PackPlace[] = []
-  constructor(sw: number, sh: number, readonly gap: number) {
+  constructor(sw: number, sh: number, readonly gap: number, readonly rule: Rule = 'bssf') {
     this.free = [{ x: 0, y: 0, w: sw + gap, h: sh + gap }] // le jeu peut dépasser de la planche : une pièce de pleine taille tient
   }
 
   find(w: number, h: number, noRotate?: boolean) {
-    let best: { x: number; y: number; w: number; h: number; rot: boolean; short: number; long: number } | null = null
+    let best: { x: number; y: number; w: number; h: number; rot: boolean; short: number; long: number; k1: number; k2: number } | null = null
     for (const f of this.free) {
       const tries: [number, number, boolean][] = noRotate ? [[w, h, false]] : [[w, h, false], [h, w, true]]
       for (const [pw, ph, rot] of tries) {
         if (pw > f.w || ph > f.h) continue
         const short = Math.min(f.w - pw, f.h - ph)
         const long = Math.max(f.w - pw, f.h - ph)
-        if (!best || short < best.short || (short === best.short && long < best.long)) best = { x: f.x, y: f.y, w: pw, h: ph, rot, short, long }
+        const [k1, k2] = this.rule === 'bssf' ? [short, long] : this.rule === 'blsf' ? [long, short] : this.rule === 'baf' ? [f.w * f.h - pw * ph, short] : [f.y + ph, f.x]
+        if (!best || k1 < best.k1 || (k1 === best.k1 && k2 < best.k2)) best = { x: f.x, y: f.y, w: pw, h: ph, rot, short, long, k1, k2 }
       }
     }
     return best
@@ -87,10 +91,12 @@ export class Bin {
 
 type Packed = { bins: Bin[]; rejected: PackItem[] }
 
-const tooBig = (it: PackItem, sw: number, sh: number) =>
+export const tooBig = (it: Pick<PackItem, 'w' | 'h' | 'noRotate'>, sw: number, sh: number) =>
   it.noRotate ? it.w > sw || it.h > sh : Math.min(it.w, it.h) > Math.min(sw, sh) || Math.max(it.w, it.h) > Math.max(sw, sh)
 
-const ORDERS: ((a: PackItem, b: PackItem) => number)[] = [
+export type Order = (a: PackItem, b: PackItem) => number
+
+export const ORDERS: Order[] = [
   (a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.w * b.h - a.w * a.h,
   (a, b) => b.w * b.h - a.w * a.h || Math.max(b.w, b.h) - Math.max(a.w, a.h),
   (a, b) => Math.min(b.w, b.h) - Math.min(a.w, a.h) || b.w * b.h - a.w * a.h,
@@ -102,11 +108,12 @@ const ORDERS: ((a: PackItem, b: PackItem) => number)[] = [
 /**
  * Range `items` dans des planches de sw × sh (jeu `gap` entre pièces). `multi` faux : une seule planche, ce qui ne tient pas est rejeté.
  * `fixed` : pièces déjà posées (x, y, w, h de la planche, rot) autour desquelles on range le reste (première planche seulement).
+ * `orders` : ordres de tri essayés (par défaut `ORDERS`). `rule` : règle de choix de la place libre.
  */
-export const pack = (items: PackItem[], sw: number, sh: number, gap: number, { multi = true, fixed = [] as PackPlace[] } = {}): { bins: PackPlace[][]; rejected: PackItem[] } => {
+export const pack = (items: PackItem[], sw: number, sh: number, gap: number, { multi = true, fixed = [] as PackPlace[], orders = ORDERS as Order[], rule = 'bssf' as Rule } = {}): { bins: PackPlace[][]; rejected: PackItem[] } => {
   let best: Packed | null = null
-  for (const order of ORDERS) {
-    const start = new Bin(sw, sh, gap)
+  for (const order of orders) {
+    const start = new Bin(sw, sh, gap, rule)
     for (const f of fixed) start.occupy(f)
     const bins = packOnce(start, items, sw, sh, gap, order, multi)
     if (!best || bins.rejected.length < best.rejected.length || (bins.rejected.length === best.rejected.length && bins.bins.length < best.bins.length)) best = bins
@@ -127,7 +134,7 @@ const packOnce = (first: Bin, items: PackItem[], sw: number, sh: number, gap: nu
       out.rejected.push(it)
       continue
     }
-    const b = new Bin(sw, sh, gap)
+    const b = new Bin(sw, sh, gap, first.rule)
     if (b.place(it)) out.bins.push(b)
     else out.rejected.push(it)
   }

@@ -76,6 +76,7 @@ const buildJob = (sheet: Sheet, marking: Marking): LaserJob => {
 
   // gravure : le cadre d'abord, puis les noms, pièce par pièce
   const engrave: Pt[][] = []
+  const drawingLines: Pt[][] = [] // dessins des modèles : gravés après les noms, montrés d'une autre couleur dans l'aperçu laser
   const frame = marking.frame ? frameRect(sheet) : null
   if (frame) {
     const r = planRoute([{ free: [flip(frame)] }], [], pos, { budgetMs: 0 })
@@ -101,7 +102,7 @@ const buildJob = (sheet: Sheet, marking: Marking): LaserJob => {
     const groups: Group[] = sheet.items.flatMap((it) => ((drawings.get(it.uid)?.length ?? 0) ? [{ free: drawings.get(it.uid)!.map(flip) }] : []))
     if (groups.length) {
       const r = planRoute(groups, [], pos, { budgetMs: ROUTE_BUDGET_MS })
-      engrave.push(...r.steps.flatMap((st) => st.contours))
+      drawingLines.push(...r.steps.flatMap((st) => st.contours))
       travel += r.travel
       baseline += r.baseline
       pos = r.end
@@ -135,7 +136,7 @@ const buildJob = (sheet: Sheet, marking: Marking): LaserJob => {
     widthMm: sheet.width,
     heightMm: sheet.height,
     title: `${sheet.label} — contreplaqué ${sheet.thickness} mm`,
-    layers: { cut: pieces.flatMap((p) => p.contours), ...(engrave.length ? { engrave } : {}) },
+    layers: { cut: pieces.flatMap((p) => p.contours), ...(engrave.length ? { engrave } : {}), ...(drawingLines.length ? { drawings: drawingLines } : {}) },
     pieces,
     ordered: true,
     frame: sheet.items.length ? { minX, minY, maxX, maxY } : undefined,
@@ -144,14 +145,13 @@ const buildJob = (sheet: Sheet, marking: Marking): LaserJob => {
   return job
 }
 
-const NOTICE = 'Le cadre et les noms (si cochés) sont gravés à bas régime avant la coupe. Les coupes (trous d’abord, puis le contour de chaque pièce) suivent.'
 
 /** Les planches proposées au pilotage de la laser. Le travail d'une planche (ordre de coupe optimisé) n'est calculé que quand on la choisit. */
 export const laserItems = (sheets: { sheet: Sheet; marking: Marking }[]): LaserItem[] =>
   sheets
     .filter((s) => s.sheet.items.length)
     .map(({ sheet, marking }) => {
-      const item = { label: sheet.label, fileName: sheet.key, notice: NOTICE } as LaserItem
+      const item = { label: sheet.label, fileName: sheet.key } as LaserItem
       // calculé une seule fois, et seulement quand on le lit. Propriétés non énumérables : en développement, React lit toutes les propriétés
       // des props pour afficher leurs différences, ce qui lançait le calcul du parcours à chaque rendu (plus d'une seconde par clic).
       let job: ReturnType<typeof sheetToJob> | undefined

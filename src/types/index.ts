@@ -1,4 +1,4 @@
-import type { CustomBoard, Marking, Part, Sheet, SheetSettings } from '@/core/types'
+import type { CustomBoard, Marking, Sheet } from '@/core/types'
 
 /** Onglets de l'application. */
 export type Tab = 'auto' | 'perso' | 'modeles'
@@ -16,17 +16,6 @@ export type ImportReport = {
   added: number
   replaced: number
   errors: string[]
-}
-
-/** Le projet tel qu'il est gardé dans localStorage (format `cnc-projet-v1`). */
-export type ProjectState = {
-  parts: Part[]
-  settings: SheetSettings
-  /** Cases cochées par planche automatique (clé de planche). */
-  autoMarking: Record<string, Marking>
-  boards: CustomBoard[]
-  /** Planches marquées « fait » (clé de planche). */
-  done: Record<string, boolean>
 }
 
 /** Fenêtre visible d'une planche (mm) : x, y du coin haut-gauche et largeur ; la hauteur suit le rapport de la planche. */

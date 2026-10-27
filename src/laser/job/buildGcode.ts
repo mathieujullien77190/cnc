@@ -23,18 +23,22 @@ export function buildGcode(job: LaserJob, opt: CutOptions): GcodeJob {
   const w = new Writer(opt.rapidFeed ?? DEFAULT_RAPID, job.widthMm, job.heightMm, opt.motion);
   const contours = orderContours(job);
   const engrave = (job.layers.engrave ?? []).map((p) => simplifyContour(p)).filter((p) => p.length >= 3);
+  const drawings = (job.layers.drawings ?? []).map((p) => simplifyContour(p)).filter((p) => p.length >= 3);
   const s = powerToS(opt.powerPct, opt.sMax, opt.capPct);
   const feed = Math.max(1, opt.feed);
   const eFeed = Math.max(1, opt.engraveFeed ?? 1500);
   const ePower = opt.engravePowerPct ?? 15;
   const eS = powerToS(ePower, opt.sMax, opt.capPct);
   const ePasses = Math.max(1, Math.round(opt.engravePasses ?? 1));
-  const clamped = opt.powerPct > opt.capPct || opt.powerPct > 100 || (engrave.length > 0 && ePower > opt.capPct);
+  const clamped = opt.powerPct > opt.capPct || opt.powerPct > 100 || ((engrave.length > 0 || drawings.length > 0) && ePower > opt.capPct);
   prologue(w, opt.air);
-  for (let p = 0; p < ePasses; p++) for (const c of engrave) w.cut(c, eFeed, eS, p === 0, true);
+  for (let p = 0; p < ePasses; p++) {
+    for (const c of engrave) w.cut(c, eFeed, eS, p === 0, true);
+    for (const c of drawings) w.cut(c, eFeed, eS, p === 0, true, undefined, true);
+  }
   emitContours(w, contours, { feed, s, passes: opt.passes, passMode: opt.passMode });
   epilogue(w, opt.air);
-  const stats = w.stats(contours.length + engrave.length, clamped);
+  const stats = w.stats(contours.length + engrave.length + drawings.length, clamped);
   return {
     lines: w.lines, lineTimes: w.lineTimes, segments: w.segments, segLines: w.segLines, stats,
     header: [
@@ -42,7 +46,7 @@ export function buildGcode(job: LaserJob, opt: CutOptions): GcodeJob {
       `Planche ${num(job.widthMm)} x ${num(job.heightMm)} mm ; origine de travail = coin bas-gauche, X à droite, Y vers l'arrière`,
       `${contours.length} contours, ${Math.max(1, Math.round(opt.passes))} passe(s) (${opt.passMode === 'all' ? 'tout le jeu' : 'contour par contour'}), F${num(feed)} mm/min, S${s}/${opt.sMax}`,
       ...(opt.air ? ["Assistance d'air : M8 avant la coupe, M9 après"] : []),
-      ...(engrave.length ? [`${engrave.length} contours gravés avant la coupe : F${num(eFeed)} mm/min, S${eS}/${opt.sMax}, ${ePasses} passe(s)`] : ['Les noms des pièces ne sont pas gravés.']),
+      ...(engrave.length + drawings.length ? [`${engrave.length + drawings.length} contours gravés avant la coupe (dont ${drawings.length} de dessins) : F${num(eFeed)} mm/min, S${eS}/${opt.sMax}, ${ePasses} passe(s)`] : ['Les noms des pièces ne sont pas gravés.']),
     ],
   };
 }

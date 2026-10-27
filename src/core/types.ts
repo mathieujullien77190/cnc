@@ -57,6 +57,16 @@ export interface Sheet {
   fill: number
 }
 
+/** Solution de « Optimiser mieux » : une graine par groupe de pièces (épaisseur, ou épaisseur et famille), valable tant que `sig` est celle des pièces et réglages. */
+export interface DeepPlan {
+  sig: string
+  /** Clé de groupe (`3`, `3|R`) -> graine du rangement en profondeur. Un groupe absent garde le rangement normal. */
+  seeds: Record<string, number>
+  /** Nombre de planches avant et après (pour l'affichage). */
+  before: number
+  after: number
+}
+
 export interface SheetSettings {
   width: number
   height: number
@@ -66,6 +76,8 @@ export interface SheetSettings {
   spread?: boolean
   /** Une série de planches par famille de pièces (R, S…) au lieu de tout mélanger. */
   byType?: boolean
+  /** Solution de « Optimiser mieux » (absente : rangement normal). */
+  deep?: DeepPlan
 }
 
 export interface Marking {

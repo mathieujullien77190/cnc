@@ -1,14 +1,17 @@
 import type { MachineSettings } from './types';
 
 /** Clé localStorage des réglages de la machine (vitesse, puissance, passes, plafond…). */
+/** Couleur des dessins gravés dans l'aperçu du trajet (les noms et le cadre restent en bleu). */
+export const DRAWING_COLOR = '#9333ea';
+
 export const MACHINE_SETTINGS_KEY = 'laser-reglages';
 
 /**
- * Valeurs de départ du constructeur (tableau « Sculpfun E1 Paramètres », laser bleu 21 W, contreplaqué de tilleul 3 mm : coupe 750 mm/min à 100 % en 1 passe, gravure 5000 mm/min à 10 %), À CALIBRER selon le contreplaqué réel (départ de cette app : 660 mm/min à 100 %).
+ * Valeurs de départ du constructeur (tableau « Sculpfun E1 Paramètres », laser bleu 21 W, contreplaqué de tilleul 3 mm : coupe 750 mm/min à 100 % en 1 passe, gravure 5000 mm/min à 10 %), À CALIBRER selon le contreplaqué réel (départ de cette app : 650 mm/min à 100 %).
  * Régler vitesse et puissance sur une chute avant de couper de vraies pièces.
  */
 export const DEFAULT_MACHINE_SETTINGS: MachineSettings = {
-  feed: 660, // choisi après la planche d'essai sur ta machine : il reste un fil de bois, la pièce ne tombe pas (le constructeur annonce 750 mm/min pour du tilleul de 3 mm)
+  feed: 650, // départ choisi pour ta machine à 100 % (le constructeur annonce 750 mm/min pour du tilleul de 3 mm) ; à ajuster avec la planche d'essai
   power: 100,
   passes: 1,
   passMode: 'all',

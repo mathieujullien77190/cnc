@@ -1,10 +1,7 @@
 import { useMemo } from 'react'
 import type { CustomBoard, Marking, Override, Part, SheetSettings } from '@/core/types'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
-import { projectActions } from '@/store/projectSlice'
-import { selectBoards, selectDone, selectParts, selectSettings } from '@/store/selectors'
-import { importFiles, importTexts, replaceTexts, type FileText } from '@/store/thunks'
-import { useSheets } from '@/store/useSheets'
+import { importFiles, importTexts, projectActions, replaceTexts, selectBoards, selectDone, selectParts, selectSettings, useSheets, type FileText } from '@/store/project'
 
 /**
  * Façade mince sur le store : le projet (catalogue de pièces, réglages de planche, planches automatiques et personnalisées)

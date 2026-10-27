@@ -40,7 +40,7 @@ export interface CutOptions {
   engravePasses?: number;
 }
 
-export interface Segment { x0: number; y0: number; x1: number; y1: number; cut: boolean; /** Gravure (trait léger) plutôt que coupe. */ engrave?: boolean; /** Pièce dont ce contour fait partie (nom) : l'aperçu passe une pièce en pointillé quand elle est finie. */ piece?: string }
+export interface Segment { x0: number; y0: number; x1: number; y1: number; cut: boolean; /** Gravure (trait léger) plutôt que coupe. */ engrave?: boolean; /** Gravure d'un dessin (et non d'un nom ou du cadre) : autre couleur dans l'aperçu. */ drawing?: boolean; /** Pièce dont ce contour fait partie (nom) : l'aperçu passe une pièce en pointillé quand elle est finie. */ piece?: string }
 
 export interface GcodeStats {
   /** Contours distincts (pièces + trous). */
@@ -130,7 +130,7 @@ export class Writer {
     this.x = x; this.y = y;
   }
   /** Coupe un contour fermé : part du premier point, revient au premier point. */
-  cut(pts: [number, number][], feed: number, s: number, record: boolean, engrave = false, piece?: string) {
+  cut(pts: [number, number][], feed: number, s: number, record: boolean, engrave = false, piece?: string, drawing = false) {
     this.rapid(pts[0][0], pts[0][1], record);
     this.bound(pts[0][0], pts[0][1]);
     const seq = [...pts.slice(1), pts[0]];
@@ -141,7 +141,7 @@ export class Writer {
       if (engrave) this.engraveMm += d; else this.cutMm += d;
       this.maxS = Math.max(this.maxS, s);
       this.bound(x, y);
-      if (record) this.segment({ x0: this.x, y0: this.y, x1: x, y1: y, cut: true, ...(engrave ? { engrave: true } : {}), ...(piece ? { piece } : {}) });
+      if (record) this.segment({ x0: this.x, y0: this.y, x1: x, y1: y, cut: true, ...(engrave ? { engrave: true } : {}), ...(drawing ? { drawing: true } : {}), ...(piece ? { piece } : {}) });
       this.x = x; this.y = y;
     });
   }

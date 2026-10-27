@@ -1,12 +1,12 @@
 import { familyOf } from './family'
-import { frameBox } from './job'
 import { markPiece } from './marking'
-import { pack, type Box, type PackItem, type PackPlace } from './nesting'
+import { makeRng, nestParts, rectHoles, turnAny, type Composite, type NestCache } from './hollow'
+import { ORDERS, pack, tooBig, type Order, type PackItem, type PackPlace, type Rule } from './nesting'
 import type { CustomBoard, Marking, Override, Part, Placed, Pt, Sheet, SheetSettings } from './types'
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000
 
-interface Instance {
+export interface Instance {
   uid: string
   part: Part
 }
@@ -14,35 +14,8 @@ interface Instance {
 export const instancesOf = (parts: Part[], qtyOf: (p: Part) => number): Instance[] =>
   parts.flatMap((part) => Array.from({ length: Math.max(0, qtyOf(part)) }, (_, i) => ({ uid: `${part.key}#${i + 1}`, part })))
 
-/** Trous rectangulaires (droits, d'au moins 12 mm) d'une pièce : des pièces plus petites peuvent s'y ranger. */
-const rectHoles = (part: Part): Box[] =>
-  part.holes
-    .map((h) => {
-      const xs = h.map((p) => p[0])
-      const ys = h.map((p) => p[1])
-      const box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
-      const area = Math.abs(h.reduce((s, p, i) => s + p[0] * h[(i + 1) % h.length][1] - h[(i + 1) % h.length][0] * p[1], 0)) / 2
-      return Math.abs(area - box.w * box.h) < 1e-3 * box.w * box.h && box.w >= 12 && box.h >= 12 ? box : null
-    })
-    .filter((b): b is Box => !!b)
-
 /** Rotation de 90° d'un contour (y vers le bas) dans sa boîte de hauteur h : (x, y) -> (h - y, x). */
 const turn90 = (pts: Pt[], h: number): Pt[] => pts.map(([x, y]) => [h - y, x])
-
-/** Contour tourné d'un angle quelconque (degrés, sens horaire, y vers le bas) autour du centre de la pièce, ramené à l'origine. */
-const turnAny = (part: Part, deg: number) => {
-  const r = (deg * Math.PI) / 180
-  const c = Math.cos(r)
-  const s = Math.sin(r)
-  const cx = part.w / 2
-  const cy = part.h / 2
-  const rot = (pts: Pt[]): Pt[] => pts.map(([x, y]) => [cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c])
-  const outer = rot(part.outer)
-  const x0 = Math.min(...outer.map((p) => p[0]))
-  const y0 = Math.min(...outer.map((p) => p[1]))
-  const shift = (pts: Pt[]): Pt[] => pts.map(([x, y]) => [x - x0, y - y0])
-  return { outer: shift(outer), holes: part.holes.map((h) => shift(rot(h))), labels: part.labels?.map((l) => shift(rot(l))), w: Math.max(...outer.map((p) => p[0])) - x0, h: Math.max(...outer.map((p) => p[1])) - y0 }
-}
 
 /** Angle actuel d'une pièce posée (degrés). */
 export const angleOf = (it: { rot: boolean; angle?: number }) => it.angle ?? (it.rot ? 90 : 0)
@@ -76,21 +49,23 @@ const EXTRAS = [12, 10, 8, 6, 5, 4, 3, 2, 1.5, 1]
 interface PackOpts {
   multi: boolean
   fixed?: PackPlace[]
+  orders?: Order[]
+  rule?: Rule
 }
+
+const smallOf = (items: PackItem[], W: number, H: number) => items.map((it) => Math.max(it.w, it.h) <= Math.min(W, H) * SMALL_RATIO)
 
 /**
  * Range les pièces ; avec `spread`, desserre les petites : on cherche le plus grand espace supplémentaire autour d'elles qui ne demande
  * ni planche de plus ni pièce rejetée de plus que le rangement serré. Sans solution, on garde le rangement serré.
  */
-const packSpreadTop = (insts: Instance[], W: number, H: number, gap: number, spread: boolean, o: PackOpts) => {
-  const base = pack(insts.map(toItem), W, H, gap, o)
+const packSpreadItems = (list: PackItem[], W: number, H: number, gap: number, spread: boolean, o: PackOpts) => {
+  const base = pack(list, W, H, gap, o)
   if (!spread) return base
-  const limit = Math.min(W, H) * SMALL_RATIO
-  const small = insts.map((i) => Math.max(i.part.w, i.part.h) <= limit)
+  const small = smallOf(list, W, H)
   if (!small.some(Boolean)) return base
   for (const extra of EXTRAS) {
-    const items = insts.map((inst, idx): PackItem => {
-      const it = toItem(inst, idx)
+    const items = list.map((it, idx): PackItem => {
       if (!small[idx]) return it
       return { ...it, w: it.w + extra, h: it.h + extra, holes: it.holes?.map((h) => ({ ...h, x: h.x + extra / 2, y: h.y + extra / 2 })) }
     })
@@ -103,12 +78,139 @@ const packSpreadTop = (insts: Instance[], W: number, H: number, gap: number, spr
   return base
 }
 
+const packSpreadTop = (insts: Instance[], W: number, H: number, gap: number, spread: boolean, o: PackOpts) => packSpreadItems(insts.map(toItem), W, H, gap, spread, o)
+
 /** Le rangement part du coin bas-gauche de la planche (comme la machine) : on range depuis le haut dans un repère retourné, puis on retourne le résultat. */
 const packSpread = (insts: Instance[], W: number, H: number, gap: number, spread: boolean, o: PackOpts) => {
   const flip = <T extends { y: number; h: number }>(p: T): T => ({ ...p, y: H - p.y - p.h })
   const r = packSpreadTop(insts, W, H, gap, spread, { ...o, fixed: o.fixed?.map(flip) })
   return { bins: r.bins.map((bin) => bin.map(flip)), rejected: r.rejected }
 }
+
+/** Une pièce posée sur la planche (coin de sa boîte, `rot` : 90°, `angle` : rotation libre) : le résultat d'un rangement, avant de devenir une `Placed`. */
+export interface Row {
+  inst: Instance
+  x: number
+  y: number
+  rot: boolean
+  angle?: number
+}
+
+/** Un rangement : les pièces de chaque planche (repère de la zone utile, sans la marge) et ce qui ne tient pas. */
+export interface Layout {
+  bins: Row[][]
+  rejected: Instance[]
+}
+
+/** Rangement normal (MaxRects, trous rectangulaires réutilisés, desserrage éventuel). */
+export const baseLayout = (insts: Instance[], W: number, H: number, gap: number, spread: boolean): Layout => {
+  const { bins, rejected } = packSpread(insts, W, H, gap, spread, { multi: true })
+  return { bins: bins.map((bin) => bin.map((pl) => ({ inst: insts[pl.idx], x: pl.x, y: pl.y, rot: pl.rot }))), rejected: rejected.map((r) => insts[r.idx]) }
+}
+
+/** Pas d'angle essayés pour les pièces rangées dans des trous : 90° le plus souvent, parfois plus fin. */
+const DEEP_STEPS = [90, 90, 45, 30, 15]
+const DEEP_RULES: Rule[] = ['bssf', 'blsf', 'baf', 'bl']
+
+/** Pièces d'un composite sur la planche : l'hôte posé en `pl` (tourné de 90° ou non), les invitées à leur place dans son repère. */
+const rowsOf = (insts: Instance[], comp: Composite, pl: { x: number; y: number; rot: boolean }): Row[] => {
+  const root = insts[comp.members[0].idx]
+  return comp.members.map((m, k) => {
+    const inst = insts[m.idx]
+    if (k === 0) return { inst, x: pl.x, y: pl.y, rot: pl.rot }
+    const t = turnAny(inst.part, m.deg)
+    const deg = (m.deg + (pl.rot ? 90 : 0)) % 360
+    const x = r3(pl.rot ? pl.x + root.part.h - m.y - t.h : pl.x + m.x)
+    const y = r3(pl.rot ? pl.y + m.x : pl.y + m.y)
+    return deg === 0 ? { inst, x, y, rot: false } : deg === 90 ? { inst, x, y, rot: true } : { inst, x, y, rot: false, angle: deg }
+  })
+}
+
+/**
+ * Rangement « en profondeur » de la graine `seed` : les pièces qui tiennent dans le trou d'une autre (forme quelconque, vrai test de polygone,
+ * jeu `max(gap, 1)` mm) y sont posées d'abord ; chaque hôte avec ses invitées est ensuite rangé comme une seule pièce. La graine 0 est
+ * déterministe (tailles décroissantes, 4 angles) ; les autres perturbent l'ordre, les angles essayés, les ordres de tri et la règle de place. Sans validation : voir `layoutValid`.
+ * `cache` : à partager entre des essais sur les mêmes pièces (accélère la recherche, ne change pas le résultat).
+ */
+export const deepLayout = (insts: Instance[], W: number, H: number, gap: number, spread: boolean, seed: number, cache?: NestCache): Layout => {
+  const rng = makeRng(Math.imul(seed + 1, 0x9e3779b1) ^ 0x5bd1e995)
+  const rnd = seed > 0
+  const noise = rnd ? 0.05 + 0.4 * rng() : 0
+  const angleStep = rnd ? DEEP_STEPS[Math.floor(rng() * DEEP_STEPS.length)] : 90
+  const skip = rnd && rng() < 0.5 ? 0.1 + 0.3 * rng() : 0
+  const shuffleAngles = rnd && rng() < 0.5
+  const eligible = insts.map((i) => !tooBig({ w: i.part.w, h: i.part.h, noRotate: i.part.rotate === 'none' }, W, H))
+  const comps = nestParts(insts.map((i) => i.part), { clearance: Math.max(gap, 1), cache, eligible, rng, noise, angleStep, shuffleAngles, skip })
+  const items = comps.map((c, ci): PackItem => {
+    const root = insts[c.members[0].idx].part
+    return { w: root.w, h: root.h, idx: ci, noRotate: c.noRotate, holes: c.holes }
+  })
+  const keyed = (): Order => {
+    const k = items.map((it) => it.w * it.h * (1 + noise * (rng() * 2 - 1)))
+    return (a, b) => k[b.idx] - k[a.idx] || a.idx - b.idx
+  }
+  const orders = rnd ? [...ORDERS, keyed(), keyed()] : ORDERS
+  const rule = rnd ? DEEP_RULES[Math.floor(rng() * DEEP_RULES.length)] : 'bssf'
+  const r = packSpreadItems(items, W, H, gap, spread, { multi: true, orders, rule })
+  return {
+    bins: r.bins.map((bin) => bin.flatMap((pl) => rowsOf(insts, comps[pl.idx], { x: pl.x, y: H - pl.y - pl.h, rot: pl.rot }))),
+    rejected: r.rejected.flatMap((it) => comps[it.idx].members.map((m) => insts[m.idx])),
+  }
+}
+
+/** Le rangement est-il sûr ? Toutes les pièces posées une fois, aucune ne sort ni n'en chevauche une autre (une pièce dans un trou est permise). */
+export const layoutValid = (l: Layout, insts: Instance[], W: number, H: number): boolean => {
+  if (l.bins.reduce((s, b) => s + b.length, 0) + l.rejected.length !== insts.length) return false
+  return l.bins.every((bin) => {
+    const items = bin.map((r, i) => placePart(r.inst, r.x, r.y, r.rot, i + 1, r.angle))
+    return conflicts({ items, width: W, height: H } as Sheet).size === 0
+  })
+}
+
+/** Rangement d'un groupe : normal, ou « en profondeur » si une graine est donnée (et sûre : sinon le rangement normal). */
+export const layoutGroup = (insts: Instance[], W: number, H: number, gap: number, spread: boolean, seed?: number): Layout => {
+  if (seed !== undefined) {
+    const l = deepLayout(insts, W, H, gap, spread, seed)
+    if (layoutValid(l, insts, W, H)) return l
+  }
+  return baseLayout(insts, W, H, gap, spread)
+}
+
+/** Un groupe de pièces rangées ensemble : même épaisseur (et même famille avec `byType`). `key` : `3` ou `3|R`. */
+export interface AutoGroup {
+  t: number
+  family: string
+  key: string
+  insts: Instance[]
+}
+
+export const autoGroups = (parts: Part[], s: SheetSettings): AutoGroup[] => {
+  const thicknesses = [...new Set(parts.filter((p) => p.qty > 0).map((p) => p.thickness))].sort((a, b) => a - b)
+  return thicknesses.flatMap((t) => {
+    const all = instancesOf(parts.filter((p) => p.thickness === t), (p) => p.qty)
+    // sans `byType` tout est rangé ensemble ; avec, chaque famille a ses propres planches
+    const groups = s.byType ? [...new Set(all.map((i) => familyOf(i.part.id)))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true })).map((family) => ({ family, insts: all.filter((i) => familyOf(i.part.id) === family) })) : [{ family: '', insts: all }]
+    return groups.map((g) => ({ t, family: g.family, key: g.family ? `${t}|${g.family}` : `${t}`, insts: g.insts }))
+  })
+}
+
+/** Empreinte de ce dont dépend le rangement automatique (réglages de planche, pièces et quantités) : une solution « Optimiser mieux » n'est valable que pour la même. */
+export const deepSignature = (parts: Part[], s: SheetSettings): string => {
+  let h = 2166136261
+  const add = (text: string) => {
+    for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619)
+  }
+  add(`${s.width}|${s.height}|${s.margin}|${s.gap}|${s.spread ? 1 : 0}|${s.byType ? 1 : 0}`)
+  for (const p of parts) {
+    if (p.qty <= 0) continue
+    add(`;${p.key}|${p.qty}|${p.thickness}|${p.rotate}|${p.w}|${p.h}`)
+    for (const pts of [p.outer, ...p.holes]) add(`|${pts.length}:${pts.reduce((a, q) => a + q[0] * 7 + q[1] * 13, 0).toFixed(2)}`)
+  }
+  return (h >>> 0).toString(36)
+}
+
+/** La solution « Optimiser mieux » gardée dans les réglages, si elle correspond encore aux pièces et aux réglages. */
+export const validDeep = (parts: Part[], s: SheetSettings) => (s.deep && s.deep.sig === deepSignature(parts, s) ? s.deep : undefined)
 
 const fillOf = (items: Placed[], w: number, h: number) => items.reduce((s, it) => s + it.w * it.h, 0) / (w * h)
 
@@ -121,34 +223,29 @@ export const buildAutoSheets = (parts: Part[], s: SheetSettings): Sheet[] => {
   const H = s.height - 2 * s.margin
   const out: Sheet[] = []
   const families = new Map<string, string>() // clé de planche -> famille (avec `byType`)
-  const thicknesses = [...new Set(parts.filter((p) => p.qty > 0).map((p) => p.thickness))].sort((a, b) => a - b)
-  for (const t of thicknesses) {
-    const all = instancesOf(parts.filter((p) => p.thickness === t), (p) => p.qty)
-    // sans `byType` tout est rangé ensemble ; avec, chaque famille a ses propres planches
-    const groups = s.byType ? [...new Set(all.map((i) => familyOf(i.part.id)))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true })).map((family) => ({ family, insts: all.filter((i) => familyOf(i.part.id) === family) })) : [{ family: '', insts: all }]
-    for (const { family, insts } of groups) {
-      const stem = family ? `auto-${t}-${family}` : `auto-${t}`
-      const { bins, rejected } = packSpread(insts, W, H, s.gap, !!s.spread, { multi: true })
-      bins.forEach((bin, bi) => {
-        const items = numbered(bin.map((pl) => ({ inst: insts[pl.idx], x: pl.x + s.margin, y: pl.y + s.margin, rot: pl.rot })))
-        const key = `${stem}-${bi + 1}`
-        families.set(key, family)
-        out.push({ key, label: `${t} mm · planche ${bi + 1}`, thickness: t, width: s.width, height: s.height, items, rejected: [], custom: false, fill: fillOf(items, s.width, s.height) })
-      })
-      if (rejected.length) {
-        const last = [...out].reverse().find((sh) => sh.thickness === t && families.get(sh.key) === family)
-        const lost = rejected.map((r) => insts[r.idx].part)
-        if (last) last.rejected = lost
-        else {
-          families.set(`${stem}-0`, family)
-          out.push({ key: `${stem}-0`, label: `${t} mm · rien ne tient`, thickness: t, width: s.width, height: s.height, items: [], rejected: lost, custom: false, fill: 0 })
-        }
+  const plan = validDeep(parts, s)
+  for (const { t, family, key: groupKey, insts } of autoGroups(parts, s)) {
+    const stem = family ? `auto-${t}-${family}` : `auto-${t}`
+    const { bins, rejected } = layoutGroup(insts, W, H, s.gap, !!s.spread, plan?.seeds[groupKey])
+    bins.forEach((bin, bi) => {
+      const items = numbered(bin.map((r) => ({ ...r, x: r.x + s.margin, y: r.y + s.margin })))
+      const key = `${stem}-${bi + 1}`
+      families.set(key, family)
+      out.push({ key, label: `${t} mm · planche ${bi + 1}`, thickness: t, width: s.width, height: s.height, items, rejected: [], custom: false, fill: fillOf(items, s.width, s.height) })
+    })
+    if (rejected.length) {
+      const last = [...out].reverse().find((sh) => sh.thickness === t && families.get(sh.key) === family)
+      const lost = rejected.map((r) => r.part)
+      if (last) last.rejected = lost
+      else {
+        families.set(`${stem}-0`, family)
+        out.push({ key: `${stem}-0`, label: `${t} mm · rien ne tient`, thickness: t, width: s.width, height: s.height, items: [], rejected: lost, custom: false, fill: 0 })
       }
     }
   }
   // numéro de planche unique sur tout le travail, toutes épaisseurs confondues
   let n = 0
-  return out.map((sh) => (sh.items.length ? { ...sh, mark: String(++n), label: `planche ${n}${families.get(sh.key) ? ` · ${families.get(sh.key)}` : ''} · ${sh.thickness} mm` } : sh))
+  return out.map((sh) => (sh.items.length ? { ...sh, mark: String(++n), label: `planche ${n}${families.get(sh.key) ? ` · ${families.get(sh.key)}` : ''}` } : sh))
 }
 
 /** Une planche (automatique) reprise telle quelle comme planche perso : mêmes pièces, chacune à sa place. */

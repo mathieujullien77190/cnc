@@ -18,6 +18,8 @@ export interface LaserJob {
     cut: Polyline[];
     /** Contours à graver (trait léger, avant la coupe). */
     engrave?: Polyline[];
+    /** Dessins à graver (même trait léger que `engrave`, après lui) : l'aperçu les montre dans une autre couleur. */
+    drawings?: Polyline[];
   };
   /** Les mêmes contours de coupe regroupés par pièce (ordre de coupe exact). Facultatif. */
   pieces?: LaserPiece[];

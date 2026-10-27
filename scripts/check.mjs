@@ -313,6 +313,100 @@ try {
       check(laid.every((sh) => sh.rejected.length === 0), `${m.id} (${label}) : toutes les pièces tiennent sur du 300 × 300`)
     }
   }
+  // --- « Optimiser mieux » : pièces rangées dans les trous (formes quelconques) d'autres pièces ---
+  const { deepSearch } = await server.ssrLoadModule('/src/core/deep.ts')
+  const { deepSignature, validDeep } = await server.ssrLoadModule('/src/core/sheets.ts')
+  const mk = (id, outer, holes = [], extra = {}) => {
+    const xs = outer.map((p) => p[0])
+    const ys = outer.map((p) => p[1])
+    const x0 = Math.min(...xs)
+    const y0 = Math.min(...ys)
+    const mv = (pts) => pts.map(([x, y]) => [x - x0, y - y0])
+    return { key: `t/${id}`, id, category: 'T', project: 't', thickness: 3, material: 'ctp', outer: mv(outer), holes: holes.map(mv), qty: 1, rotate: 'any90', w: Math.max(...xs) - x0, h: Math.max(...ys) - y0, ...extra }
+  }
+  const rectPoly = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]
+  const ellipse = (cx, cy, rx, ry, n = 48) => Array.from({ length: n }, (_, i) => [cx + rx * Math.cos((2 * Math.PI * i) / n), cy + ry * Math.sin((2 * Math.PI * i) / n)])
+  const ptSegDist = (p, a, b) => {
+    const dx = b[0] - a[0]
+    const dy = b[1] - a[1]
+    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy || 1)))
+    return Math.hypot(a[0] + t * dx - p[0], a[1] + t * dy - p[1])
+  }
+  const edgeDist = (p, poly) => Math.min(...poly.map((a, i) => ptSegDist(p, a, poly[(i + 1) % poly.length])))
+  const dset = { width: 300, height: 300, margin: 5, gap: 1 }
+  const withDeep = (ps, s = dset, seeds = { 3: 0 }) => ({ ...s, deep: { sig: deepSignature(ps, s), seeds, before: 2, after: 1 } })
+
+  // hôte 120 × 120 avec un grand trou ovale (90 × 60), petite pièce 40 × 20 qui y tient, pièce 80 × 50 qui tient dans la boîte du trou mais pas dans l'ovale
+  const host = mk('H-01', rectPoly(0, 0, 120, 120), [ellipse(60, 60, 45, 30)])
+  const little = mk('S-01', rectPoly(0, 0, 40, 20))
+  const wide = mk('W-01', rectPoly(0, 0, 80, 50))
+  const dpOne = [host, little]
+  const dsOne = buildAutoSheets(dpOne, withDeep(dpOne))
+  const dHost = dsOne[0]?.items.find((i) => i.part.id === 'H-01')
+  const dLittle = dsOne[0]?.items.find((i) => i.part.id === 'S-01')
+  const hole = dHost?.holes[0]
+  check(dsOne.length === 1 && !!dHost && !!dLittle && dLittle.outer.every((p) => lbInside(p, hole)), 'optimiser mieux : la petite pièce est posée dans le trou ovale de l’hôte')
+  check(dLittle.outer.every((p) => edgeDist(p, hole) >= 1 - 1e-6), 'optimiser mieux : au moins 1 mm de bois entre la petite pièce et le bord du trou')
+  check(dsOne.every((sh) => conflicts(sh).size === 0), 'optimiser mieux : une pièce dans un trou n’est pas un conflit')
+  const dJob = sheetToJob(dsOne[0], { names: false, frame: false })
+  const dNames = dJob.pieces.map((p) => p.name)
+  check(dNames.findIndex((n) => /S-01/.test(n)) < dNames.findIndex((n) => /H-01/.test(n)), 'optimiser mieux : la pièce du trou est coupée avant son hôte')
+  const dsWide = buildAutoSheets([host, wide], withDeep([host, wide]))
+  const dWide = dsWide.flatMap((sh) => sh.items).find((i) => i.part.id === 'W-01')
+  const dWideHost = dsWide.flatMap((sh) => sh.items).find((i) => i.part.id === 'H-01')
+  check(!!dWide && !dWide.outer.every((p) => lbInside(p, dWideHost.holes[0])), 'optimiser mieux : une pièce qui ne tient pas dans le trou n’y est pas posée')
+  check(dsWide.every((sh) => conflicts(sh).size === 0), 'optimiser mieux : pièce hors trou sans conflit')
+
+  // trou polygonal (triangle) et pièces tournées à 90°
+  const tri = mk('TR-01', rectPoly(0, 0, 100, 100), [[[10, 90], [90, 90], [50, 20]]])
+  const strip = mk('L-01', rectPoly(0, 0, 8, 30))
+  const dsTri = buildAutoSheets([tri, strip], withDeep([tri, strip]))
+  const triHole = dsTri[0].items.find((i) => i.part.id === 'TR-01').holes[0]
+  const stripIn = dsTri[0].items.find((i) => i.part.id === 'L-01')
+  check(dsTri.length === 1 && stripIn.outer.every((p) => lbInside(p, triHole) && edgeDist(p, triHole) >= 1 - 1e-6) && conflicts(dsTri[0]).size === 0, 'optimiser mieux : trou en triangle, pièce posée dedans à plus de 1 mm du bord')
+
+  // un hôte tourné de 90° par le rangement de la planche emmène ses invitées
+  const longHost = mk('LH-01', rectPoly(0, 0, 280, 60), [ellipse(140, 30, 100, 22)])
+  const guest = mk('G-01', rectPoly(0, 0, 50, 20))
+  const tallSettings = { width: 130, height: 300, margin: 5, gap: 1 }
+  const dsTall = buildAutoSheets([longHost, guest], withDeep([longHost, guest], tallSettings))
+  const tHost = dsTall.flatMap((sh) => sh.items).find((i) => i.part.id === 'LH-01')
+  const tGuest = dsTall.flatMap((sh) => sh.items).find((i) => i.part.id === 'G-01')
+  check(!!tHost && tHost.rot && tGuest.outer.every((p) => lbInside(p, tHost.holes[0])) && dsTall.every((sh) => conflicts(sh).size === 0), 'optimiser mieux : l’hôte tourné de 90° emmène la pièce de son trou')
+
+  // reproductible : mêmes pièces et même solution, mêmes planches ; solution périmée ou absente : rangement normal inchangé
+  const signature = (shs) => JSON.stringify(shs.map((sh) => sh.items.map((i) => [i.uid, i.x, i.y, i.rot, i.angle ?? null])))
+  const again = buildAutoSheets(dpOne, withDeep(dpOne))
+  check(signature(again) === signature(dsOne), 'optimiser mieux : deux calculs donnent exactement les mêmes planches')
+  const plainOne = buildAutoSheets(dpOne, dset)
+  const staleSet = { ...dset, deep: { sig: 'autre', seeds: { 3: 0 }, before: 2, after: 1 } }
+  check(signature(buildAutoSheets(dpOne, staleSet)) === signature(plainOne) && !validDeep(dpOne, staleSet), 'optimiser mieux : solution périmée ignorée, rangement normal inchangé')
+  check(!validDeep([host, wide], withDeep(dpOne)) && !!validDeep(dpOne, withDeep(dpOne)), 'optimiser mieux : un changement de pièces invalide la solution')
+  check(!validDeep(dpOne, { ...withDeep(dpOne), gap: 2 }) && !validDeep(dpOne, { ...withDeep(dpOne), width: 310 }), 'optimiser mieux : un changement de réglage de planche invalide la solution')
+  const sameBytes = JSON.parse(JSON.stringify(withDeep(dpOne)))
+  check(signature(buildAutoSheets(dpOne, sameBytes)) === signature(dsOne), 'optimiser mieux : la solution relue depuis la sauvegarde redonne les mêmes planches')
+  check(signature(buildAutoSheets(parts, settings)) === signature(buildAutoSheets(parts, { ...settings, deep: undefined })), 'optimiser mieux : sans solution, l’exemple est rangé comme avant')
+
+  // mangeoire V3 : la recherche ne dégrade jamais (au plus autant de planches), tout est posé, sans conflit
+  const v3file = panelsToCutParts(finishPanels(v3.build(defaultParams(v3)).panels), v3.id).file
+  const v3parts = parseCutParts(JSON.stringify(v3file)).parts
+  for (const [W, H] of [[300, 300], [400, 320]]) {
+    const s = { width: W, height: H, margin: 5, gap: 1 }
+    const plain = buildAutoSheets(v3parts, s)
+    const res = deepSearch(v3parts, s, { budgetMs: 60000, maxSeeds: 40 })
+    const opt = buildAutoSheets(v3parts, res.plan ? { ...s, deep: res.plan } : s)
+    const count = (shs) => shs.reduce((a, sh) => a + sh.items.length, 0)
+    check(opt.length <= plain.length && res.after.sheets === opt.length && res.before.sheets === plain.length, `mangeoire V3 ${W} × ${H} : ${plain.length} planches -> ${opt.length} planches après ${res.tried} essais`)
+    check(count(opt) === count(plain) && opt.every((sh) => !sh.rejected.length && conflicts(sh).size === 0), `mangeoire V3 ${W} × ${H} : toutes les pièces posées, sans conflit`)
+    check(signature(buildAutoSheets(v3parts, res.plan ? { ...s, deep: res.plan } : s)) === signature(opt), `mangeoire V3 ${W} × ${H} : la solution se rejoue à l’identique`)
+  }
+  // rangement par type : la recherche se fait par famille et ne dégrade pas non plus
+  const byTypeSet = { width: 300, height: 300, margin: 5, gap: 1, byType: true }
+  const byTypeRes = deepSearch(v3parts, byTypeSet, { budgetMs: 60000, maxSeeds: 15 })
+  const byTypePlain = buildAutoSheets(v3parts, byTypeSet)
+  const byTypeOpt = buildAutoSheets(v3parts, byTypeRes.plan ? { ...byTypeSet, deep: byTypeRes.plan } : byTypeSet)
+  check(byTypeOpt.length <= byTypePlain.length && byTypeOpt.every((sh) => conflicts(sh).size === 0), `mangeoire V3 par type : ${byTypePlain.length} planches -> ${byTypeOpt.length}`)
+
   // --- store Redux : reducers purs, planches calculées, format de sauvegarde, persistance ---
   const mem = new Map()
   let writes = 0
@@ -326,13 +420,10 @@ try {
     },
   }
   Object.defineProperty(globalThis, 'localStorage', { value: fakeStorage, configurable: true, writable: true })
-  const { createAppStore, store: appStore } = await server.ssrLoadModule('/src/store/index.ts')
-  const { projectActions, emptyProject, loadProject, serializeProject } = await server.ssrLoadModule('/src/store/projectSlice.ts')
-  const { modelsActions, loadModels, serializeModels } = await server.ssrLoadModule('/src/store/modelsSlice.ts')
-  const { uiActions } = await server.ssrLoadModule('/src/store/uiSlice.ts')
-  const sel = await server.ssrLoadModule('/src/store/selectors.ts')
-  const { importTexts, replaceTexts } = await server.ssrLoadModule('/src/store/thunks.ts')
-  const { persistStore } = await server.ssrLoadModule('/src/store/persist.ts')
+  const { createAppStore, persistStore, store: appStore } = await server.ssrLoadModule('/src/store/index.ts')
+  const { projectActions, emptyProject, loadProject, serializeProject, importTexts, replaceTexts, ...sel } = await server.ssrLoadModule('/src/store/project/index.ts')
+  const { modelsActions, loadModels, serializeModels } = await server.ssrLoadModule('/src/store/models/index.ts')
+  const { uiActions } = await server.ssrLoadModule('/src/store/ui/index.ts')
   check(appStore.getState().project.parts.length === 0, 'store : le singleton se crée hors navigateur (projet vide)')
 
   const st = createAppStore()
