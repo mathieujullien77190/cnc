@@ -37,14 +37,14 @@ Imports : `@/...` (alias de `src/`) entre dossiers, `./...` dans un composant. U
 
 - **Modèles 3D** : liste des modèles (titre seul). Choisir un modèle envoie ses planches à la découpe (le catalogue est remplacé) ; recliquer le désélectionne (plus de planches). Réglages = les actions du modèle (interrupteurs) + l'éclaté. Clic droit : cacher une planche ou son groupe, réafficher une par une ou tout. Téléchargement du `.cutparts.json` ou du `.model.json` figé. API `window.cnc3d`.
 - **Planches automatiques** : toutes les pièces, une série de planches par épaisseur (« Optimiser par type » : une série par famille). Clic sur une pièce de la liste → sa planche ; clic sur une pièce de la planche → sa ligne dans la liste. « Afficher dans planche perso » copie une planche en perso sans toucher à l'automatique.
-- **Planche perso** : une seule planche, quantités par pièce (− / +), glisser, tourner (R ou angle), les pièces en trop empilées en haut à gauche (en conflit, à déplacer).
+- **Planche perso** : une seule planche, pièces de toute épaisseur (essai, habillage en okoumé…), quantités par pièce (− / +), glisser, tourner (R ou angle), les pièces en trop empilées en haut à gauche (en conflit, à déplacer).
 
 Les trois vues restent montées (masquées hors de leur onglet) : sélections, zoom, défilement et vue 3D se retrouvent comme on les a laissés.
 
 ## Règles du cœur
 
 - Repère des planches : y vers le bas ; machine : y vers le haut (`flipY` dans `job.ts`). Le rangement part du coin bas-gauche (`packSpread` range dans un repère retourné, trous compris).
-- Une planche = une épaisseur. Un rangement ne fait jamais se chevaucher des pièces : `baseLayout` vérifie (`layoutValid`) et refait sans réutiliser les trous si besoin.
+- Une planche automatique = une épaisseur (la planche perso fait exception, c'est à l'utilisateur de s'en servir). Un rangement ne fait jamais se chevaucher des pièces : `baseLayout` vérifie (`layoutValid`) et refait sans réutiliser les trous si besoin.
 - « Optimiser encore mieux » : recherche polygonale dans un Web Worker, au clic seulement (`polynest.ts`, `deep.ts`). Le résultat est `settings.deep` (`sig`, placements par groupe), rejoué tel quel par `buildAutoSheets` tant que `sig` correspond aux pièces et réglages ; sinon rangement normal. Gardé seulement s'il gagne une planche. Les deux boutons de mode l'effacent ; annuler ne dit rien.
 - Une pièce posée dans le trou d'une autre est coupée avant elle (`insideOf` → `route.ts`). Le travail laser d'une planche n'est calculé que fenêtre ouverte (`laserItems` paresseux, propriétés non énumérables).
 - Gravure avant coupe, dans l'ordre : cadre, noms des pièces (bleu), dessins des modèles (violet, case « Mettre les dessins ») ; skill `gravure-noms-dessins`. Noms toujours sur la pièce (trait double, ou minuscule sur une petite pièce, ou rien).

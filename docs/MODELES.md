@@ -48,6 +48,8 @@ Les planches ont les mêmes champs que `Panel` (ci-dessous), aux cotes nominales
 
 Couleurs : `"colors": { "Habillage": "#ffffff" }` impose une couleur à une catégorie (vue 3D et planches) ; les autres prennent la palette.
 
+Actions : `"actions": [{ "key", "label", "default", "type", ... }]`, réglages de la vue 3D dont le code est dans `src/models/actions.ts` (skill `ajouter-action`). Interrupteurs `move` (`panels`, `by` en mm) et `turn` (`by` en degrés), avec en option `show` / `hide` (planches montrées / cachées allumé, l'inverse éteint) ; liste `choice` (`options: [{ value, label, show?, hide?, move?: [{ panels, by }] }]`, `default` = la `value` de départ). Une cible = famille, catégorie, liste de celles-ci ou indices. Une planche cachée (`visible: false`) est découpée quand même ; aucune action ne change une forme. Exemple : le nichoir (siège du ventilateur à trois états, bloc d'aération posé ou non).
+
 ## Une planche
 
 - `outer`, `holes` : contours 2D en mm, **u vers la droite, v vers le bas** (comme le `.cutparts.json`). Cercles déjà en segments (`circle()` dans `helpers.ts`).

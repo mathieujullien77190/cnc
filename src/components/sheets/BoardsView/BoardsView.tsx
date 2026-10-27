@@ -30,7 +30,7 @@ export const BoardsView = ({ project, onLaser }: BoardsViewProps) => {
   const board = boards[0]
   const sheet = boardSheets[0]
   const bad = useMemo(() => (sheet ? conflicts(sheet) : new Set<string>()), [sheet])
-  const choices = board ? parts.filter((p) => p.thickness === board.thickness).sort((a, b) => a.id.localeCompare(b.id, 'fr', { numeric: true })) : []
+  const choices = board ? [...parts].sort((a, b) => a.id.localeCompare(b.id, 'fr', { numeric: true })) : []
   const sel = sheet?.items.find((i) => i.uid === selected)
 
   // déplacer une pièce fige aussi toutes les autres à leur place actuelle : rien d'autre ne bouge
@@ -47,7 +47,7 @@ export const BoardsView = ({ project, onLaser }: BoardsViewProps) => {
   }, [parts.length, boards.length]) // eslint-disable-line react-hooks/exhaustive-deps
   // l'épaisseur de la planche suit celle des pièces (pas de réglage) : si elle n'existe plus dans le catalogue, on prend la première
   useEffect(() => {
-    if (board && thicknesses.length && !thicknesses.includes(board.thickness)) updateBoard(board.id, { thickness: thicknesses[0], qty: {}, overrides: {} })
+    if (board && thicknesses.length && !thicknesses.includes(board.thickness)) updateBoard(board.id, { thickness: thicknesses[0] })
   }, [board?.thickness, thicknesses.join()]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!parts.length) {
@@ -64,7 +64,7 @@ export const BoardsView = ({ project, onLaser }: BoardsViewProps) => {
           </Card>
 
           <div className="grid gap-3 xl:grid-cols-[18rem_1fr]">
-            <PartQuantities selectedKey={selectedKey} reveal={reveal} thickness={board.thickness} choices={choices} qty={board.qty} onQty={(key, n) => setBoardQty(board.id, key, n)} />
+            <PartQuantities selectedKey={selectedKey} reveal={reveal} thicknesses={thicknesses} choices={choices} qty={board.qty} onQty={(key, n) => setBoardQty(board.id, key, n)} />
 
             <section className={`min-w-0 space-y-2.5 rounded-lg border p-3 transition-colors ${done[sheet.key] ? 'border-emerald-300 bg-emerald-50' : 'border-stone-200 bg-white'}`}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">

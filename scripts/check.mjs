@@ -80,7 +80,7 @@ try {
   const tiny = buildCustomSheet({ ...board, width: 30, height: 30, qty: { [parts[0].key]: 50 } }, parts, 5, 1)
   check(tiny.rejected.length === 0 && tiny.items.length === 50 && conflicts(tiny).size > 0, 'planche perso trop petite : les pièces en trop sont posées par-dessus une autre, signalées en conflit')
   const other = buildCustomSheet({ ...board, thickness: 99 }, parts, 5, 1)
-  check(other.items.length === 0, 'planche perso : une autre épaisseur ne prend pas les pièces')
+  check(other.items.length === 2, 'planche perso : accepte des pièces de toute épaisseur')
 
   // export depuis un projet 3D : aller-retour avec la lecture
   const { toCutParts } = await server.ssrLoadModule('/export/exportParts.js')
@@ -277,6 +277,19 @@ try {
   check(!!v3box && Math.abs(Math.max(...v3box.outer.map((q) => q[0])) - Math.min(...v3box.outer.map((q) => q[0])) - 143) < 0.01, 'mangeoire V3 : boîtier de 143 mm de côté')
 
   check(MODELS.length >= 1 && new Set(MODELS.map((m) => m.id)).size === MODELS.length, `${MODELS.length} modèles, ids uniques`)
+  // une pièce plus grande que la planche choisie va sur une « grande planche » de la taille de la machine, pas à la poubelle
+  const nich = MODELS.find((m) => m.id === 'nichoir')
+  if (nich) {
+    const np = parseCutParts(JSON.stringify(panelsToCutParts(finishPanels(nich.build({}).panels), 'nichoir').file)).parts
+    const small = buildAutoSheets(np, { width: 300, height: 300, margin: 5, gap: 1 })
+    // "Optimiser encore mieux" tient compte de l'épaisseur : chaque groupe a la sienne, jamais deux épaisseurs sur une planche, même avec un plan
+    const { deepSearch: deepNich } = await server.ssrLoadModule('/src/core/deep.ts')
+    const nset = { width: 400, height: 320, margin: 5, gap: 1, spread: false, byType: false }
+    const nres = deepNich(np, nset, { budgetMs: 2500, maxSeeds: 3 })
+    const nsheets = buildAutoSheets(np, nres.deep ? { ...nset, deep: nres.deep } : nset)
+    check(nsheets.every((sh) => sh.items.every((i) => i.part.thickness === sh.thickness)) && nsheets.every((sh) => conflicts(sh).size === 0), 'nichoir : la recherche d’optimisation sépare les épaisseurs (3 mm et 5 mm), aucun chevauchement')
+    check(small.every((sh) => sh.rejected.length === 0) && small.some((sh) => sh.width === 400 && sh.height === 320 && sh.items.length) && small.every((sh) => conflicts(sh).size === 0), 'nichoir sur 300 × 300 : les pièces trop grandes vont sur des planches 400 × 320, aucune perdue, aucun chevauchement')
+  }
   // couleurs choisies par l'app : toujours pastel clair, et fixes (même catégorie, même couleur, quel que soit l'ordre)
   const { PALETTE, FIXED, categoryHex } = await server.ssrLoadModule('/src/core/colors.ts')
   const lum = (h) => (0.299 * ((h >> 16) & 255) + 0.587 * ((h >> 8) & 255) + 0.114 * (h & 255)) / 255

@@ -1,7 +1,8 @@
 import type { Part } from '@/core/types'
 
 export type PartQuantitiesProps = {
-  thickness: number
+  /** Épaisseurs des pièces proposées : si plusieurs, chaque ligne indique la sienne. */
+  thicknesses: number[]
   choices: Part[]
   qty: Record<string, number>
   onQty: (key: string, qty: number) => void

@@ -8,6 +8,59 @@
  "id": "nichoir",
  "name": "Nichoir",
  "description": "Nichoir high tech de testLowPoly : planches de bois seulement (sans électronique).",
+ "actions": [
+  {
+   "key": "seat",
+   "label": "Siège du ventilateur",
+   "default": "cassette",
+   "type": "choice",
+   "options": [
+    {
+     "value": "cassette",
+     "label": "Cassette ventilateur",
+     "show": "VE",
+     "hide": "HB"
+    },
+    {
+     "value": "block",
+     "label": "Bloc isolant",
+     "show": "HB",
+     "hide": "VE",
+     "move": [
+      {
+       "panels": "HB",
+       "by": [
+        265.8,
+        230,
+        -58.2
+       ]
+      }
+     ]
+    },
+    {
+     "value": "none",
+     "label": "Rien",
+     "hide": [
+      "VE",
+      "HB"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "plug",
+   "label": "Bloc d'aération posé",
+   "default": false,
+   "type": "move",
+   "panels": "HP",
+   "by": [
+    174.85,
+    -15,
+    -45
+   ],
+   "show": "HP"
+  }
+ ],
  "panels": [
   {
    "id": "HA",
@@ -12352,7 +12405,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HB",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -12547,7 +12600,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HB",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -12742,7 +12795,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HB",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -12937,7 +12990,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HB",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -13132,7 +13185,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HB",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -13332,7 +13385,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HB",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -13495,7 +13548,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HB",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -13546,7 +13599,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HB",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -13597,7 +13650,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HB",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -15417,7 +15470,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HP",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -15644,7 +15697,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HP",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -15871,7 +15924,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HP",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -16098,7 +16151,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HP",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -16325,7 +16378,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HP",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -16424,7 +16477,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HP",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -16560,7 +16613,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HP",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -16611,7 +16664,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HP",
    "category": "Hiver",
    "thickness": 3,
    "outer": [
@@ -16662,7 +16715,7 @@
    "snugDepths": []
   },
   {
-   "id": "HI",
+   "id": "HP",
    "category": "Hiver",
    "thickness": 3,
    "outer": [

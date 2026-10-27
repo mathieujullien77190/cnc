@@ -243,6 +243,9 @@ const fillOf = (items: Placed[], w: number, h: number) => items.reduce((s, it) =
 const numbered = (rows: { inst: Instance; x: number; y: number; rot: boolean; angle?: number }[]) =>
   rows.sort((a, b) => a.y - b.y || a.x - b.x).map((r, i) => placePart(r.inst, r.x, r.y, r.rot, i + 1, r.angle))
 
+/** Taille de la zone de la machine (mm) : les pièces trop grandes pour la planche choisie vont sur des planches de cette taille. */
+const MACHINE_SHEET = { w: 400, h: 320 }
+
 /** Planches automatiques : une série par épaisseur (et par famille de pièces avec `byType`), jamais deux épaisseurs sur la même planche. */
 export const buildAutoSheets = (parts: Part[], s: SheetSettings): Sheet[] => {
   const W = s.width - 2 * s.margin
@@ -259,13 +262,27 @@ export const buildAutoSheets = (parts: Part[], s: SheetSettings): Sheet[] => {
       families.set(key, family)
       out.push({ key, label: `${t} mm · planche ${bi + 1}`, thickness: t, width: s.width, height: s.height, items, rejected: [], custom: false, fill: fillOf(items, s.width, s.height) })
     })
-    if (rejected.length) {
+    // les pièces plus grandes que la planche choisie ne sont pas perdues : elles vont sur des planches de la taille de la machine (autant qu'il en faut)
+    let lost = rejected
+    if (lost.length && (s.width < MACHINE_SHEET.w || s.height < MACHINE_SHEET.h)) {
+      const w = Math.max(s.width, MACHINE_SHEET.w)
+      const h = Math.max(s.height, MACHINE_SHEET.h)
+      const big = baseLayout(lost, w - 2 * s.margin, h - 2 * s.margin, s.gap, !!s.spread)
+      big.bins.forEach((bin, bi) => {
+        const items = numbered(bin.map((r) => ({ ...r, x: r.x + s.margin, y: r.y + s.margin })))
+        const key = `${stem}-g${bi + 1}`
+        families.set(key, family)
+        out.push({ key, label: `${t} mm · grande planche ${bi + 1}`, thickness: t, width: w, height: h, items, rejected: [], custom: false, fill: fillOf(items, w, h) })
+      })
+      lost = big.rejected
+    }
+    if (lost.length) {
       const last = [...out].reverse().find((sh) => sh.thickness === t && families.get(sh.key) === family)
-      const lost = rejected.map((r) => r.part)
-      if (last) last.rejected = lost
+      const lostParts = lost.map((r) => r.part)
+      if (last) last.rejected = lostParts
       else {
         families.set(`${stem}-0`, family)
-        out.push({ key: `${stem}-0`, label: `${t} mm · rien ne tient`, thickness: t, width: s.width, height: s.height, items: [], rejected: lost, custom: false, fill: 0 })
+        out.push({ key: `${stem}-0`, label: `${t} mm · rien ne tient`, thickness: t, width: s.width, height: s.height, items: [], rejected: lostParts, custom: false, fill: 0 })
       }
     }
   }
@@ -291,7 +308,8 @@ export const boardFromSheet = (sheet: Sheet, marking: Marking): Pick<CustomBoard
 const OVERLAP_STEP = 4
 
 export const buildCustomSheet = (b: CustomBoard, catalog: Part[], margin: number, gap: number, spread = false): Sheet => {
-  const insts = instancesOf(catalog.filter((p) => p.thickness === b.thickness), (p) => b.qty[p.key] ?? 0)
+  // la planche perso accepte des pièces de toute épaisseur (essai, habillage en okoumé de 5 mm avec le reste…) : `thickness` n'est que celle affichée
+  const insts = instancesOf(catalog, (p) => b.qty[p.key] ?? 0)
   const W = b.width - 2 * margin
   const H = b.height - 2 * margin
   const fixedInsts = insts.filter((i) => b.overrides[i.uid])

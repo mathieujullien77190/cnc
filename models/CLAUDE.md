@@ -6,7 +6,7 @@ Un fichier contient :
 - `id` (kebab-case), `name`, `description` courte ;
 - `panels` : les planches aux cotes nominales (contour u droite / v bas en mm, `thickness`, `position` = centre de la boîte dans le monde x droite / y haut / z avant, `rotation` Euler XYZ en degrés, `category` pour la couleur, `id` = préfixe de famille en MAJUSCULES, `holes`, `labels`, `rules`, `snugDepths`) ;
 - `colors` (optionnel) : couleur imposée par catégorie (`#rrggbb`), vue 3D et planches ;
-- `actions` : interrupteurs de la vue 3D (`{ key, label, default, type, ...paramètres }`), dont le code est dans `src/models/actions.ts`.
+- `actions` : réglages de la vue 3D (`{ key, label, default, type, ...paramètres }`) : interrupteurs `move` / `turn` (avec `show` / `hide` en option) et listes de choix `choice` (une option montre, cache, décale) ; le code est dans `src/models/actions.ts`. Une planche cachée est découpée quand même.
 
 Règles :
 - Le serrage des crans (0,4 mm) et la numérotation (`P-01`…) sont appliqués par l'app au chargement : ne pas les mettre dans le fichier.
