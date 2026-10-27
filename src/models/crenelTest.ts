@@ -22,7 +22,7 @@ export const crenelTestParts = (thickness: number): Part[] => {
 const TEST_GAP = 3
 
 /**
- * Planche d'essai du crantage, hors projet : rien n'est ajouté au catalogue ni aux planches, elle n'existe que le temps du pilotage de la laser.
+ * Planche d'essai du crantage, hors projet : rien n'est ajouté au catalogue ni aux planches, elle n'existe que le temps du pilotage laser.
  * Les plaques sont empilées dans le coin de l'origine de la machine (bas-gauche), serrées, pour tenir sur une petite chute.
  */
 export const crenelTestSheet = (thickness: number, width: number, height: number): { sheet: Sheet; marking: Marking } => {

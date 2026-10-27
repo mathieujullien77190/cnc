@@ -150,7 +150,7 @@ const buildJob = (sheet: Sheet, marking: Marking): LaserJob => {
 }
 
 
-/** Les planches proposées au pilotage de la laser. Le travail d'une planche (ordre de coupe optimisé) n'est calculé que quand on la choisit. */
+/** Les planches proposées au pilotage laser. Le travail d'une planche (ordre de coupe optimisé) n'est calculé que quand on la choisit. */
 export const laserItems = (sheets: { sheet: Sheet; marking: Marking }[]): LaserItem[] =>
   sheets
     .filter((s) => s.sheet.items.length)

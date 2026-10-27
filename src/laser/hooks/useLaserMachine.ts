@@ -12,7 +12,7 @@ import { usePersistentState } from './usePersistentState';
 export interface Area { W: number; H: number }
 
 /**
- * Pilotage de la laser : connexion GRBL, envoi en flux, réglages de coupe (gardés), programme de l'élément choisi.
+ * Pilotage laser : connexion GRBL, envoi en flux, réglages de coupe (gardés), programme de l'élément choisi.
  * `items` = les programmes proposés (planches à couper, G-code importé) ;
  * `area` = taille de planche par défaut (cadre).
  * Vit au niveau de l'écran pour que la connexion et un envoi en cours survivent à la fermeture de la fenêtre « Pilotage ».

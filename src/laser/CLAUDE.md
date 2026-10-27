@@ -1,6 +1,6 @@
 # src/laser/
 
-Pilotage de la laser (Sculpfun E1 Pro 21 W, GRBL 1.1, Web Serial). **Copié du projet testBrick** : logique de machine générique, sans planche d'essai ni machine simulée.
+Pilotage laser (Sculpfun E1 Pro 21 W, GRBL 1.1, Web Serial). **Copié du projet testBrick** : logique de machine générique, sans planche d'essai ni machine simulée.
 
 | Dossier | Rôle |
 |---|---|

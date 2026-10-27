@@ -3,7 +3,7 @@ import type { LaserMachine } from '../../hooks/useLaserMachine';
 import { indicator } from '../ConnectionBar/helpers';
 import { StopButton } from '../StopButton';
 
-/** Bloc repliable du pilotage de la laser : état de la laser, accès à la fenêtre de pilotage, avancement et Arrêt pendant un envoi. Sous-bloc de « Découpe laser » par défaut (titre « Machine … »), ou bloc à part entière (`title`, `defaultOpen`). */
+/** Bloc repliable du pilotage laser : état de la laser, accès à la fenêtre de pilotage, avancement et Arrêt pendant un envoi. Sous-bloc de « Découpe laser » par défaut (titre « Machine … »), ou bloc à part entière (`title`, `defaultOpen`). */
 export function MachineSection({ m, title = 'Machine (laser Sculpfun)', defaultOpen = false }: { m: LaserMachine; title?: string; defaultOpen?: boolean }) {
   const ind = indicator(m.grbl);
   const snap = m.job.view.snap;

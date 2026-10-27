@@ -13,7 +13,7 @@ import { SendPanel } from '../SendPanel';
 import { StopButton } from '../StopButton';
 import { Webcam } from '../Webcam';
 
-/** Contenu du pilotage de la laser : connexion, déplacements, cadre, réglages, aperçu, envoi, journal. `top` = blocs ajoutés en haut de la colonne de gauche (fichiers…). */
+/** Contenu du pilotage laser : connexion, déplacements, cadre, réglages, aperçu, envoi, journal. `top` = blocs ajoutés en haut de la colonne de gauche (fichiers…). */
 export function LaserPanel({ m, top }: { m: LaserMachine; top?: ReactNode }) {
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-4 lg:grid-cols-[22rem_1fr]">
@@ -34,7 +34,7 @@ export function LaserPanel({ m, top }: { m: LaserMachine; top?: ReactNode }) {
   );
 }
 
-/** Fenêtre « Pilotage de la laser » (Sculpfun E1 Pro 21 W, GRBL 1.1, Web Serial). Le bouton ▾ la cache (la machine continue) ; l'état `lowered` appartient à l'appelant, qui le montre sur son bouton du haut pour la remonter. */
+/** Fenêtre « Pilotage laser » (Sculpfun E1 Pro 21 W, GRBL 1.1, Web Serial). Le bouton ▾ la cache (la machine continue) ; l'état `lowered` appartient à l'appelant, qui le montre sur son bouton du haut pour la remonter. */
 export function LaserMachineModal({ m, top, lowered, setLowered }: { m: LaserMachine; top?: ReactNode; lowered: boolean; setLowered: (v: boolean) => void }) {
   const ind = indicator(m.grbl);
   useEscapeKey(() => m.setOpen(false));
@@ -43,7 +43,7 @@ export function LaserMachineModal({ m, top, lowered, setLowered }: { m: LaserMac
       <div className={`pointer-events-auto flex w-full flex-col rounded-xl bg-white shadow-2xl max-h-full max-w-7xl`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-stone-200 px-5 py-3">
           <div className="flex items-center gap-4">
-            <h2 className="text-sm font-semibold text-stone-800">Pilotage de la laser</h2>
+            <h2 className="text-sm font-semibold text-stone-800">Pilotage laser</h2>
             <StatusDot tone={ind.tone} pulse={ind.pulse}>{ind.label}</StatusDot>
             {m.job.running && <StopButton onStop={() => void m.job.stop()} />}
           </div>

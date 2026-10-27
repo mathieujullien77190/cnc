@@ -6,7 +6,7 @@ Le code de l'app (Vite + React 19 + TypeScript + Tailwind v4). Langue : commenta
 |---|---|
 | `core/` | Le cœur sans React : format des pièces, rangement, planches, parcours de la tête, gravure, SVG, G-code |
 | `models/` | Moteur des modèles 3D : lecture des `.model.json`, actions, crans, serrage, vue three.js, conversion en pièces |
-| `laser/` | Pilotage de la laser (GRBL, Web Serial), copié de testBrick : ne pas y mettre de logique de l'app |
+| `laser/` | Pilotage laser (GRBL, Web Serial), copié de testBrick : ne pas y mettre de logique de l'app |
 | `store/` | État de l'app (Redux Toolkit), un dossier par domaine |
 | `state/` | Hooks qui font le lien entre le store, la laser et les composants |
 | `components/` | Interface React : un dossier par composant, rangés par domaine, briques dans `components/ui/` |

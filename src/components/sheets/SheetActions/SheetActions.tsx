@@ -3,7 +3,7 @@ import { saveSvg } from '@/laser'
 import { Btn, Toolbar } from '@/components/ui'
 import type { SheetActionsProps } from './types'
 
-/** Téléchargement et envoi d'une planche : SVG (coupe rouge, gravure bleue), pilotage de la laser. */
+/** Téléchargement et envoi d'une planche : SVG (coupe rouge, gravure bleue), pilotage laser. */
 export const SheetActions = ({ sheet, marking, onLaser, onEdit }: SheetActionsProps) => {
   const empty = !sheet.items.length
   return (
