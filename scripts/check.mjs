@@ -277,6 +277,18 @@ try {
   check(!!v3box && Math.abs(Math.max(...v3box.outer.map((q) => q[0])) - Math.min(...v3box.outer.map((q) => q[0])) - 143) < 0.01, 'mangeoire V3 : boîtier de 143 mm de côté')
 
   check(MODELS.length >= 1 && new Set(MODELS.map((m) => m.id)).size === MODELS.length, `${MODELS.length} modèles, ids uniques`)
+  // ordre de coupe : une pièce posée dans une autre (trou, creux, boîte contenue) est toujours coupée avant son hôte
+  {
+    const sorted = [...parts].sort((a, b) => b.w * b.h - a.w * a.h)
+    const host = sorted[0]
+    const guest = sorted[sorted.length - 1]
+    const bd = { id: 'in', name: 'in', thickness: host.thickness, width: 300, height: 300, qty: { [host.key]: 1, [guest.key]: 1 }, marking: { names: false, frame: false, drawings: false } }
+    const placed = buildCustomSheet({ ...bd, overrides: { [`${host.key}#1`]: { x: 20, y: 20, rot: false }, [`${guest.key}#1`]: { x: 20 + host.w / 2 - guest.w / 2, y: 20 + host.h / 2 - guest.h / 2, rot: false } } }, parts, 5, 1)
+    const order = sheetToJob(placed, bd.marking).pieces.map((p) => p.name)
+    const gi = order.findIndex((n) => n.endsWith(` ${guest.id}`))
+    const hi = order.findIndex((n) => n.endsWith(` ${host.id}`))
+    check(gi >= 0 && hi >= 0 && gi < hi, `ordre de coupe : la pièce posée dans une autre (${guest.id} dans ${host.id}) est coupée avant son hôte`)
+  }
   // une pièce plus grande que la planche choisie va sur une « grande planche » de la taille de la machine, pas à la poubelle
   const nich = MODELS.find((m) => m.id === 'nichoir')
   if (nich) {

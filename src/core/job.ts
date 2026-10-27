@@ -36,7 +36,11 @@ const inPoly = (p: Pt, poly: Pt[]) => {
 }
 
 /** Pour chaque pièce, les indices des pièces posées dans l'un de ses trous (des carrés dans des carrés). */
-const insideOf = (items: Placed[]): number[][] => items.map((it) => items.flatMap((o, j) => (o !== it && it.holes.some((h) => inPoly(o.outer[0], h)) ? [j] : [])))
+// pièces à couper AVANT `it` : celles rangées dans un de ses trous, et celles dont la boîte tient dans la sienne (un creux, un C, une encoche : elles sont
+// dedans, on les coupe toujours en premier, avant que l'hôte ne bouge). La plus petite boîte passe devant : pas de cycle possible.
+const EPS_BOX = 1e-6
+const withinBox = (o: Placed, it: Placed) => o.x >= it.x - EPS_BOX && o.y >= it.y - EPS_BOX && o.x + o.w <= it.x + it.w + EPS_BOX && o.y + o.h <= it.y + it.h + EPS_BOX && o.w * o.h < it.w * it.h - EPS_BOX
+const insideOf = (items: Placed[]): number[][] => items.map((it) => items.flatMap((o, j) => (o !== it && (it.holes.some((h) => inPoly(o.outer[0], h)) || withinBox(o, it)) ? [j] : [])))
 
 /** Parcours de la tête d'un travail : déplacements à vide (laser éteint) avec l'ordre optimisé et avec le seul plus proche voisin. */
 export interface Travel {
