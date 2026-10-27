@@ -10,7 +10,7 @@ export const build = (m: ModelDef, p: Params): { result: Built | null; error: st
   try {
     const r = m.build(p)
     const panels = finishPanels(r.panels)
-    return { result: { ...r, panels, view: r.panels.map((q, i) => ({ ...q, id: panels[i].id })) }, error: '' }
+    return { result: { ...r, panels, view: r.panels.map((q, i) => ({ ...q, id: panels[i].id })), raw: r.panels }, error: '' }
   } catch (e) {
     return { result: null, error: e instanceof Error ? e.message : String(e) }
   }

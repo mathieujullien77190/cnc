@@ -1,6 +1,6 @@
 ---
 name: cranter-plaques
-description: Cranter des plaques pour qu'elles s'emboîtent (languettes et encoches / fenêtres, mêmes règles que testBrick) dans un modèle de l'app de découpe CNC. À utiliser quand l'utilisateur demande « crante les plaques », « fais-les s'emboîter », « ajoute des crans / des languettes / des fenêtres », ou quand un modèle (src/models/library/*.model.ts) assemble des planches.
+description: Cranter des plaques pour qu'elles s'emboîtent (languettes et encoches / fenêtres, mêmes règles que testBrick) dans un modèle de l'app de découpe CNC. À utiliser quand l'utilisateur demande « crante les plaques », « fais-les s'emboîter », « ajoute des crans / des languettes / des fenêtres », ou quand un modèle (models/*.model.json) assemble des planches.
 ---
 
 # Cranter des plaques

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { categoryCss } from '@/core/colors'
+import { categoryCss, categoryInk } from '@/core/colors'
 import { familyOf, groupByFamily } from './helpers'
 import type { PartTreeProps } from './types'
 
@@ -39,8 +39,8 @@ export const PartTree = ({ parts, renderPart, empty, defaultOpen = false, reveal
             type="button"
             onClick={() => toggle(family)}
             aria-expanded={isOpen(family)}
-            className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs font-semibold text-stone-900 shadow-sm hover:brightness-95"
-            style={{ backgroundColor: categoryCss(list[0].category) }}
+            className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs font-semibold shadow-sm hover:brightness-95"
+            style={{ backgroundColor: categoryCss(list[0].category), color: categoryInk(list[0].category) }}
           >
             <span className="w-3 text-[10px]">{isOpen(family) ? '▾' : '▸'}</span>
             <span>{family}</span>

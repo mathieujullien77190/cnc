@@ -13,7 +13,7 @@ Un goujon est toujours le même :
 - C'est **une pièce du modèle** : catégorie `Goujon`, préfixe d'id `G` (G-01…), épaisseur `T` comme les autres planches (il apparaît donc dans les planches perso de cette épaisseur), forme = rectangle 3,4 × longueur, posée debout (axes `[X, Z]`). Elle est donc dans la vue 3D et dans l'export de découpe.
 - Pas de jeu à ajouter : le trou fait T × T (3 × 3) exprès, le goujon de 3,4 mm de large rentre serré.
 
-## Référence : `src/models/library/mangeoire-v3.model.ts`
+## Référence : `models/mangeoire-v3.model.ts`
 
 ```ts
 const DOWEL = { side: 3.4, inset: 9, out: 0 }          // côté, retrait au bord, dépassement

@@ -1,14 +1,14 @@
 # Modèles 3D
 
-Onglet « Modèles 3D » : une liste de modèles three.js, réglables, qui donnent à la fois la vue 3D et les pièces à découper. Les modèles sont du **code écrit par l'IA** : un fichier = un modèle.
+Onglet « Modèles 3D » : une liste de modèles qui donnent à la fois la vue 3D et les pièces à découper. Un modèle = **un fichier `models/<id>.model.json`** (format `cnc-model`), sans code : les planches, leurs positions 3D et des actions (interrupteurs de la vue). Le code des actions est dans l'app (`src/models/actions.ts`, skill `ajouter-action`).
 
 ## Ajouter un modèle
 
-Créer `src/models/library/<nom>.model.ts`. Il apparaît dans la liste tout seul (`import.meta.glob`, rechargement à chaud).
+Créer `models/<nom>.model.ts`. Il apparaît dans la liste tout seul (`import.meta.glob`, rechargement à chaud).
 
 ```ts
-import { rect } from '../helpers'
-import { defineModel } from '../types'
+import { rect } from '@/models/helpers'
+import { defineModel } from '@/models/types'
 
 export default defineModel({
   id: 'plateau',                       // unique, sert de nom de projet
@@ -28,6 +28,26 @@ export default defineModel({
 
 Pas besoin d'importer three.js : le modèle décrit des **planches** (`Panel`, `src/models/types.ts`), la vue 3D les extrude et l'export les découpe.
 
+## Modèle en JSON (sans code)
+
+Un modèle figé (sans réglages) peut être un simple fichier `models/<id>.model.json` :
+
+```json
+{
+  "format": "cnc-model",
+  "version": 1,
+  "id": "plateau",
+  "name": "Plateau",
+  "panels": [
+    { "id": "P", "category": "Plateau", "thickness": 3, "outer": [[0, 0], [120, 0], [120, 80], [0, 80]], "holes": [], "position": [0, 1.5, 0], "rotation": [-90, 0, 0] }
+  ]
+}
+```
+
+Les planches ont les mêmes champs que `Panel` (ci-dessous), aux cotes nominales : le serrage des crans et la numérotation sont appliqués au chargement, comme pour un modèle TS. Le bouton « Télécharger le modèle (.model.json) » de l'onglet 3D produit ce fichier pour le modèle choisi avec ses réglages du moment : on peut ainsi figer une variante. Un fichier invalide est ignoré, avec le motif dans la console du navigateur.
+
+Couleurs : `"colors": { "Habillage": "#ffffff" }` impose une couleur à une catégorie (vue 3D et planches) ; les autres prennent la palette.
+
 ## Une planche
 
 - `outer`, `holes` : contours 2D en mm, **u vers la droite, v vers le bas** (comme le `.cutparts.json`). Cercles déjà en segments (`circle()` dans `helpers.ts`).
@@ -37,6 +57,7 @@ Pas besoin d'importer three.js : le modèle décrit des **planches** (`Panel`, `
 - `rotation` : Euler en degrés, ordre XYZ. Sans rotation, la planche est dans le plan XY (u → x, v → -y). Debout dans le plan YZ : `[0, -90, 0]` (u → z). Couchée : `[-90, 0, 0]` (u → x, v → z).
 - `id` : **préfixe de famille** (`E`, `B`, `CX`…). Le numéro est attribué automatiquement : `E-01`, `E-02`… un numéro par contour distinct (identiques à 180° près = même numéro, comptées en `qty`), dans l'ordre d'apparition. Le numéro est dessiné sur la face avant de chaque planche dans la vue 3D, avec les mêmes traits que ceux gravés à la découpe (une planche trop petite pour porter son nom n'en a pas).
 - `rotate: 'none'` impose le sens du fil.
+- `snugDepths` (option) : profondeurs de cran à serrer, en épaisseurs (défaut `[1]`). `[]` désactive le serrage pour une planche dont les crans sont déjà ajustés (modèle importé d'un autre projet).
 
 ## Règles de conception
 
@@ -65,6 +86,10 @@ Choisir un modèle (ou changer l'un de ses réglages) envoie ses pièces à la d
 | `addToCut()` | envoie les planches à la découpe |
 | `hide(i)`, `hideGroup('BO')`, `showAll()` | cache une planche ou un groupe (toutes les planches dont l'id a les mêmes lettres), remet tout |
 | `fit()`, `explode(0..1)`, `screenshot()` | cadrage, éclaté, image PNG (data URL) |
+
+## Nichoir (import depuis testLowPoly)
+
+`models/nichoir.model.json` est produit par `node scripts/models/nichoir-from-testLowPoly.mjs` (lance Vite et three de `C:/projet/testLowPoly`, appelle `makeNest` aux réglages par défaut, garde les plaques de bois, convertit le repère Z haut → Y haut et vérifie les coins). À relancer après un changement du nichoir ; ses crans sont déjà serrés par testLowPoly, d'où `snugDepths: []`.
 
 ## Skill
 

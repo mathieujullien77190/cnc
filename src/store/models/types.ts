@@ -11,6 +11,8 @@ export type ModelsState = {
   hidden: Record<string, number[]>
   /** Mode mesure de la vue 3D. */
   measuring: boolean
+  /** Couleurs par famille dans la vue 3D (faux : bois uni). */
+  colored: boolean
 }
 
 export type ParamsPayload = { modelId: string; params: ModelParams }

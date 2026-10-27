@@ -1,54 +1,64 @@
 # Découpe CNC / laser
 
-App qui range des pièces 2D en planches et pilote une laser (Sculpfun E1 Pro 21 W, GRBL 1.1, Web Serial : Chrome ou Edge). Les pièces viennent de projets 3D (three.js) sous forme de fichiers `.cutparts.json` : voir `docs/FORMAT.md`.
-Langue : français (UI, commentaires, docs), code en anglais. Commits : Conventional Commits en anglais, faits par l'utilisateur (jamais de co-auteur ni de mention de l'assistant).
+App qui range des pièces 2D sur des planches et pilote une laser (Sculpfun E1 Pro 21 W, zone 400 × 320 mm, GRBL 1.1, Web Serial : Chrome ou Edge). Les pièces viennent de modèles 3D (`models/*.model.json`) ou de fichiers `.cutparts.json` (`docs/FORMAT.md`).
 
-## Stack et commandes
-Vite + React 19 + TypeScript + Tailwind v4 (pas de styled-components).
+Langue : français (interface, commentaires, docs), code en anglais. Commits : Conventional Commits en anglais, faits par l'utilisateur, jamais de co-auteur ni de mention de l'assistant.
+
+## Commandes
+
 ```sh
-npm run dev        # http://localhost:5173
-npm run build      # tsc + vite build
-npm run typecheck
-npm run check      # scripts/check.mjs : format, rangement, gravure, G-code, planches perso
-node scripts/make-example.mjs   # régénère examples/exemple.cutparts.json
+npm run dev          # http://localhost:5173
+npm run typecheck    # tsc
+npm run check        # scripts/check.mjs : cœur, store, modèles (0 ECHEC attendu)
+npm run build        # tsc + vite build
 ```
 
-## Fichiers
-| Fichier | Rôle |
-|---|---|
-| `src/core/format.ts` | Lecture et validation du `.cutparts.json` (pièces recalées sur 0, 0, erreurs par pièce) |
-| `src/core/nesting.ts` | Rangement MaxRects (rotation 90°, `noRotate`, trous réutilisés, pièces fixes) |
-| `src/core/sheets.ts` | Planches automatiques (une série par épaisseur), planches perso (quantités + positions manuelles), conflits, noms gravés (`marksOf`) ; `layoutGroup` (rangement normal ou « en profondeur » selon la graine de `settings.deep`), `deepSignature` / `validDeep` |
-| `src/core/hollow.ts` | « Optimiser encore mieux », géométrie : `nestParts` pose des pièces dans les trous de forme quelconque d’autres pièces (vrai test de polygone, 0/90/180/270° ou angles plus fins, jeu max(`gap`, 1) mm) ; un hôte et ses invitées forment un composite rangé d’un bloc |
-| `src/core/deep.ts` | « Optimiser encore mieux », recherche : `deepSearch` essaie des graines (ordre des pièces, angles, ordres de tri, règle de place) par groupe de pièces dans un budget de temps (`DEEP_BUDGET_MS`), garde la meilleure (moins de planches, puis remplissage) si elle bat le rangement normal |
-| `src/core/marking.ts` | Police à segments et placement du nom sur la pièce |
-| `src/core/route.ts` | Parcours de la tête : ordre des pièces et point d'attaque de chaque contour (plus proche voisin + 2-opt/or-opt, contraintes « a avant b », budget 150 ms par étape) |
-| `src/core/job.ts` | Planche → travail de découpe (`LaserJob`) : cadre et noms gravés avant la coupe, ordre de coupe ; G-code |
-| `src/core/svg.ts` | Export SVG (calque coupe rouge, calque gravure bleu) |
-| `src/store/` | Store Redux Toolkit, un dossier par domaine. Racine : `index.ts` (`store`, `createAppStore`, `persistStore`, `RootState`, `AppDispatch`), `hooks.ts` (`useAppDispatch` / `useAppSelector`). `project/` (pièces, réglages, cases de gravure et « fait », planches perso ; sélecteurs mémoïsés `selectAutoSheets` / `selectBoardSheets` / `selectEntries` et `useSheets`, jamais stockés ; thunks `importTexts` / `importFiles` / `replaceTexts` ; `persist.ts` = `cnc-projet-v1`), `ui/` (onglet, bilans d’import, pièce choisie, zoom des aperçus), `models/` (modèle choisi, réglages, éclaté, planches cachées, mesure ; `persist.ts` = `cnc-modeles-v1`). Chaque dossier : `types`, `reducers`, `slice`, `actions`, `selectors`, `index` (barrel : importer par `@/store/project` etc.). Voir skill `store-redux` |
-| `src/state/` | `useProject` : façade mince sur le store (mêmes noms qu’avant) ; `useLaserSession` : pilotage laser (planche d’essai, fenêtre abaissée), reste local ; `useDeepSearch` + `deepSearch.worker.ts` : « Optimiser encore mieux » dans un Web Worker (progression, annulation = arrêt du worker) |
-| `src/constants/`, `src/types/` | Clés de stockage et valeurs par défaut ; types partagés (`Tab`, `ProjectState`, `SheetEntry`, `ImportReport`…) |
-| `src/components/ui/` | Briques d'interface : `Card`, `Checkbox`, `EmptyState`, `Field`, `NumField`, `PartTag`, `Select`, `Title`, `Toolbar`, plus celles de `src/laser/ui` (`Btn`, `Chip`, `Notice`, `Section`, `Hint`, `IconButton`, `Modal`…) ré-exportées. Importer depuis `@/components/ui` |
-| `src/components/` | Un dossier par composant (`index.ts` barrel, `X.tsx`, `types.ts`, `helpers.ts`/`constants.ts` si besoin), importé par `@/components/X` : `PartsPanel`, `SettingsPanel`, `AutoView`, `BoardsView`, `SheetCard`, `SheetPreview` (glisser / R, hooks `useSheetView` et `useMarks`), `LaserDialog`, `AppHeader`, `DropZone`… ; primitives partagées dans `components/ui/` (`NumField`) |
-| `src/models/` | Modèles 3D three.js : `library/*.model.ts` (un fichier = un modèle, `defineModel`), `registry.ts` (glob), `viewer3d.ts` (scène), `toCutParts.ts` (planches → `cnc-parts`). Voir `docs/MODELES.md` |
-| `src/components/ModelsView/` | Onglet « Modèles 3D » (reste monté, masqué hors de son onglet) : liste, réglages, vue, envoi à la découpe, API `window.cnc3d` (`useCnc3dApi`) |
-| `src/state/useLaserSession.ts` | Pilotage laser du projet : planches + planche d'essai (crantage, goujons), envoi à la laser |
-| `src/helpers/`, `src/types/` | Helpers et types partagés entre composants (`round1`, `rejectedText`, `Tab`) |
-| `src/laser/` | Pilotage GRBL (connexion, déplacements, cadre à vide, envoi, webcam), copié de testBrick ; sans planche d'essai ni machine simulée |
-| `export/exportParts.js` | Module à copier dans un projet three.js pour produire le fichier |
+Après tout changement : les trois. L'utilisateur regarde le rendu (3D, planches, laser) lui-même dans son navigateur : ne pas ouvrir de navigateur, ne pas affirmer qu'un rendu est bon.
 
-## Règles
-- Imports : `@/...` (alias de `src/`) entre dossiers, `./...` dans un composant. Structure : skill `react-structure`.
-- Repère des planches : y vers le bas ; repère machine : y vers le haut (`flipY` dans `job.ts`).
-- Une planche ne contient qu'une épaisseur.
-- « Optimiser encore mieux » (bouton du bloc Planches de `SettingsPanel`, composant `DeepOptimizer`) : recherche dans un Web Worker (jamais sur le fil principal, seulement au clic) qui range des pièces dans les trous de forme quelconque d’autres pièces. Le résultat est `settings.deep` (`{ sig, seeds, before, after }`, champ optionnel de `cnc-projet-v1`) : une graine par groupe (`3` ou `3|R` avec `byType`), rejouée à l’identique par `buildAutoSheets` ; valable seulement si `sig` (`deepSignature`) correspond encore aux pièces et réglages de planche, sinon rangement normal. Sans `deep`, le rangement est exactement l’ancien. Les deux boutons de mode effacent `deep`. Une planche rangée en profondeur doit toujours passer `layoutValid` (sinon retour au rangement normal pour le groupe).
-- Une pièce posée dans le trou d'une autre est toujours coupée avant elle (`insideOf` → contraintes de `route.ts`). Le travail d'une planche est calculé à la demande et mis en cache (`laserItems` en getter paresseux).
-- Noms : toujours sur la pièce. Trait double (2 passes) en taille normale ; si la pièce est vraiment petite, texte minuscule en un seul trait (`MINI_HEIGHTS` dans `marking.ts`). Une pièce où rien ne tient reste sans nom.
-- Aperçu : molette, glisser, + / − / Ajuster / plein écran ; dézoom jusqu'à ×0,5, hauteur bornée à 75 % de l'écran.
-- Gravure avant coupe, dans cet ordre : cadre (case « Mettre un contour »), puis noms (case « Mettre le nom des pièces »), puis dessins des modèles (case « Mettre les dessins », en violet ; ne pas les confondre avec les noms : skill `gravure-noms-dessins`). La coupe ne dépend pas des cases.
-- État : tout ce qui doit survivre à un changement d’onglet ou de vue est dans le store Redux (`src/store/`), pas en `useState`. Pas d’objet non sérialisable dans le store (le viewer three.js reste hors store, piloté par lui). Les planches sont calculées par sélecteurs mémoïsés, jamais stockées. Seul le composant « conteneur » parle au store ; les feuilles restent pilotées par props. Un sélecteur ne renvoie jamais un objet neuf à chaque appel.
-- Sauvegarde : la tranche `project` est écrite dans localStorage `cnc-projet-v1` (format inchangé : `parts`, `settings`, `autoMarking`, `boards`, `done`), en une écriture groupée après les rafales d’actions ; le modèle choisi et ses réglages dans `cnc-modeles-v1`. Le reste (onglet, éclaté, planches cachées, zoom…) reste en mémoire.
-- Réglages de coupe (vitesse, puissance, passes) globaux, gardés par `useLaserMachine` ; pas encore de réglages par épaisseur.
-- Test visuel : l'utilisateur teste lui-même dans son navigateur.
-- Modèles 3D : un modèle décrit des planches 2D + position/rotation (pas de three.js dans le modèle) ; la vue et la découpe en sortent. Nouveau modèle = nouveau fichier dans `src/models/library`, et `npm run check` doit rester vert (bornes comprises).
-- Crans : identiques à testBrick (impair, 16 mm visés, profondeur = épaisseur, serrage de 0,4 mm appliqué par `finishPanels`) ; skill `cranter-plaques`. Goujons : lamelles de 3,4 mm de large × 3 mm d’épaisseur, dans des trous de 3 × 3 mm alignés dans les plaques empilées, skill `goujon`. Couleurs par famille communes à la vue planche et à la vue 3D (`src/core/colors.ts`).
+## Où est quoi
+
+Chaque dossier a son `CLAUDE.md` avec le détail. En bref :
+
+| Dossier | Rôle |
+|---|---|
+| `models/` | Les modèles 3D : un `.model.json` par modèle (planches, positions 3D, actions, couleurs), sans code |
+| `src/core/` | Cœur sans React : format, rangement, planches, parcours, gravure, SVG, G-code |
+| `src/models/` | Moteur des modèles : lecture du JSON, actions, serrage, numérotation, vue three.js |
+| `src/laser/` | Pilotage GRBL, copié de testBrick : pas de logique de l'app dedans |
+| `src/store/` | État Redux Toolkit par domaine (`project`, `ui`, `models`) ; skill `store-redux` |
+| `src/state/` | Hooks de liaison : `useProject`, `useLaserSession`, `useDeepSearch` (worker) |
+| `src/components/` | Interface React par domaine (`app`, `sheets`, `parts`, `settings`, `models`, `laser`) ; briques dans `ui/` |
+| `docs/`, `scripts/`, `export/`, `examples/` | Doc de référence, contrôles, module d'export three.js, exemple |
+| `.claude/skills/` | `creer-modele`, `ajouter-action`, `cranter-plaques`, `goujon`, `gravure-noms-dessins`, `store-redux`, `react-structure` |
+
+Imports : `@/...` (alias de `src/`) entre dossiers, `./...` dans un composant. Un composant = un dossier (`index.ts`, `X.tsx`, `types.ts`), briques importées depuis `@/components/ui`.
+
+## Les trois onglets
+
+- **Modèles 3D** : liste des modèles (titre seul). Choisir un modèle envoie ses planches à la découpe (le catalogue est remplacé) ; recliquer le désélectionne (plus de planches). Réglages = les actions du modèle (interrupteurs) + l'éclaté. Clic droit : cacher une planche ou son groupe, réafficher une par une ou tout. Téléchargement du `.cutparts.json` ou du `.model.json` figé. API `window.cnc3d`.
+- **Planches automatiques** : toutes les pièces, une série de planches par épaisseur (« Optimiser par type » : une série par famille). Clic sur une pièce de la liste → sa planche ; clic sur une pièce de la planche → sa ligne dans la liste. « Afficher dans planche perso » copie une planche en perso sans toucher à l'automatique.
+- **Planche perso** : une seule planche, quantités par pièce (− / +), glisser, tourner (R ou angle), les pièces en trop empilées en haut à gauche (en conflit, à déplacer).
+
+Les trois vues restent montées (masquées hors de leur onglet) : sélections, zoom, défilement et vue 3D se retrouvent comme on les a laissés.
+
+## Règles du cœur
+
+- Repère des planches : y vers le bas ; machine : y vers le haut (`flipY` dans `job.ts`). Le rangement part du coin bas-gauche (`packSpread` range dans un repère retourné, trous compris).
+- Une planche = une épaisseur. Un rangement ne fait jamais se chevaucher des pièces : `baseLayout` vérifie (`layoutValid`) et refait sans réutiliser les trous si besoin.
+- « Optimiser encore mieux » : recherche polygonale dans un Web Worker, au clic seulement (`polynest.ts`, `deep.ts`). Le résultat est `settings.deep` (`sig`, placements par groupe), rejoué tel quel par `buildAutoSheets` tant que `sig` correspond aux pièces et réglages ; sinon rangement normal. Gardé seulement s'il gagne une planche. Les deux boutons de mode l'effacent ; annuler ne dit rien.
+- Une pièce posée dans le trou d'une autre est coupée avant elle (`insideOf` → `route.ts`). Le travail laser d'une planche n'est calculé que fenêtre ouverte (`laserItems` paresseux, propriétés non énumérables).
+- Gravure avant coupe, dans l'ordre : cadre, noms des pièces (bleu), dessins des modèles (violet, case « Mettre les dessins ») ; skill `gravure-noms-dessins`. Noms toujours sur la pièce (trait double, ou minuscule sur une petite pièce, ou rien).
+- Couleurs par famille communes à la vue planche et à la 3D (`src/core/colors.ts`) ; un modèle peut en imposer (`colors`).
+- Réglages de coupe globaux (`useLaserMachine`, défaut 650 mm/min à 100 %) ; pas de réglage par épaisseur.
+
+## Règles des modèles
+
+- Un modèle décrit des planches aux cotes nominales ; serrage des crans (0,4 mm, `snugDepths`, `[]` pour l'éviter) et numérotation sont appliqués au chargement. Pas de three.js ni de code dans un modèle.
+- Une action déplace ou tourne des planches, jamais une forme : un réglage qui change la découpe = un autre fichier. Types d'actions dans `src/models/actions.ts` (skill `ajouter-action`).
+- Crans : comme testBrick (impair, 16 mm, profondeur = épaisseur) ; skill `cranter-plaques`. Goujons : skill `goujon`. Contours calculés par script, jamais à la main (skill `creer-modele`).
+- `npm run check` passe chaque modèle avec chaque action : fichier valide, planches numérotées, trous dedans, textes sur du bois plein, pièces sur la machine (400 × 320) ; au-delà de 300 × 300 il le signale (« note »).
+
+## État et sauvegarde
+
+- Tout ce qui survit à un changement d'onglet est dans le store ; les planches sont calculées par sélecteurs mémoïsés, jamais stockées. Pas d'objet non sérialisable (le viewer three.js reste hors store).
+- localStorage : `cnc-projet-v1` (pièces, réglages dont `deep`, cases, planches perso ; format inchangé, champs nouveaux optionnels), `cnc-modeles-v1` (modèle choisi, actions), `laser-reglages`. Écriture groupée après les rafales d'actions.

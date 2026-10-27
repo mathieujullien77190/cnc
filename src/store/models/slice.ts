@@ -10,6 +10,7 @@ export const modelsSlice = createSlice({
     explodeSet: r.explodeSet,
     hiddenSet: r.hiddenSet,
     measuringSet: r.measuringSet,
+    coloredSet: r.coloredSet,
   },
 })
 

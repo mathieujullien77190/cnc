@@ -1,6 +1,6 @@
 ---
 name: gravure-noms-dessins
-description: Distinguer le nom gravé d'une pièce et les dessins gravés dessus (textes, traits, tableaux, icônes) dans l'app de découpe CNC. À utiliser quand l'utilisateur parle de « nom des pièces », « dessins », « gravure », « labels », « règles », de leur couleur ou de leur case à cocher, ou quand un modèle (src/models/library/*.model.ts) grave quelque chose sur ses planches.
+description: Distinguer le nom gravé d'une pièce et les dessins gravés dessus (textes, traits, tableaux, icônes) dans l'app de découpe CNC. À utiliser quand l'utilisateur parle de « nom des pièces », « dessins », « gravure », « labels », « règles », de leur couleur ou de leur case à cocher, ou quand un modèle (models/*.model.json) grave quelque chose sur ses planches.
 ---
 
 # Noms et dessins gravés

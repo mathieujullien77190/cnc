@@ -1,7 +1,7 @@
 import { Card, Title } from '@/components/ui'
 import type { ModelListProps } from './types'
 
-/** Liste des modèles du dossier `src/models/library`. */
+/** Liste des modèles du dossier `models/`. */
 export const ModelList = ({ models, currentId, onPick }: ModelListProps) => (
   <Card>
     <Title as="h2" className="mb-2">Modèles ({models.length})</Title>

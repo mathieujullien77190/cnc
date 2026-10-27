@@ -277,6 +277,57 @@ try {
   check(!!v3box && Math.abs(Math.max(...v3box.outer.map((q) => q[0])) - Math.min(...v3box.outer.map((q) => q[0])) - 143) < 0.01, 'mangeoire V3 : boîtier de 143 mm de côté')
 
   check(MODELS.length >= 1 && new Set(MODELS.map((m) => m.id)).size === MODELS.length, `${MODELS.length} modèles, ids uniques`)
+  // couleurs choisies par l'app : toujours pastel clair, et fixes (même catégorie, même couleur, quel que soit l'ordre)
+  const { PALETTE, FIXED, categoryHex } = await server.ssrLoadModule('/src/core/colors.ts')
+  const lum = (h) => (0.299 * ((h >> 16) & 255) + 0.587 * ((h >> 8) & 255) + 0.114 * (h & 255)) / 255
+  check([...PALETTE, ...Object.values(FIXED)].every((h) => lum(h) >= 0.6), 'couleurs de l’app : toutes pastel clair (luminosité ≥ 0,6)')
+  check(categoryHex('Zorglub') === categoryHex('Zorglub') && lum(categoryHex('Zorglub')) >= 0.6 && categoryHex('Plaque') === FIXED.Plaque, 'couleurs : fixes par nom de catégorie, pastel pour une catégorie inconnue')
+  // modèle en JSON (sans code) : un modèle TS exporté puis relu donne exactement les mêmes pièces
+  const { modelFromJson, modelToJson } = await server.ssrLoadModule('/src/models/json.ts')
+  for (const m of MODELS) {
+    const raw = m.build(defaultParams(m)).panels
+    const again = modelFromJson(JSON.parse(JSON.stringify(modelToJson(m, raw))), m.id)
+    const a = JSON.stringify(panelsToCutParts(finishPanels(raw), m.id).file)
+    const b = JSON.stringify(panelsToCutParts(finishPanels(again.build({}).panels), m.id).file)
+    check(again.id === m.id && again.params.length === 0 && a === b, `${m.id} : exporté en .model.json puis relu, mêmes pièces`)
+  }
+  // actions : un interrupteur (allumé ou éteint) et chaque option d'une liste ne changent que des positions et la visibilité (jamais la forme, le nombre de planches ni les pièces découpées)
+  const cutOf = (m, panels) => JSON.stringify(panelsToCutParts(finishPanels(panels), m.id).file)
+  const sameShape = (a, b) => a.length === b.length && a.every((p, i) => JSON.stringify([p.outer, p.holes ?? [], p.id, p.thickness]) === JSON.stringify([b[i].outer, b[i].holes ?? [], b[i].id, b[i].thickness]))
+  const movedIn = (a, b) => a.filter((p, i) => JSON.stringify(p.position) !== JSON.stringify(b[i].position)).length
+  for (const m of MODELS) {
+    const off = Object.fromEntries(m.params.map((d) => [d.key, d.type === 'boolean' ? false : d.default]))
+    const base = m.build(off).panels
+    const baseCut = cutOf(m, base)
+    for (const d of m.params) {
+      if (d.type === 'boolean') {
+        const on = m.build({ ...off, [d.key]: true }).panels
+        const moved = movedIn(on, base)
+        check(sameShape(on, base) && moved > 0 && cutOf(m, on) === baseCut, `${m.id} : action « ${d.label} » déplace ${moved} planche(s) sans changer la découpe`)
+      } else if (d.type === 'select') {
+        const states = d.options.map((o) => ({ o, panels: m.build({ ...off, [d.key]: o.value }).panels }))
+        const ok = states.length >= 2 && states.every(({ panels }) => sameShape(panels, base) && cutOf(m, panels) === baseCut)
+        const sum = states.map(({ o, panels }) => `« ${o.label} » : ${panels.filter((p) => p.visible === false).length} cachée(s), ${movedIn(panels, base)} déplacée(s)`).join(' ; ')
+        check(ok, `${m.id} : liste « ${d.label} » : mêmes planches et même découpe pour ses ${states.length} options (${sum})`)
+      }
+    }
+  }
+  const tinyModel = { format: 'cnc-model', version: 1, name: 'x', panels: [{ id: 'P', thickness: 3, outer: [[0, 0], [10, 0], [10, 10], [0, 10]], position: [0, 0, 0] }, { id: 'Q', category: 'Q', thickness: 3, outer: [[0, 0], [10, 0], [10, 10], [0, 10]], position: [20, 0, 0] }] }
+  const withAct = modelFromJson({ ...tinyModel, actions: [{ key: 'up', label: 'Levé', default: false, type: 'move', panels: 'Q', by: [0, 5, 0], show: 'Q' }, { key: 'tilt', label: 'Penché', default: true, type: 'turn', panels: [0], by: [0, 0, 15] }] }, 'x')
+  const w = withAct.build({ up: true, tilt: true }).panels
+  check(w[1].position[1] === 5 && w[0].position[1] === 0 && w[0].rotation?.[2] === 15 && withAct.params.length === 2 && withAct.params.every((d) => d.type === 'boolean'), 'actions move et turn : décalage et rotation appliqués aux bonnes planches')
+  const wOff = withAct.build({ up: false, tilt: false }).panels, wDef = withAct.build({}).panels
+  check(w[1].visible === true && wOff[1].visible === false && wOff[0].rotation === undefined && wDef[1].visible === false && wDef[0].rotation?.[2] === 15, 'interrupteur : « show » montre les planches allumé et les cache éteint ; réglage absent = défaut')
+  // liste de choix : une option cache, une autre montre et décale, une troisième cache tout ; valeur inconnue = défaut
+  const seatOpts = [{ value: 'p', label: 'Plaque P', show: [0], hide: 'Q' }, { value: 'q', label: 'Plaque Q', show: 'Q', hide: [0], move: [{ panels: 'Q', by: [-20, 0, 0] }] }, { value: 'none', label: 'Rien', hide: ['P', 'Q'] }]
+  const seat = modelFromJson({ ...tinyModel, actions: [{ key: 'seat', label: 'Siège', default: 'p', type: 'choice', options: seatOpts }] }, 'x')
+  const sP = seat.build({ seat: 'p' }).panels, sQ = seat.build({ seat: 'q' }).panels, sNone = seat.build({ seat: 'none' }).panels, sBad = seat.build({ seat: 'zzz' }).panels
+  const sParam = seat.params[0]
+  check(sParam.type === 'select' && sParam.default === 'p' && sParam.options.map((o) => o.label).join() === 'Plaque P,Plaque Q,Rien', 'action choice : réglage en liste (options = les labels, défaut = la value par défaut)')
+  check(sP[0].visible === true && sP[1].visible === false && sP[1].position[0] === 20 && sQ[0].visible === false && sQ[1].visible === true && sQ[1].position[0] === 0 && sNone.every((p) => p.visible === false) && sNone[1].position[0] === 20 && JSON.stringify(sBad) === JSON.stringify(sP), 'action choice : chaque option montre, cache et décale ses planches ; valeur inconnue = défaut')
+  const badJson = (raw) => { try { modelFromJson(raw, 'x'); return false } catch (e) { return /modèle|planche|action/.test(e.message) } }
+  check(badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: 'x', type: 'choice', options: seatOpts }] }) && badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: 'p', type: 'choice', options: seatOpts.slice(0, 1) }] }) && badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: 'p', type: 'choice', options: [seatOpts[0], { value: 'z', label: 'z', show: 'Z' }] }] }) && badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: 'oui', type: 'move', panels: 'Q', by: [0, 0, 0] }] }), 'action choice invalide refusée (défaut hors options, une seule option, cible inconnue, défaut non booléen d’un interrupteur)')
+  check(badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: false, type: 'fly', panels: 'Q' }] }) && badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: false, type: 'move', panels: 'Z', by: [0, 0, 0] }] }) && badJson({ format: 'cnc-model', version: 1, name: 'x', panels: [] }) && badJson({ format: 'cnc-model', version: 1, name: 'x', panels: [{ id: 'p-01', thickness: 3, outer: [[0, 0], [1, 0], [1, 1]], position: [0, 0, 0] }] }) && badJson({ format: 'autre' }), 'modèle JSON invalide refusé avec un message lisible')
   for (const m of MODELS) {
     const lo = Object.fromEntries(m.params.map((d) => [d.key, d.type === 'number' ? d.min : d.default]))
     const hi = Object.fromEntries(m.params.map((d) => [d.key, d.type === 'number' ? d.max : d.default]))
@@ -310,7 +361,10 @@ try {
       })
       check(!labelBad.length, `${m.id} (${label}) : textes gravés sur du bois plein${labelBad.length ? ' : ' + labelBad.join(' ') : ''}`)
       const laid = buildAutoSheets(back.parts, { width: 300, height: 300, margin: 5, gap: 1 })
-      check(laid.every((sh) => sh.rejected.length === 0), `${m.id} (${label}) : toutes les pièces tiennent sur du 300 × 300`)
+      const big = laid.flatMap((sh) => sh.rejected.map((r) => `${r.id} ${Math.round(r.w)}×${Math.round(r.h)}`))
+      if (big.length) console.log(`note  ${m.id} (${label}) : ${big.length} pièce(s) plus grandes que 300 × 300 (${[...new Set(big)].slice(0, 4).join(', ')}${big.length > 4 ? '…' : ''}) : planche 400 × 320 nécessaire`)
+      const machine = buildAutoSheets(back.parts, { width: 400, height: 320, margin: 5, gap: 1 })
+      check(machine.every((sh) => sh.rejected.length === 0), `${m.id} (${label}) : toutes les pièces tiennent sur la machine (400 × 320)`)
     }
   }
   // --- « Optimiser mieux » : pièces rangées dans les trous (formes quelconques) d'autres pièces ---
@@ -387,25 +441,81 @@ try {
   check(signature(buildAutoSheets(dpOne, sameBytes)) === signature(dsOne), 'optimiser mieux : la solution relue depuis la sauvegarde redonne les mêmes planches')
   check(signature(buildAutoSheets(parts, settings)) === signature(buildAutoSheets(parts, { ...settings, deep: undefined })), 'optimiser mieux : sans solution, l’exemple est rangé comme avant')
 
-  // mangeoire V3 : la recherche ne dégrade jamais (au plus autant de planches), tout est posé, sans conflit
+  // mangeoire V3 : le rangement normal (sans plan) est exactement l'ancien ; la recherche polygonale gagne au moins une planche en 300 × 300
+  // (6 au plus, ce que l'utilisateur obtient à la main), tout est posé, sans conflit, le jeu est respecté entre vrais contours, et le plan se rejoue vite et à l'identique
   const v3file = panelsToCutParts(finishPanels(v3.build(defaultParams(v3)).panels), v3.id).file
   const v3parts = parseCutParts(JSON.stringify(v3file)).parts
-  for (const [W, H] of [[300, 300], [400, 320]]) {
+  const ringDist = (a, b) => {
+    let m = Infinity
+    for (let i = 0; i < a.length; i++) for (let j = 0; j < b.length; j++) m = Math.min(m, ptSegDist(a[i], b[j], b[(j + 1) % b.length]), ptSegDist(b[j], a[i], a[(i + 1) % a.length]))
+    return m
+  }
+  const minGap = (shs) => {
+    let m = Infinity
+    for (const sh of shs) for (let i = 0; i < sh.items.length; i++) for (let j = i + 1; j < sh.items.length; j++) {
+      const a = sh.items[i]
+      const b = sh.items[j]
+      if (a.x > b.x + b.w + 5 || b.x > a.x + a.w + 5 || a.y > b.y + b.h + 5 || b.y > a.y + a.h + 5) continue
+      for (const ra of [a.outer, ...a.holes]) for (const rb of [b.outer, ...b.holes]) m = Math.min(m, ringDist(ra, rb))
+    }
+    return m
+  }
+  const count = (shs) => shs.reduce((a, sh) => a + sh.items.length, 0)
+  const v3plain = buildAutoSheets(v3parts, { width: 300, height: 300, margin: 5, gap: 1 })
+  let opt300 = v3plain
+  check(v3plain.map((sh) => sh.fill.toFixed(2)).join(' ') === '0.83 0.91 0.90 0.89 0.76 0.66 0.29', `mangeoire V3 300 × 300 sans plan : rangement inchangé (${v3plain.length} planches, remplissages ${v3plain.map((sh) => sh.fill.toFixed(2)).join(' ')})`)
+  for (const [W, H, maxSeeds, atMost] of [[300, 300, 6, 6], [400, 320, 4, Infinity]]) {
     const s = { width: W, height: H, margin: 5, gap: 1 }
     const plain = buildAutoSheets(v3parts, s)
-    const res = deepSearch(v3parts, s, { budgetMs: 60000, maxSeeds: 40 })
+    const res = deepSearch(v3parts, s, { budgetMs: 15000, maxSeeds })
     const opt = buildAutoSheets(v3parts, res.plan ? { ...s, deep: res.plan } : s)
-    const count = (shs) => shs.reduce((a, sh) => a + sh.items.length, 0)
-    check(opt.length <= plain.length && res.after.sheets === opt.length && res.before.sheets === plain.length, `mangeoire V3 ${W} × ${H} : ${plain.length} planches -> ${opt.length} planches après ${res.tried} essais`)
+    if (W === 300) opt300 = opt
+    check(opt.length <= plain.length - 1 && opt.length <= atMost && res.after.sheets === opt.length && res.before.sheets === plain.length && res.plan?.before === plain.length && res.plan?.after === opt.length, `mangeoire V3 ${W} × ${H} : ${plain.length} planches -> ${opt.length} planches après ${res.tried} essais en ${(res.ms / 1000).toFixed(1)} s (au plus ${Math.min(atMost, plain.length - 1)})`)
     check(count(opt) === count(plain) && opt.every((sh) => !sh.rejected.length && conflicts(sh).size === 0), `mangeoire V3 ${W} × ${H} : toutes les pièces posées, sans conflit`)
-    check(signature(buildAutoSheets(v3parts, res.plan ? { ...s, deep: res.plan } : s)) === signature(opt), `mangeoire V3 ${W} × ${H} : la solution se rejoue à l’identique`)
+    check(minGap(opt) >= s.gap - 1e-6, `mangeoire V3 ${W} × ${H} : jeu de ${s.gap} mm respecté entre contours (min ${minGap(opt).toFixed(3)} mm)`)
+    const tr0 = performance.now()
+    const replay = buildAutoSheets(v3parts, JSON.parse(JSON.stringify(res.plan ? { ...s, deep: res.plan } : s)))
+    const trMs = performance.now() - tr0
+    check(signature(replay) === signature(opt) && trMs < 20, `mangeoire V3 ${W} × ${H} : le plan (${JSON.stringify(res.plan).length} octets) se rejoue à l’identique en ${trMs.toFixed(1)} ms`)
+    const stalePlan = { ...s, deep: { ...res.plan, sig: 'autre' } }
+    check(signature(buildAutoSheets(v3parts, stalePlan)) === signature(plain), `mangeoire V3 ${W} × ${H} : un plan à la signature périmée est ignoré`)
+    const brokenPlan = { ...s, deep: { ...res.plan, places: Object.fromEntries(Object.entries(res.plan.places).map(([k, v]) => [k, v.map((p, i) => (i ? p : [p[0], p[1], p[2] + 2, p[3], p[4]]))])) } }
+    check(signature(buildAutoSheets(v3parts, brokenPlan)) === signature(plain), `mangeoire V3 ${W} × ${H} : un plan dont une pièce chevauche une autre est ignoré (rangement normal)`)
+    const pairs2 = []
+    for (const sh of opt) {
+      const order = sheetToJob(sh, { names: false, frame: false }).pieces
+      order.forEach((outerPiece, oi) => order.forEach((other, ii) => { if (ii !== oi && outerPiece.contours.slice(1).some((h) => inPoly(other.contours[0][0], h))) pairs2.push(ii < oi) }))
+    }
+    check(pairs2.every(Boolean), `mangeoire V3 ${W} × ${H} : ${pairs2.length} pièces dans un trou, toutes coupées avant leur hôte`)
+    check(opt.every((sh) => sh.items.every((it) => (marksFor(sh).get(it.uid) ?? []).flat().every((p) => p[0] >= it.x - 1e-6 && p[0] <= it.x + it.w + 1e-6 && p[1] >= it.y - 1e-6 && p[1] <= it.y + it.h + 1e-6))), `mangeoire V3 ${W} × ${H} : les noms gravés restent sur leur pièce`)
   }
   // rangement par type : la recherche se fait par famille et ne dégrade pas non plus
   const byTypeSet = { width: 300, height: 300, margin: 5, gap: 1, byType: true }
-  const byTypeRes = deepSearch(v3parts, byTypeSet, { budgetMs: 60000, maxSeeds: 15 })
+  const byTypeRes = deepSearch(v3parts, byTypeSet, { budgetMs: 8000, maxSeeds: 4 })
   const byTypePlain = buildAutoSheets(v3parts, byTypeSet)
   const byTypeOpt = buildAutoSheets(v3parts, byTypeRes.plan ? { ...byTypeSet, deep: byTypeRes.plan } : byTypeSet)
-  check(byTypeOpt.length <= byTypePlain.length && byTypeOpt.every((sh) => conflicts(sh).size === 0), `mangeoire V3 par type : ${byTypePlain.length} planches -> ${byTypeOpt.length}`)
+  check(byTypeOpt.length <= byTypePlain.length && byTypeOpt.every((sh) => conflicts(sh).size === 0) && count(byTypeOpt) === count(byTypePlain), `mangeoire V3 par type : ${byTypePlain.length} planches -> ${byTypeOpt.length}`)
+  // « Modifier la planche » reprend les positions et angles du plan tels quels
+  const { boardFromSheet } = await server.ssrLoadModule('/src/core/sheets.ts')
+  const turnedSheet = opt300.find((sh) => sh.items.some((it) => it.angle !== undefined)) ?? opt300.reduce((a, b) => (b.items.length > a.items.length ? b : a))
+  const bfs = boardFromSheet(turnedSheet, { names: true, frame: true })
+  const bfsSheet = buildCustomSheet({ id: 'bfs', ...bfs }, v3parts, 5, 1)
+  check(bfsSheet.items.length === turnedSheet.items.length && conflicts(bfsSheet).size === 0 && turnedSheet.items.every((it) => bfsSheet.items.some((o) => o.part.key === it.part.key && Math.abs(o.x - it.x) < 1e-6 && Math.abs(o.y - it.y) < 1e-6 && angleOf(o) === angleOf(it))), `modifier la planche : ${turnedSheet.items.length} pièces reprises aux mêmes positions et angles (${turnedSheet.items.filter((it) => it.angle !== undefined).length} à angle libre), sans conflit`)
+
+  // deux L qui ne tiennent ensemble que par imbrication polygonale (boîtes 60 × 60 qui se chevauchent sur une zone utile de 80 × 80)
+  const ell = (id) => mk(id, [[0, 0], [60, 0], [60, 10], [10, 10], [10, 60], [0, 60]])
+  const ells = [ell('L-01'), ell('L-02')]
+  const ellSet = { width: 90, height: 90, margin: 5, gap: 2 }
+  const ellPlain = buildAutoSheets(ells, ellSet)
+  const ellRes = deepSearch(ells, ellSet, { budgetMs: 5000, maxSeeds: 3 })
+  const ellOpt = buildAutoSheets(ells, { ...ellSet, deep: ellRes.plan })
+  const [la, lb] = ellOpt[0]?.items ?? []
+  check(ellPlain.length === 2 && ellRes.plan && ellOpt.length === 1 && ellOpt[0].items.length === 2 && conflicts(ellOpt[0]).size === 0, `deux L : ${ellPlain.length} planches en rangement normal -> ${ellOpt.length} par imbrication`)
+  check(la && lb && la.x < lb.x + lb.w && lb.x < la.x + la.w && la.y < lb.y + lb.h && lb.y < la.y + la.h, 'deux L : leurs boîtes se chevauchent (imbriquées), pas leurs contours')
+  check(minGap(ellOpt) >= 2 - 1e-6, `deux L : jeu de 2 mm respecté (min ${minGap(ellOpt).toFixed(3)} mm)`)
+  const ellNoRot = [ell('L-01'), { ...ell('L-02'), rotate: 'none' }]
+  const ellNoRotOpt = buildAutoSheets(ellNoRot, { ...ellSet, deep: deepSearch(ellNoRot, ellSet, { budgetMs: 5000, maxSeeds: 3 }).plan ?? undefined })
+  check(ellNoRotOpt.flatMap((sh) => sh.items).every((it) => it.part.rotate !== 'none' || angleOf(it) === 0), 'deux L : une pièce « sans rotation » reste à 0°')
 
   // --- store Redux : reducers purs, planches calculées, format de sauvegarde, persistance ---
   const mem = new Map()

@@ -99,7 +99,8 @@ const apart = (a: Pt[], b: Pt[], c: number) => {
   return true
 }
 
-interface Shape {
+/** Un contour fermé et sa boîte englobante. */
+export interface Shape {
   pts: Pt[]
   x0: number
   y0: number
@@ -107,10 +108,30 @@ interface Shape {
   y1: number
 }
 
-const shapeOf = (pts: Pt[]): Shape => {
+export const shapeOf = (pts: Pt[]): Shape => {
   const xs = pts.map((p) => p[0])
   const ys = pts.map((p) => p[1])
   return { pts, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }
+}
+
+/** Le point est-il dans l'une des matières de `s` (contour extérieur `s[0]`, hors de ses trous `s[1..]`) ? */
+const inSolidOf = (p: Pt, s: Shape[]) => inPolyAt(p[0], p[1], s[0].pts) && !s.some((h, i) => i > 0 && inPolyAt(p[0], p[1], h.pts))
+
+/**
+ * Deux pièces posées (contour extérieur en premier, puis les trous) sont-elles compatibles : tous leurs contours à au moins `c` mm les uns
+ * des autres, et aucune ne couvre la matière de l'autre ? Une pièce dans un trou de l'autre, ou dans le creux d'un U, est permise.
+ * Vrai test de polygones (distance entre segments, point dans polygone), les boîtes ne servent que de pré-filtre.
+ */
+export const clearOf = (a: Shape[], b: Shape[], c: number): boolean => {
+  if (a[0].x0 > b[0].x1 + c || b[0].x0 > a[0].x1 + c || a[0].y0 > b[0].y1 + c || b[0].y0 > a[0].y1 + c) return true
+  for (const ra of a) {
+    for (const rb of b) {
+      if (ra.x0 > rb.x1 + c || rb.x0 > ra.x1 + c || ra.y0 > rb.y1 + c || rb.y0 > ra.y1 + c) continue
+      if (!apart(ra.pts, rb.pts, c)) return false
+    }
+  }
+  // les contours sont loin les uns des autres : un seul sommet dit si une pièce est dans la matière de l'autre
+  return !inSolidOf(a[0].pts[0], b) && !inSolidOf(b[0].pts[0], a)
 }
 
 interface Cavity extends Shape {

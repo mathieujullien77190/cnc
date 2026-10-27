@@ -1,11 +1,11 @@
-import { Checkbox, Select } from '@/components/ui'
+import { Select, Switch } from '@/components/ui'
 import type { ParamFieldProps } from './types'
 
-/** Un réglage du modèle : case à cocher, liste ou curseur selon son type. */
+/** Un réglage du modèle : interrupteur on / off, liste ou curseur selon son type. */
 export const ParamField = ({ def, value, onChange }: ParamFieldProps) => {
   if (def.type === 'boolean') {
     return (
-      <Checkbox label={def.label} checked={value as boolean} onChange={onChange} className="items-center gap-2 text-xs text-stone-700" />
+      <Switch label={def.label} checked={value as boolean} onChange={onChange} />
     )
   }
   if (def.type === 'select') {

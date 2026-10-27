@@ -5,3 +5,4 @@ export const selectModelParams = (s: RootState) => s.models.params
 export const selectExplode = (s: RootState) => s.models.explode
 export const selectHidden = (s: RootState) => s.models.hidden
 export const selectMeasuring = (s: RootState) => s.models.measuring
+export const selectColored = (s: RootState) => s.models.colored

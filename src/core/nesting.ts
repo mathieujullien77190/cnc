@@ -30,7 +30,8 @@ export type Rule = 'bssf' | 'blsf' | 'baf' | 'bl'
 export class Bin {
   free: Box[]
   items: PackPlace[] = []
-  constructor(sw: number, sh: number, readonly gap: number, readonly rule: Rule = 'bssf') {
+  /** `flipY` : le repère de rangement est le miroir vertical de la planche (rangement depuis le bas) ; les trous des pièces, donnés dans le repère de la planche, sont retournés. */
+  constructor(sw: number, sh: number, readonly gap: number, readonly rule: Rule = 'bssf', readonly flipY = false) {
     this.free = [{ x: 0, y: 0, w: sw + gap, h: sh + gap }] // le jeu peut dépasser de la planche : une pièce de pleine taille tient
   }
 
@@ -65,7 +66,9 @@ export class Bin {
 
   carve(r: Box, item: PackItem, rot: boolean) {
     const nested = (item.holes ?? []).map((h) => {
-      const [x0, x1, y0, y1] = rot ? [item.h - h.y - h.h, item.h - h.y, h.x, h.x + h.w] : [h.x, h.x + h.w, h.y, h.y + h.h]
+      // trou dans le repère de rangement : tourné de 90° si la pièce l'est ; en miroir vertical si le repère l'est
+      const [x0, x1] = rot ? [item.h - h.y - h.h, item.h - h.y] : [h.x, h.x + h.w]
+      const [y0, y1] = rot ? (this.flipY ? [item.w - h.x - h.w, item.w - h.x] : [h.x, h.x + h.w]) : this.flipY ? [item.h - h.y - h.h, item.h - h.y] : [h.y, h.y + h.h]
       return { x: r.x + x0 + this.gap, y: r.y + y0 + this.gap, w: x1 - x0 - this.gap, h: y1 - y0 - this.gap }
     })
     const next: Box[] = []
@@ -110,10 +113,10 @@ export const ORDERS: Order[] = [
  * `fixed` : pièces déjà posées (x, y, w, h de la planche, rot) autour desquelles on range le reste (première planche seulement).
  * `orders` : ordres de tri essayés (par défaut `ORDERS`). `rule` : règle de choix de la place libre.
  */
-export const pack = (items: PackItem[], sw: number, sh: number, gap: number, { multi = true, fixed = [] as PackPlace[], orders = ORDERS as Order[], rule = 'bssf' as Rule } = {}): { bins: PackPlace[][]; rejected: PackItem[] } => {
+export const pack = (items: PackItem[], sw: number, sh: number, gap: number, { multi = true, fixed = [] as PackPlace[], orders = ORDERS as Order[], rule = 'bssf' as Rule, flipY = false } = {}): { bins: PackPlace[][]; rejected: PackItem[] } => {
   let best: Packed | null = null
   for (const order of orders) {
-    const start = new Bin(sw, sh, gap, rule)
+    const start = new Bin(sw, sh, gap, rule, flipY)
     for (const f of fixed) start.occupy(f)
     const bins = packOnce(start, items, sw, sh, gap, order, multi)
     if (!best || bins.rejected.length < best.rejected.length || (bins.rejected.length === best.rejected.length && bins.bins.length < best.bins.length)) best = bins
@@ -134,7 +137,7 @@ const packOnce = (first: Bin, items: PackItem[], sw: number, sh: number, gap: nu
       out.rejected.push(it)
       continue
     }
-    const b = new Bin(sw, sh, gap, first.rule)
+    const b = new Bin(sw, sh, gap, first.rule, first.flipY)
     if (b.place(it)) out.bins.push(b)
     else out.rejected.push(it)
   }

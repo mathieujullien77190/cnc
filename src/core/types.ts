@@ -57,11 +57,16 @@ export interface Sheet {
   fill: number
 }
 
-/** Solution de « Optimiser mieux » : une graine par groupe de pièces (épaisseur, ou épaisseur et famille), valable tant que `sig` est celle des pièces et réglages. */
+/** Une pièce posée par le plan : uid de l'exemplaire, numéro de planche du groupe (0, 1…), coin de sa boîte (repère de la zone utile, sans la marge) et angle (0, 90, 180… ou libre). */
+export type PlanPlace = [uid: string, sheet: number, x: number, y: number, angle: number]
+
+/** Solution de « Optimiser mieux » par groupe de pièces (épaisseur, ou épaisseur et famille), valable tant que `sig` est celle des pièces et réglages. */
 export interface DeepPlan {
   sig: string
-  /** Clé de groupe (`3`, `3|R`) -> graine du rangement en profondeur. Un groupe absent garde le rangement normal. */
-  seeds: Record<string, number>
+  /** Clé de groupe (`3`, `3|R`) -> graine du rangement en profondeur (anciennes solutions). Un groupe absent garde le rangement normal. */
+  seeds?: Record<string, number>
+  /** Clé de groupe -> placements trouvés par la recherche polygonale (rejoués tels quels, après contrôle). */
+  places?: Record<string, PlanPlace[]>
   /** Nombre de planches avant et après (pour l'affichage). */
   before: number
   after: number

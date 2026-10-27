@@ -4,7 +4,7 @@ import { Btn, Hint, ProgressBar } from '@/components/ui'
 import { useDeepSearch } from '@/state/useDeepSearch'
 import type { DeepOptimizerProps } from './types'
 
-/** « Optimiser encore mieux » : cherche pendant quelques secondes (sans bloquer la page) à ranger des pièces dans les trous d'autres pièces. Le résultat est gardé dans les réglages. */
+/** « Optimiser encore mieux » : cherche pendant quelques secondes (sans bloquer la page) un rangement qui imbrique les pièces par leur vrai contour. Le plan trouvé est gardé dans les réglages. */
 export const DeepOptimizer = ({ parts, settings, onChange }: DeepOptimizerProps) => {
   const { state, elapsedMs, budgetMs, start, cancel } = useDeepSearch(parts, settings, (deep) => onChange({ deep }))
   const active = validDeep(parts, settings)
@@ -31,7 +31,7 @@ export const DeepOptimizer = ({ parts, settings, onChange }: DeepOptimizerProps)
           <button type="button" className="underline hover:text-emerald-950" onClick={() => onChange({ deep: undefined })}>Revenir au rangement normal</button>
         </p>
       ) : (
-        <Hint>{state.phase === 'done' && state.sig === sig ? state.message : `Cherche à ranger des pièces dans les trous d’autres pièces (environ ${Math.round(budgetMs / 1000)} s).`}</Hint>
+        <Hint>{state.phase === 'done' && state.sig === sig ? state.message : `Cherche à imbriquer les pièces par leur vrai contour (creux, trous, formes en C ou en U) pour gagner des planches (environ ${Math.round(budgetMs / 1000)} s).`}</Hint>
       )}
     </div>
   )

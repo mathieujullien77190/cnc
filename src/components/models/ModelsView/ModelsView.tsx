@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Notice } from '@/components/ui'
 import { saveText } from '@/laser'
 import { MODELS, modelById } from '@/models/registry'
+import { modelToJson } from '@/models/json'
 import { panelsToCutParts } from '@/models/toCutParts'
 import { cleanParams, defaultParams } from '@/models/types'
 import { Viewer3D } from '@/models/viewer3d'
@@ -20,7 +21,7 @@ import type { MenuState } from './types'
 import { useCnc3dApi } from './useCnc3dApi'
 
 /**
- * Onglet « Modèles 3D » : liste des modèles du dossier `src/models/library`, réglages, vue three.js, envoi des planches à la découpe.
+ * Onglet « Modèles 3D » : liste des modèles du dossier `models/`, réglages, vue three.js, envoi des planches à la découpe.
  * Les modèles sont du code (écrit par l'IA) ; l'API `window.cnc3d` laisse aussi l'IA piloter la vue depuis le navigateur.
  */
 export const ModelsView = () => {
@@ -29,6 +30,7 @@ export const ModelsView = () => {
   const savedModel = useAppSelector((s) => s.models.model)
   const savedParams = useAppSelector((s) => s.models.params)
   const explode = useAppSelector((s) => s.models.explode)
+  const colored = useAppSelector((s) => s.models.colored)
   const measuring = useAppSelector((s) => s.models.measuring)
   const hidden = useAppSelector((s) => s.models.hidden)
   const report = useAppSelector((s) => s.ui.modelReport)
@@ -56,7 +58,8 @@ export const ModelsView = () => {
     v.onHidden = setHiddenCount
     v.onMenu = (index, cx, cy) => {
       const r = host.current!.getBoundingClientRect()
-      setMenu(index < 0 ? null : { index, x: cx - r.left, y: cy - r.top })
+      // clic droit dans le vide : le menu s'ouvre quand même (pour réafficher les planches cachées)
+      setMenu({ index, x: cx - r.left, y: cy - r.top })
     }
     viewer.current = v
     return () => {
@@ -85,11 +88,19 @@ export const ModelsView = () => {
     if (keep.length !== stored.length) dispatch(modelsActions.hiddenSet({ modelId: model?.id ?? '', indices: keep }))
   }, [result, model?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => viewer.current?.setExplode(explode), [explode])
+  useEffect(() => viewer.current?.setColors(colored), [colored])
   useEffect(() => viewer.current?.select(selected), [selected])
   useEffect(() => viewer.current?.setMeasure(measuring), [measuring])
 
   // choisir un modèle ou changer un réglage envoie les planches à la découpe toutes seules (voir plus bas) ; recharger la page ne touche à rien
   const syncCut = useRef(false)
+  // première ouverture avec un modèle déjà choisi (le nichoir par défaut) et rien à découper : ses planches partent à la découpe, comme si on venait de le choisir
+  const catalogEmpty = useAppSelector((s) => s.project.parts.length === 0)
+  const firstSync = useRef(true)
+  if (firstSync.current) {
+    firstSync.current = false
+    if (model && catalogEmpty) syncCut.current = true
+  }
   const pick = (id: string) => {
     syncCut.current = !!id
     dispatch(modelsActions.modelPicked(id))
@@ -112,6 +123,7 @@ export const ModelsView = () => {
     dispatch(modelsActions.paramsSet({ modelId: model.id, params: defaultParams(model) }))
   }
   const setExplode = (k: number) => dispatch(modelsActions.explodeSet(k))
+  const setColored = (on: boolean) => dispatch(modelsActions.coloredSet(on))
   const setMeasuring = (on: boolean) => dispatch(modelsActions.measuringSet(on))
   const setHidden = (indices: number[]) => dispatch(modelsActions.hiddenSet({ modelId, indices }))
   const hide = (i: number) => {
@@ -123,6 +135,10 @@ export const ModelsView = () => {
     const ok = indices.filter((i) => i >= 0 && i < count)
     viewer.current?.hideMany(ok)
     setHidden([...new Set([...hiddenNow(), ...ok])])
+  }
+  const show = (indices: number[]) => {
+    viewer.current?.showMany(indices)
+    setHidden(hiddenNow().filter((i) => !indices.includes(i)))
   }
   const showAll = () => {
     viewer.current?.showAll()
@@ -145,33 +161,42 @@ export const ModelsView = () => {
     return () => clearTimeout(id)
   }, [cut]) // eslint-disable-line react-hooks/exhaustive-deps
   const download = () => cut && model && saveText(JSON.stringify(cut.file), `${model.id}.cutparts.json`)
+  // le modèle figé en JSON : à déposer dans `models/` pour l'avoir dans la liste sans code
+  const downloadModel = () => result && model && saveText(JSON.stringify(modelToJson(model, result.raw), null, 2), `${model.id}.model.json`)
 
   useCnc3dApi({ pick, setParam, toCut, hide, hideMany, showAll, model, params, result, cut, selected }, { viewer, setMeasuring, setExplode })
 
   const sel = selected >= 0 ? result?.panels[selected] : undefined
-  const menuPanel = menu && result?.panels[menu.index]
+  const menuPanel = menu && menu.index >= 0 ? result?.panels[menu.index] : undefined
+  // planches cachées du modèle : une entrée par planche (nom numéroté), plus une par groupe quand plusieurs planches d'un groupe sont cachées
+  const hiddenItems = useMemo(() => {
+    if (!result) return []
+    const idx = (hidden[modelId] ?? []).filter((i) => i < result.view.length).sort((a, b) => a - b)
+    const groups = new Map<string, number[]>()
+    for (const i of idx) groups.set(groupName(result.view[i].id), [...(groups.get(groupName(result.view[i].id)) ?? []), i])
+    return [...idx.map((i) => ({ label: result.view[i].id, indices: [i] })), ...[...groups].filter(([, list]) => list.length > 1).map(([g, list]) => ({ label: `le groupe ${g} (${list.length})`, indices: list }))]
+  }, [hidden, modelId, result])
 
   return (
     <div className="grid gap-3 lg:grid-cols-[17rem_1fr]">
       <div className="space-y-3">
         <ModelList models={MODELS} currentId={model?.id} onPick={toggle} />
-        {model && <ModelSettings model={model} params={params} explode={explode} onParam={setParam} onReset={reset} onExplode={setExplode} />}
-        {cut && model && <CutActions report={report} onDownload={download} />}
+        {model && <ModelSettings model={model} params={params} explode={explode} colored={colored} onColored={setColored} onParam={setParam} onReset={reset} onExplode={setExplode} />}
+        {cut && model && <CutActions report={report} onDownload={download} onDownloadModel={downloadModel} />}
       </div>
 
       <div className="min-w-0 space-y-3">
         <div className="relative overflow-hidden rounded-lg border border-stone-200 bg-stone-100 shadow-sm">
           <div ref={host} className="h-[calc(100dvh-6.5rem)] min-h-96 w-full" />
           <ViewToolbar measuring={measuring} hiddenCount={hiddenCount} onMeasure={() => setMeasuring(!measuring)} onFit={() => viewer.current?.fit()} onShowAll={showAll} />
-          {menu && menuPanel && result && (
+          {menu && result && (menuPanel || hiddenItems.length > 0) && (
             <ContextMenu
               x={menu.x}
               y={menu.y}
-              panelId={menuPanel.id}
-              group={groupName(result.view[menu.index].id)}
-              groupCount={groupOf(result.view, menu.index).length}
-              onHide={() => { hide(menu.index); setMenu(null) }}
-              onHideGroup={() => { hideMany(groupOf(result.view, menu.index)); setMenu(null) }}
+              panel={menuPanel ? { id: menuPanel.id, group: groupName(result.view[menu.index].id), groupCount: groupOf(result.view, menu.index).length, onHide: () => { hide(menu.index); setMenu(null) }, onHideGroup: () => { hideMany(groupOf(result.view, menu.index)); setMenu(null) } } : undefined}
+              hiddenItems={hiddenItems}
+              onShow={(indices) => { show(indices); setMenu(null) }}
+              onShowAll={() => { showAll(); setMenu(null) }}
             />
           )}
           {sel && (

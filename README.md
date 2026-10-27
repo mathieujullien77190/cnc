@@ -14,7 +14,7 @@ Idée ──► IA (LLM) ──► Modèle 3D ──► Planches à plat ──�
           fichier      réglable      crans et trous     300 × 300 mm   gravure
 ```
 
-1. **Le modèle.** L'IA écrit un fichier `src/models/library/<nom>.model.ts`. Il décrit des planches (contour 2D, épaisseur, position, rotation) et des réglages. Il n'y a pas de three.js dans le modèle : l'application en tire la vue 3D et les pièces à découper.
+1. **Le modèle.** L'IA écrit un fichier `models/<nom>.model.json`. Il décrit des planches (contour 2D, épaisseur, position, rotation) et des actions (ouvrir une trappe, tirer un tiroir). Pas de code dans le modèle : l'application en tire la vue 3D et les pièces à découper.
 2. **La vue 3D.** Le modèle apparaît tout seul dans l'onglet « Modèles 3D », avec ses réglages et un curseur d'éclaté pour vérifier l'assemblage.
 3. **Les pièces.** Choisir un modèle envoie ses planches à la découpe toutes seules. Elles arrivent au format `.cutparts.json`, le même qu'on peut importer depuis n'importe quel projet three.js.
 4. **Le rangement.** Les pièces sont rangées automatiquement sur des feuilles, une série par épaisseur. On peut aussi composer une planche à la main.
@@ -32,7 +32,7 @@ Idée ──► IA (LLM) ──► Modèle 3D ──► Planches à plat ──�
 
 ### Planches
 - **Automatiques** : toutes les pièces importées, rangées au mieux (rotation à 90°, trous réutilisés), une série par épaisseur, jamais deux épaisseurs sur la même feuille.
-- **Optimiser encore mieux** (bouton du bloc « Planches ») : une recherche de quelques secondes, sans bloquer la page, qui essaie de ranger des pièces à l’intérieur des trous d’autres pièces (fenêtres, ronds, formes quelconques) pour gagner des planches ; le résultat est gardé avec le projet et se défait en recliquant sur un mode de rangement.
+- **Optimiser encore mieux** (bouton du bloc « Planches ») : une recherche de quelques secondes, sans bloquer la page, qui range les pièces avec leur vrai contour et non leur boîte (C et U imbriqués, pièces dans les trous d’autres pièces, boîtes qui se chevauchent sans que le bois se touche) pour gagner des planches ; le plan trouvé est gardé avec le projet, rejoué tel quel, et se défait en recliquant sur un mode de rangement.
 - **Perso** : on choisit les pièces et leur quantité sur une feuille (boutons − / +), on les déplace à la main, on les tourne (touche R ou angle libre). Les conflits sont signalés en rouge.
 - Aperçu zoomable, formats 300 × 300 et 400 × 320 mm (zone de la machine) ou taille libre.
 - Export SVG (calque coupe rouge, calque gravure bleu).
@@ -64,7 +64,7 @@ npm run dev          # http://localhost:5173
 ## Créer un modèle avec une IA
 
 1. Ouvrir ce dépôt avec Claude Code (ou un autre agent) et décrire l'objet voulu.
-2. L'agent écrit `src/models/library/<nom>.model.ts` en suivant la référence `docs/MODELES.md`. Le skill `creer-modele` détaille la marche à suivre.
+2. L'agent écrit `models/<nom>.model.json` en suivant la référence `docs/MODELES.md`. Le skill `creer-modele` détaille la marche à suivre.
 3. Le modèle apparaît dans l'onglet « Modèles 3D » à chaud. On règle, on regarde en éclaté, puis on envoie à la découpe.
 4. `npm run check` doit rester vert : chaque pièce tient sur 290 × 290 mm à tous les réglages permis.
 
@@ -84,7 +84,8 @@ Un projet three.js peut produire ses pièces sans passer par ici : copier `expor
 
 | Dossier | Contenu |
 |---|---|
-| `src/models/` | modèles 3D (`library/`), vue three.js, conversion en pièces |
+| `models/` | les modèles 3D : un fichier `.model.json` par modèle (planches, positions 3D, actions), sans code |
+| `src/models/` | moteur des modèles : vue three.js, crans, conversion en pièces |
 | `src/core/` | format des pièces, rangement, planches, parcours de la tête, gravure, SVG, G-code |
 | `src/laser/` | pilotage GRBL, connexion, déplacements, envoi, webcam |
 | `src/components/` | interface React, un dossier par composant |

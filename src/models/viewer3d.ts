@@ -92,6 +92,8 @@ const SNAP_PX = 16
 
 /** Part de la couleur de la face gardée pour la tranche (0,8 = 20 % plus foncée). */
 export const EDGE_SHADE = 0.8
+/** Couleur unique quand les couleurs par famille sont désactivées : contreplaqué clair, uni. */
+export const PLAIN_WOOD = 0xd4b07a
 
 /** Vue 3D d'un modèle : orbite, éclairage, éclaté, sélection d'une planche. Aucune interface ici. */
 export class Viewer3D {
@@ -100,7 +102,8 @@ export class Viewer3D {
   private camera = new THREE.PerspectiveCamera(40, 1, 1, 20000)
   private controls: OrbitControls
   private root = new THREE.Group()
-  private objects: { group: THREE.Group; origin: THREE.Vector3; materials: THREE.MeshStandardMaterial[] }[] = []
+  private objects: { group: THREE.Group; origin: THREE.Vector3; materials: THREE.MeshStandardMaterial[]; hex: number; shown: boolean }[] = []
+  private colored = true
   private selected = -1
   private explode = 0
   private raf = 0
@@ -117,7 +120,7 @@ export class Viewer3D {
   private tag: THREE.Sprite | null = null
   private keydown = (e: KeyboardEvent) => e.key === 'Escape' && this.measuring && this.clearMeasure()
   onMeasure: (m: Measure | null) => void = () => {}
-  private rightDrag = false
+  /** Point du dernier clic droit : le menu ne s'ouvre que si la souris n'a presque pas bougé (sinon c'était un déplacement de la vue). */
   private rightStart: [number, number] | null = null
   onSelect: (index: number) => void = () => {}
   /** Clic droit sans glisser : planche visée (-1 si le vide) et position écran. */
@@ -159,15 +162,13 @@ export class Viewer3D {
     el.addEventListener('pointermove', (e) => this.measuring && this.snapHover(e))
     el.addEventListener('contextmenu', (e) => {
       e.preventDefault()
-      if (this.down === null && this.rightDrag) return
+      const start = this.rightStart
+      this.rightStart = null
+      if (start && Math.hypot(e.clientX - start[0], e.clientY - start[1]) > 4) return // c'était un déplacement de la vue
       if (!this.measuring) this.onMenu(this.hit(e), e.clientX, e.clientY)
     })
     el.addEventListener('pointerdown', (e) => {
-      if (e.button === 2) this.rightDrag = false
-      this.rightStart = [e.clientX, e.clientY]
-    })
-    el.addEventListener('pointermove', (e) => {
-      if (this.rightStart && Math.hypot(e.clientX - this.rightStart[0], e.clientY - this.rightStart[1]) > 4) this.rightDrag = true
+      if (e.button === 2) this.rightStart = [e.clientX, e.clientY]
     })
     this.resize()
     const loop = () => {
@@ -197,7 +198,7 @@ export class Viewer3D {
     const r = this.renderer.domElement.getBoundingClientRect()
     const ray = new THREE.Raycaster()
     ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera)
-    const meshes = this.objects.filter((_, i) => !this.hidden.has(i)).map((o) => o.group.children[0])
+    const meshes = this.objects.filter((o, i) => !this.hidden.has(i) && o.shown).map((o) => o.group.children[0])
     const h = ray.intersectObjects(meshes)[0]
     return h ? this.objects.findIndex((o) => o.group.children[0] === h.object) : -1
   }
@@ -312,13 +313,32 @@ export class Viewer3D {
     this.applyHidden()
   }
 
+  showMany(indices: number[]) {
+    for (const i of indices) this.hidden.delete(i)
+    this.applyHidden()
+  }
+
   showAll() {
     this.hidden.clear()
     this.applyHidden()
   }
 
+  /** Couleurs par famille (vrai) ou bois uni (faux). */
+  setColors(on: boolean) {
+    this.colored = on
+    this.applyColors()
+  }
+
+  private applyColors() {
+    for (const o of this.objects) {
+      const hex = this.colored ? o.hex : PLAIN_WOOD
+      o.materials[0].color.setHex(hex)
+      o.materials[1].color.setHex(hex).multiplyScalar(EDGE_SHADE)
+    }
+  }
+
   private applyHidden() {
-    this.objects.forEach((o, i) => (o.group.visible = !this.hidden.has(i)))
+    this.objects.forEach((o, i) => (o.group.visible = !this.hidden.has(i) && o.shown))
     this.onHidden(this.hidden.size)
   }
 
@@ -335,8 +355,9 @@ export class Viewer3D {
     this.objects = panels.map((p) => {
       const group = panelObject(p, categoryHex(p.category ?? ''))
       this.root.add(group)
-      return { group, origin: group.position.clone(), materials: (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial[] }
+      return { group, origin: group.position.clone(), materials: (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial[], hex: categoryHex(p.category ?? ''), shown: p.visible !== false }
     })
+    this.applyColors()
     this.selected = -1
     this.hidden = new Set([...this.hidden].filter((i) => i < panels.length && !reset))
     this.applyHidden()

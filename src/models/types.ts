@@ -27,6 +27,8 @@ export interface Panel {
   position: [number, number, number]
   /** Rotation d'Euler en degrés (ordre XYZ). */
   rotation?: [number, number, number]
+  /** `false` : la planche n'est pas montrée dans la vue 3D (une action l'a retirée) ; elle est découpée quand même. */
+  visible?: boolean
   /** `none` : sens du fil imposé. */
   rotate?: 'any90' | 'none'
   material?: string
@@ -55,18 +57,18 @@ export interface ModelResult {
 }
 
 /**
- * Un modèle = un fichier `src/models/library/<nom>.model.ts` qui exporte `default defineModel({...})`.
- * `build` est pur : mêmes réglages, mêmes planches. Aucun import de three.js nécessaire.
+ * Un modèle = un fichier `models/<id>.model.json` (format `cnc-model`, lu par `json.ts`) ; `ModelDef` est sa forme en mémoire.
+ * `build` est pur : mêmes réglages (actions), mêmes planches.
  */
 export interface ModelDef {
   id: string
   name: string
   description: string
   params: ParamDef[]
+  /** Couleurs imposées par catégorie (`#rrggbb`), communes à la vue 3D et aux planches ; les autres catégories prennent la palette. */
+  colors?: Record<string, string>
   build: (p: Params) => ModelResult
 }
-
-export const defineModel = (m: ModelDef): ModelDef => m
 
 export const defaultParams = (m: ModelDef): Params => Object.fromEntries(m.params.map((d) => [d.key, d.default]))
 
