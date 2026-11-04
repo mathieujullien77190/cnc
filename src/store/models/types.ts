@@ -1,5 +1,8 @@
 export type ModelParams = Record<string, number | boolean | string>
 
+/** Coupe de la vue 3D : axe du plan (null : pas de coupe), position dans la boîte du modèle (0 à 1), côté gardé. */
+export type SectionState = { axis: 'x' | 'y' | 'z' | null; t: number; flip: boolean }
+
 export type ModelsState = {
   /** Modèle choisi (vide : le premier de la liste). */
   model: string
@@ -13,6 +16,10 @@ export type ModelsState = {
   measuring: boolean
   /** Couleurs par famille dans la vue 3D (faux : bois uni). */
   colored: boolean
+  /** Numéros et dessins gravés visibles dans la vue 3D, pour tous les modèles (faux : cachés). */
+  marks: boolean
+  /** Plan de coupe de la vue 3D (gardé en mémoire seulement). */
+  section: SectionState
 }
 
 export type ParamsPayload = { modelId: string; params: ModelParams }

@@ -2,6 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { MODELS } from '@/models/registry'
 import type { Viewer3D } from '@/models/viewer3d'
 import type { ModelDef, Params } from '@/models/types'
+import type { SectionState } from '@/store/models'
 import { groupName } from './helpers'
 import type { Built, Cut } from './types'
 
@@ -19,10 +20,10 @@ type Api = {
   selected: number
 }
 
-type Controls = { viewer: RefObject<Viewer3D | null>; setMeasuring: (on: boolean) => void; setExplode: (k: number) => void }
+type Controls = { viewer: RefObject<Viewer3D | null>; setMeasuring: (on: boolean) => void; setExplode: (k: number) => void; setSection: (s: Partial<SectionState>) => void }
 
 /** API `window.cnc3d` pour l'IA (pilotage depuis le navigateur) : toujours la dernière version des fermetures. */
-export const useCnc3dApi = (latest: Api, { viewer, setMeasuring, setExplode }: Controls) => {
+export const useCnc3dApi = (latest: Api, { viewer, setMeasuring, setExplode, setSection }: Controls) => {
   const api = useRef(latest)
   api.current = latest
   useEffect(() => {
@@ -40,6 +41,8 @@ export const useCnc3dApi = (latest: Api, { viewer, setMeasuring, setExplode }: C
       /** Mode mesure (coins aimantés) : `measure(true)` puis clics sur la vue. */
       measure: (on: boolean) => setMeasuring(on),
       explode: (k: number) => setExplode(k),
+      /** Coupe de la vue : `section('y', 0.5)` garde le bas jusqu'à la moitié de la hauteur, `section('x', 0.3, true)` l'autre côté, `section(null)` l'éteint. */
+      section: (axis: SectionState['axis'], t = 0.5, flip = false) => setSection({ axis, t, flip }),
       /** Cache la planche d'indice i (vue seulement) / remet tout. */
       hide: (i: number) => api.current.hide(i),
       /** Cache toutes les planches dont l'id commence par ces lettres (« BO »). */

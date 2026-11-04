@@ -35,6 +35,7 @@ const FONT: Record<string, Stroke[]> = {
   9: [[[2, 0], [2, 4], [0, 4], [0, 2], [2, 2]]],
   '-': [[[0.2, 2], [1.8, 2]]],
   '.': [[[1, 0], [1, 0.4]]],
+  "'": [[[1, 4], [1, 3.2]]],
   '+': [[[0, 2], [2, 2]], [[1, 3], [1, 1]]],
   A: [[[0, 0], [0, 3], [1, 4], [2, 3], [2, 0]], [[0, 2], [2, 2]]],
   B: [[[0, 0], [0, 4], [1, 4], [2, 3], [1, 2], [0, 2]], [[1, 2], [2, 1], [1, 0], [0, 0]]],
@@ -64,6 +65,35 @@ const FONT: Record<string, Stroke[]> = {
   Z: [[[0, 4], [2, 4], [0, 0], [2, 0]]],
 }
 
+/** Arc d'ellipse (centre cx, cy ; rayons rx, ry ; angles en degrés, sens trigonométrique si a1 > a0), n segments. */
+const arc = (cx: number, cy: number, rx: number, ry: number, a0: number, a1: number, n = 10): Stroke =>
+  Array.from({ length: n + 1 }, (_, k): [number, number] => {
+    const a = ((a0 + ((a1 - a0) * k) / n) * Math.PI) / 180
+    return [Math.round((cx + rx * Math.cos(a)) * 1000) / 1000, Math.round((cy + ry * Math.sin(a)) * 1000) / 1000]
+  })
+
+/** Chiffres et lettres arrondis (numéros des jours, titre) : mêmes cases 2 × 4 que `FONT`, courbes à la place des angles droits. */
+const ROUND_FONT: Record<string, Stroke[]> = {
+  0: [arc(1, 2, 1, 2, 90, 450, 24)],
+  1: [[[0.2, 3.1], [1.05, 4], [1.05, 0]], [[0.2, 0], [1.9, 0]]],
+  2: [[...arc(1, 3, 1, 1, 170, -35, 10), [0, 0], [2, 0]]],
+  3: [arc(1, 3, 0.95, 1, 155, -90, 10), arc(1, 1, 1, 1, 90, -155, 12)],
+  4: [[[1.6, 0], [1.6, 4], [0, 1.3], [2, 1.3]]],
+  5: [[[1.9, 4], [0.25, 4], [0.1, 2.2]], arc(0.95, 1.15, 1, 1.15, 125, -150, 12)],
+  6: [[...arc(1.05, 3, 0.95, 1, 30, 180, 8), [0, 1.2]], arc(1, 1.1, 1, 1.1, 0, 360, 20)],
+  7: [[[0, 4], [2, 4], [0.7, 0]]],
+  8: [arc(1, 3, 0.9, 1, 0, 360, 18), arc(1, 1.05, 1, 1.05, 0, 360, 20)],
+  9: [arc(1, 2.9, 1, 1.1, 0, 360, 20), [[2, 2.9], ...arc(1, 1, 1, 1, 0, -140, 9)]],
+  // lettres arrondies (titre) ; les autres lettres, déjà faites de droites, gardent la police à segments
+  A: [[[0, 0], [0, 2.6], ...arc(1, 2.6, 1, 1.4, 180, 0, 12).slice(1), [2, 0]], [[0, 1.4], [2, 1.4]]],
+  C: [arc(1, 2, 1, 2, 45, 315, 16)],
+  D: [[[0, 0], [0, 4], [0.9, 4], ...arc(0.9, 2, 1.1, 2, 90, -90, 14).slice(1), [0, 0]]],
+  O: [arc(1, 2, 1, 2, 90, 450, 24)],
+  P: [[[0, 0], [0, 4], [0.9, 4], ...arc(0.9, 3, 1.1, 1, 90, -90, 10).slice(1), [0, 2]]],
+  R: [[[0, 0], [0, 4], [0.9, 4], ...arc(0.9, 3, 1.1, 1, 90, -90, 10).slice(1), [0, 2]], [[0.9, 2], [2, 0]]],
+  U: [[[0, 4], [0, 1], ...arc(1, 1, 1, 1, 180, 360, 10).slice(1), [2, 4]]],
+}
+
 const segmentRect = (a: Pt, b: Pt, w: number): Pt[] => {
   const dx = b[0] - a[0]
   const dy = b[1] - a[1]
@@ -80,8 +110,8 @@ const segmentRect = (a: Pt, b: Pt, w: number): Pt[] => {
 
 const textW = (n: number) => n * ADVANCE - (ADVANCE - GLYPH_W)
 
-/** Rectangles (4 points) d'un texte, coin haut-gauche en (x, y), hauteur h, y vers le bas. */
-export const digitRects = (text: string, x: number, y: number, h: number, passes = 2): Pt[][] => {
+/** Rectangles (4 points) d'un texte, coin haut-gauche en (x, y), hauteur h, y vers le bas. `font: 'round'` : chiffres et quelques lettres arrondis (A C D O P R U ; les autres caractères gardent la police à segments). */
+export const digitRects = (text: string, x: number, y: number, h: number, passes = 2, font?: 'round'): Pt[][] => {
   const k = h / GLYPH_H
   const w = textW([...text].length)
   const clamp = ([px, py]: Pt): Pt => [Math.min(Math.max(px, 0), w) * k, Math.min(Math.max(py, 0), GLYPH_H) * k]
@@ -89,7 +119,7 @@ export const digitRects = (text: string, x: number, y: number, h: number, passes
   ;[...text.toUpperCase()].forEach((ch, i) => {
     const x0 = i * ADVANCE + STROKE / 2
     const y0 = STROKE / 2
-    for (const stroke of FONT[ch] ?? []) {
+    for (const stroke of (font === 'round' ? ROUND_FONT[ch] : undefined) ?? FONT[ch] ?? []) {
       for (let j = 0; j + 1 < stroke.length; j++) {
         const a: Pt = [x0 + stroke[j][0] * UNIT, y0 + stroke[j][1] * UNIT]
         const b: Pt = [x0 + stroke[j + 1][0] * UNIT, y0 + stroke[j + 1][1] * UNIT]

@@ -328,7 +328,8 @@ try {
       if (d.type === 'boolean') {
         const on = m.build({ ...off, [d.key]: true }).panels
         const moved = movedIn(on, base)
-        check(sameShape(on, base) && moved > 0 && cutOf(m, on) === baseCut, `${m.id} : action « ${d.label} » déplace ${moved} planche(s) sans changer la découpe`)
+        const shown = on.filter((p, i) => p.visible !== base[i].visible).length // un interrupteur peut aussi seulement montrer / cacher
+        check(sameShape(on, base) && moved + shown > 0 && cutOf(m, on) === baseCut, `${m.id} : action « ${d.label} » déplace ${moved} et montre / cache ${shown} planche(s) sans changer la découpe`)
       } else if (d.type === 'select') {
         const states = d.options.map((o) => ({ o, panels: m.build({ ...off, [d.key]: o.value }).panels }))
         const ok = states.length >= 2 && states.every(({ panels }) => sameShape(panels, base) && cutOf(m, panels) === baseCut)
@@ -343,6 +344,11 @@ try {
   check(w[1].position[1] === 5 && w[0].position[1] === 0 && w[0].rotation?.[2] === 15 && withAct.params.length === 2 && withAct.params.every((d) => d.type === 'boolean'), 'actions move et turn : décalage et rotation appliqués aux bonnes planches')
   const wOff = withAct.build({ up: false, tilt: false }).panels, wDef = withAct.build({}).panels
   check(w[1].visible === true && wOff[1].visible === false && wOff[0].rotation === undefined && wDef[1].visible === false && wDef[0].rotation?.[2] === 15, 'interrupteur : « show » montre les planches allumé et les cache éteint ; réglage absent = défaut')
+  // charnière : la planche Q (centre en 20, 0, 0, couchée) tourne de 180° autour de z au point (10, 5, 0) : elle passe en (0, 10, 0), retournée ; rotation composée comme three.js (ordre XYZ)
+  const hinged = modelFromJson({ ...tinyModel, panels: [tinyModel.panels[0], { ...tinyModel.panels[1], rotation: [-90, 0, 0] }], actions: [{ key: 'shut', label: 'Fermé', default: false, type: 'hinge', steps: [{ panels: 'Q', by: [0, 0, 180], pivot: [10, 5, 0] }] }] }, 'x')
+  const hOn = hinged.build({ shut: true }).panels, hOff = hinged.build({ shut: false }).panels
+  const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-6)
+  check(near(hOn[1].position, [0, 10, 0]) && near(hOn[1].rotation, [90, 0, 180]) && near(hOff[1].position, [20, 0, 0]) && near(hOn[0].position, [0, 0, 0]), 'action hinge : tourne autour du pivot, position et rotation suivent (180° en z : planche couchée retournée)')
   // liste de choix : une option cache, une autre montre et décale, une troisième cache tout ; valeur inconnue = défaut
   const seatOpts = [{ value: 'p', label: 'Plaque P', show: [0], hide: 'Q' }, { value: 'q', label: 'Plaque Q', show: 'Q', hide: [0], move: [{ panels: 'Q', by: [-20, 0, 0] }] }, { value: 'none', label: 'Rien', hide: ['P', 'Q'] }]
   const seat = modelFromJson({ ...tinyModel, actions: [{ key: 'seat', label: 'Siège', default: 'p', type: 'choice', options: seatOpts }] }, 'x')
@@ -351,6 +357,11 @@ try {
   check(sParam.type === 'select' && sParam.default === 'p' && sParam.options.map((o) => o.label).join() === 'Plaque P,Plaque Q,Rien', 'action choice : réglage en liste (options = les labels, défaut = la value par défaut)')
   check(sP[0].visible === true && sP[1].visible === false && sP[1].position[0] === 20 && sQ[0].visible === false && sQ[1].visible === true && sQ[1].position[0] === 0 && sNone.every((p) => p.visible === false) && sNone[1].position[0] === 20 && JSON.stringify(sBad) === JSON.stringify(sP), 'action choice : chaque option montre, cache et décale ses planches ; valeur inconnue = défaut')
   const badJson = (raw) => { try { modelFromJson(raw, 'x'); return false } catch (e) { return /modèle|planche|action/.test(e.message) } }
+  // curseur de charnière : à 50 %, la même planche n'a tourné que de 90° ; à 0, rien ne bouge ; le réglage est un nombre de 0 à 100
+  const sliding = modelFromJson({ ...tinyModel, panels: [tinyModel.panels[0], { ...tinyModel.panels[1], rotation: [-90, 0, 0] }], actions: [{ key: 'open', label: 'Ouverture', default: 0, type: 'swing', steps: [{ panels: 'Q', by: [0, 0, 180], pivot: [10, 5, 0] }] }] }, 'x')
+  const sHalf = sliding.build({ open: 50 }).panels, sZero = sliding.build({ open: 0 }).panels, sFull = sliding.build({ open: 100 }).panels
+  check(near(sHalf[1].position, [15, 15, 0]) && near(sZero[1].position, [20, 0, 0]) && near(sFull[1].position, [0, 10, 0]) && sliding.params[0].type === 'number' && sliding.params[0].max === 100, 'action swing : curseur de 0 à 100 %, rotation proportionnelle autour du pivot')
+  check(badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: false, type: 'hinge', steps: [] }] }) && badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: false, type: 'hinge', steps: [{ panels: 'Q', by: [0, 0, 90] }] }] }), 'action hinge invalide refusée (aucun pas, pivot manquant)')
   check(badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: 'x', type: 'choice', options: seatOpts }] }) && badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: 'p', type: 'choice', options: seatOpts.slice(0, 1) }] }) && badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: 'p', type: 'choice', options: [seatOpts[0], { value: 'z', label: 'z', show: 'Z' }] }] }) && badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: 'oui', type: 'move', panels: 'Q', by: [0, 0, 0] }] }), 'action choice invalide refusée (défaut hors options, une seule option, cible inconnue, défaut non booléen d’un interrupteur)')
   check(badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: false, type: 'fly', panels: 'Q' }] }) && badJson({ ...tinyModel, actions: [{ key: 'a', label: 'a', default: false, type: 'move', panels: 'Z', by: [0, 0, 0] }] }) && badJson({ format: 'cnc-model', version: 1, name: 'x', panels: [] }) && badJson({ format: 'cnc-model', version: 1, name: 'x', panels: [{ id: 'p-01', thickness: 3, outer: [[0, 0], [1, 0], [1, 1]], position: [0, 0, 0] }] }) && badJson({ format: 'autre' }), 'modèle JSON invalide refusé avec un message lisible')
   for (const m of MODELS) {
@@ -625,6 +636,14 @@ try {
   st.dispatch(modelsActions.hiddenSet({ modelId: 'b', indices: [0] }))
   st.dispatch(modelsActions.hiddenSet({ modelId: 'a', indices: [] }))
   check(JSON.stringify(st.getState().models.hidden) === '{"b":[0]}', 'store : planches cachées gardées par modèle')
+
+  // numéros de la vue 3D : visibles au départ, un seul réglage pour tous les modèles
+  const marks0 = st.getState().models.marks
+  st.dispatch(modelsActions.marksSet(false))
+  st.dispatch(modelsActions.modelPicked('b'))
+  const marks1 = st.getState().models.marks
+  st.dispatch(modelsActions.marksSet(true))
+  check(marks0 === true && marks1 === false && st.getState().models.marks === true, 'store : « Numéros » (vue 3D) global, il survit au changement de modèle')
 
   // catalogue remplacé : quantités perso et « fait » à zéro, réglages gardés
   st.dispatch(projectActions.settingsSet({ width: 400 }))

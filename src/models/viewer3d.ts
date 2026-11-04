@@ -5,10 +5,67 @@ import { categoryHex } from '../core/colors'
 import { digitRects, markPiece } from '../core/marking'
 import { ruleRect } from './toCutParts'
 import { contourEdges } from './edges'
+import { solidQuads } from './solid'
 import type { Panel } from './types'
+
+/** Tuyau rond : la section (cercle de `outer`) balayée le long du trajet `tube.path`, à la couleur de la famille (deux matériaux comme une planche, le second sert de tranche). */
+const tubeObject = (p: Panel, color: number): THREE.Group => {
+  const xs = p.outer.map((q) => q[0])
+  const radius = (Math.max(...xs) - Math.min(...xs)) / 2
+  const curve = new THREE.CatmullRomCurve3((p.tube?.path ?? []).map(([x, y, z]) => new THREE.Vector3(x, y, z)), false, 'centripetal')
+  const geo = new THREE.TubeGeometry(curve, Math.max(8, (p.tube?.path.length ?? 0) * 2), radius, 24, false)
+  geo.addGroup(0, Infinity, 0)
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.45 })
+  const mesh = new THREE.Mesh(geo, [mat, mat.clone()])
+  const g = new THREE.Group()
+  g.add(mesh)
+  g.position.set(...p.position)
+  return g
+}
+
+/** Pièce pleine d'un seul tenant : les faces de la grille de cellules, avec seulement les arêtes vives (entre deux faces d'orientations différentes) tracées en noir. */
+const solidObject = (p: Panel, color: number): THREE.Group => {
+  const quads = solidQuads(p.solid!)
+  const pos: number[] = []
+  const nor: number[] = []
+  const edges = new Map<string, { a: number[]; b: number[]; ns: Set<string> }>()
+  const edge = (a: number[], b: number[], n: number[]) => {
+    const ka = a.join(','), kb = b.join(',')
+    const key = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`
+    const e = edges.get(key) ?? { a, b, ns: new Set<string>() }
+    e.ns.add(n.join(','))
+    edges.set(key, e)
+  }
+  for (const { a, b, c, d, n } of quads) {
+    for (const v of [a, b, c, a, c, d]) {
+      pos.push(...v)
+      nor.push(...n)
+    }
+    edge(a, b, n)
+    edge(b, c, n)
+    edge(c, d, n)
+    edge(d, a, n)
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3))
+  geo.addGroup(0, pos.length / 3, 0)
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.05, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })
+  const mesh = new THREE.Mesh(geo, [mat, mat.clone()])
+  const lines: number[] = []
+  for (const e of edges.values()) if (e.ns.size > 1) lines.push(...e.a, ...e.b)
+  const edgeGeo = new THREE.BufferGeometry()
+  edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3))
+  const g = new THREE.Group()
+  g.add(mesh, new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: 0x3a2e1f })))
+  g.position.set(...p.position)
+  return g
+}
 
 /** Planche → maillage extrudé, centré sur sa boîte englobante. Repère : voir `Panel`. */
 const panelObject = (p: Panel, color: number): THREE.Group => {
+  if (p.solid) return solidObject(p, color)
+  if (p.tube) return tubeObject(p, color)
   const xs = p.outer.map((q) => q[0])
   const ys = p.outer.map((q) => q[1])
   const cx = (Math.min(...xs) + Math.max(...xs)) / 2
@@ -40,13 +97,14 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
   const w = Math.max(...xs) - Math.min(...xs)
   const h = Math.max(...ys) - Math.min(...ys)
   // les textes gravés en plus du nom (labels) sont aussi des obstacles pour le nom
-  const words = [...(p.labels ?? []).map((l) => digitRects(l.text, l.x, l.y, l.h)), ...(p.rules ?? []).map((r) => [ruleRect(r)])]
+  const words = [...(p.labels ?? []).map((l) => digitRects(l.text, l.x, l.y, l.h, 2, l.font)), ...(p.rules ?? []).map((r) => [ruleRect(r)])]
   const rects = markPiece({ x: Math.min(...xs), y: Math.min(...ys), w, h, outer: p.outer, holes: [...(p.holes ?? []), ...words.flat()] }, p.id)
   if (rects.length || words.length) {
     const markMat = new THREE.MeshBasicMaterial({ color: 0x2b1a0c, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
-    const build = (list: [number, number][][], z: number) => {
+    const build = (list: [number, number][][], z: number, mark = false) => {
       const parts = list.map((r) => new THREE.ShapeGeometry(path(new THREE.Shape(), r)))
       const mesh = new THREE.Mesh(mergeGeometries(parts), markMat)
+      mesh.userData.mark = mark // le numéro de la planche seulement : masquable (`setMarks`) ; les textes et dessins du modèle restent
       mesh.position.z = z
       parts.forEach((x) => x.dispose())
       return mesh
@@ -55,13 +113,9 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
     const mx = rects.flat().map((q) => q[0])
     const flipX = Math.min(...mx) + Math.max(...mx)
     const front = p.thickness / 2 + 0.02
-    // chaque texte est retourné autour de son propre centre sur la face arrière
-    const flipped = (list: [number, number][][]) => {
-      const fx = Math.min(...list.flat().map((q) => q[0])) + Math.max(...list.flat().map((q) => q[0]))
-      return list.map((r) => r.map(([x, y]): [number, number] => [fx - x, y]))
-    }
-    if (rects.length) g.add(build(rects, front), build(rects.map((r) => r.map(([x, y]): [number, number] => [flipX - x, y])), -front))
-    for (const wd of words) g.add(build(wd, front), build(flipped(wd), -front))
+    if (rects.length) g.add(build(rects, front, true), build(rects.map((r) => r.map(([x, y]): [number, number] => [flipX - x, y])), -front, true))
+    // les textes et dessins du modèle ne sont gravés que d'un côté : la face avant (local +z) seulement
+    for (const wd of words) g.add(build(wd, front))
   }
   g.position.set(...p.position)
   const [rx, ry, rz] = (p.rotation ?? [0, 0, 0]).map((d) => THREE.MathUtils.degToRad(d))
@@ -71,6 +125,7 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
 
 /** Coins d'une planche (contour et trous, sur les deux faces), dans le repère local du groupe de `panelObject`. */
 const cornersOf = (p: Panel): THREE.Vector3[] => {
+  if (p.tube || p.solid) return [] // pas de coins à viser sur un tuyau ni sur une pièce imprimée
   const xs = p.outer.map((q) => q[0])
   const ys = p.outer.map((q) => q[1])
   const cx = (Math.min(...xs) + Math.max(...xs)) / 2
@@ -78,6 +133,13 @@ const cornersOf = (p: Panel): THREE.Vector3[] => {
   const out: THREE.Vector3[] = []
   for (const poly of [p.outer, ...(p.holes ?? [])]) for (const [u, v] of poly) for (const z of [-p.thickness / 2, p.thickness / 2]) out.push(new THREE.Vector3(u - cx, -(v - cy), z))
   return out
+}
+
+/** Plan de coupe : axe du monde (y = hauteur), position dans la boîte du modèle (0 à 1), côté gardé (faux : le côté des petites coordonnées). */
+export interface Section {
+  axis: 'x' | 'y' | 'z' | null
+  t: number
+  flip: boolean
 }
 
 /** Mesure entre deux coins, en mm. */
@@ -104,6 +166,7 @@ export class Viewer3D {
   private root = new THREE.Group()
   private objects: { group: THREE.Group; origin: THREE.Vector3; materials: THREE.MeshStandardMaterial[]; hex: number; shown: boolean }[] = []
   private colored = true
+  private marks = true
   private selected = -1
   private explode = 0
   private raf = 0
@@ -113,6 +176,8 @@ export class Viewer3D {
   private headlight = new THREE.DirectionalLight(0xffffff, 1.4)
   private corners: THREE.Vector3[][] = []
   private measuring = false
+  private section: Section = { axis: null, t: 0.5, flip: false }
+  private plane = new THREE.Plane()
   private pts: THREE.Vector3[] = []
   private hover = new THREE.Points(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3()]), new THREE.PointsMaterial({ color: 0xea580c, size: 14, sizeAttenuation: false, depthTest: false, transparent: true }))
   private mark = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: 0xdc2626, size: 9, sizeAttenuation: false, depthTest: false, transparent: true }))
@@ -130,6 +195,7 @@ export class Viewer3D {
   constructor(private host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.renderer.localClippingEnabled = true // la coupe ne touche que les planches (pas la grille, ni la règle)
     host.appendChild(this.renderer.domElement)
     this.scene.background = new THREE.Color(0xf5f5f4)
     // éclairage qui suit la caméra : un même ombrage quel que soit l'angle de vue, dessus comme dessous
@@ -199,7 +265,7 @@ export class Viewer3D {
     const ray = new THREE.Raycaster()
     ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera)
     const meshes = this.objects.filter((o, i) => !this.hidden.has(i) && o.shown).map((o) => o.group.children[0])
-    const h = ray.intersectObjects(meshes)[0]
+    const h = ray.intersectObjects(meshes).find((x) => !this.clipped(x.point))
     return h ? this.objects.findIndex((o) => o.group.children[0] === h.object) : -1
   }
 
@@ -241,6 +307,7 @@ export class Viewer3D {
       if (this.hidden.has(i)) return
       for (const c of this.corners[i]) {
         w.copy(c).applyMatrix4(o.group.matrixWorld)
+        if (this.clipped(w)) continue
         const p = w.clone().project(this.camera)
         if (p.z > 1) continue
         const d = Math.hypot(((p.x + 1) / 2) * r.width - mx, ((1 - p.y) / 2) * r.height - my)
@@ -298,6 +365,40 @@ export class Viewer3D {
     this.onMeasure(m)
   }
 
+  /** Point du côté coupé (invisible) : on ne le vise pas, on ne le mesure pas. */
+  private clipped(p: THREE.Vector3): boolean {
+    return !!this.section.axis && this.plane.distanceToPoint(p) < -1e-6
+  }
+
+  /** Coupe la vue par un plan perpendiculaire à l'axe x, y ou z (null : pas de coupe) à la fraction `t` de la boîte du modèle ; `flip` garde l'autre côté. */
+  setSection(axis: Section['axis'], t = 0.5, flip = false) {
+    this.section = { axis, t: Math.min(1, Math.max(0, t)), flip }
+    this.applySection()
+  }
+
+  private applySection() {
+    const { axis, t, flip } = this.section
+    if (axis) {
+      const box = new THREE.Box3().setFromObject(this.root)
+      if (box.isEmpty()) return
+      const i = { x: 0, y: 1, z: 2 }[axis]
+      const pos = box.min.getComponent(i) + (box.max.getComponent(i) - box.min.getComponent(i)) * this.section.t
+      const n = new THREE.Vector3()
+      n.setComponent(i, flip ? 1 : -1)
+      this.plane.set(n, flip ? -pos : pos) // garde les points où n · p + constante ≥ 0
+    }
+    // le plan est partagé (mis à jour sur place) : un matériau n'est recompilé que quand la coupe s'allume ou s'éteint ; coupe allumée, les faces sont à double face (on voit l'intérieur des planches ouvertes)
+    const want = axis ? [this.plane] : null
+    this.root.traverse((o) => {
+      for (const m of [(o as THREE.Mesh).material].flat() as (THREE.Material | undefined)[]) {
+        if (!m || (m.clippingPlanes === null) === (want === null)) continue
+        m.clippingPlanes = want
+        m.needsUpdate = true
+      }
+    })
+    for (const o of this.objects) o.materials[0].side = axis ? THREE.DoubleSide : THREE.FrontSide
+  }
+
   /** Cache une planche (vue seulement : la découpe ne change pas). */
   hide(i: number) {
     if (i < 0 || i >= this.objects.length) return
@@ -329,6 +430,16 @@ export class Viewer3D {
     this.applyColors()
   }
 
+  /** Numéros et dessins gravés visibles (vrai) ou cachés (faux), pour toutes les planches. */
+  setMarks(on: boolean) {
+    this.marks = on
+    this.applyMarks()
+  }
+
+  private applyMarks() {
+    for (const o of this.objects) for (const c of o.group.children) if (c.userData.mark) c.visible = this.marks
+  }
+
   private applyColors() {
     for (const o of this.objects) {
       const hex = this.colored ? o.hex : PLAIN_WOOD
@@ -358,10 +469,12 @@ export class Viewer3D {
       return { group, origin: group.position.clone(), materials: (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial[], hex: categoryHex(p.category ?? ''), shown: p.visible !== false }
     })
     this.applyColors()
+    this.applyMarks()
     this.selected = -1
     this.hidden = new Set([...this.hidden].filter((i) => i < panels.length && !reset))
     this.applyHidden()
     this.applyExplode()
+    this.applySection()
     if (!keepView) this.fit()
   }
 
@@ -376,6 +489,7 @@ export class Viewer3D {
   setExplode(k: number) {
     this.explode = k
     this.applyExplode()
+    this.applySection()
   }
 
   private applyExplode() {

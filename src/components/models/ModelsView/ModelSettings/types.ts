@@ -7,6 +7,8 @@ export type ModelSettingsProps = {
   explode: number
   colored: boolean
   onColored: (on: boolean) => void
+  marks: boolean
+  onMarks: (on: boolean) => void
   onParam: (key: string, v: ParamValue) => void
   onReset: () => void
   onExplode: (v: number) => void

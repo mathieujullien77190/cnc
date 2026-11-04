@@ -131,4 +131,64 @@ const choice: ActionType<Choice> = {
   },
 }
 
-export const ACTION_TYPES: Record<string, ActionType<unknown>> = { move, turn, choice }
+// ---- charnière : rotation autour d'un point du monde (couvercle sur gonds, livre qui se ferme) ----
+
+type Mat = number[] // 3 × 3, lignes
+const deg = Math.PI / 180
+const matOf = ([ax, ay, az]: Vec3): Mat => {
+  const [cx, sx, cy, sy, cz, sz] = [Math.cos(ax * deg), Math.sin(ax * deg), Math.cos(ay * deg), Math.sin(ay * deg), Math.cos(az * deg), Math.sin(az * deg)]
+  // même convention que three.js : ordre XYZ, M = Rx · Ry · Rz
+  return [cy * cz, -cy * sz, sy, cx * sz + sx * sy * cz, cx * cz - sx * sy * sz, -sx * cy, sx * sz - cx * sy * cz, sx * cz + cx * sy * sz, cx * cy]
+}
+const mul = (a: Mat, b: Mat): Mat => Array.from({ length: 9 }, (_, i) => a[Math.floor(i / 3) * 3] * b[i % 3] + a[Math.floor(i / 3) * 3 + 1] * b[3 + (i % 3)] + a[Math.floor(i / 3) * 3 + 2] * b[6 + (i % 3)])
+const eulerOf = (m: Mat): Vec3 => {
+  // inverse de `matOf` (three.js `Euler.setFromRotationMatrix`, ordre XYZ)
+  const y = Math.asin(Math.max(-1, Math.min(1, m[2])))
+  const near = Math.abs(m[2]) > 0.9999999
+  const x = near ? Math.atan2(m[7], m[4]) : Math.atan2(-m[5], m[8])
+  const z = near ? 0 : Math.atan2(-m[1], m[0])
+  const clean = (v: number) => Math.round((v / deg) * 1e6) / 1e6 + 0 // -0 → 0
+  return [clean(x), clean(y), clean(z)]
+}
+
+/** Un pas de charnière : planches visées, angle (degrés, ordre XYZ) et point du monde autour duquel elles tournent. */
+type Swing = Shift & { pivot: Vec3 }
+const swingOf = (raw: unknown, i: number, panels: Panel[]): Swing => {
+  const s = raw as Record<string, unknown>
+  if (!s || typeof s !== 'object') return fail(`pas ${i + 1} : objet { panels, by, pivot } attendu`)
+  return { panels: targetIndices(s.panels, panels), by: vec(s.by, 'by'), pivot: vec(s.pivot, 'pivot') }
+}
+const swing = (panels: Panel[], { panels: idx, by, pivot }: Swing): Panel[] => {
+  const R = matOf(by)
+  return panels.map((q, i) => {
+    if (!idx.includes(i)) return q
+    const d = [q.position[0] - pivot[0], q.position[1] - pivot[1], q.position[2] - pivot[2]]
+    const position: Vec3 = [0, 1, 2].map((r) => pivot[r] + R[r * 3] * d[0] + R[r * 3 + 1] * d[1] + R[r * 3 + 2] * d[2]) as Vec3
+    return { ...q, position: position.map((v) => Math.round(v * 1e6) / 1e6 + 0) as Vec3, rotation: eulerOf(mul(R, matOf(q.rotation ?? [0, 0, 0]))) }
+  })
+}
+
+type Hinge = Visibility & { steps: Swing[] }
+/** Tourne des planches autour d'un point du monde (charnière) : chaque pas vise des planches, un angle et son pivot ; les positions et les rotations suivent. */
+const hinge: ActionType<Hinge> = {
+  describe: 'interrupteur : fait tourner les planches de chaque pas de « steps » ([{ panels, by (degrés, ordre XYZ), pivot (point du monde) }]) autour de son pivot ; montre « show » et cache « hide » (l’inverse une fois éteint)',
+  check: (p, panels) => {
+    if (!Array.isArray(p.steps) || !p.steps.length) return fail('"steps" doit être une liste d’au moins un pas { panels, by, pivot }')
+    return { steps: p.steps.map((s, i) => swingOf(s, i, panels)), ...visibilityOf(p, panels) }
+  },
+  param: (_s, key, label, def) => switchParam(key, label, def),
+  apply: (panels, h, value) => (value === true ? h.steps.reduce(swing, setVisible(panels, h, true)) : setVisible(panels, h, false)),
+}
+
+/** Comme `hinge`, mais réglé par un curseur de 0 à 100 % : chaque pas tourne de « by » × valeur / 100 (ouvrir un livre peu à peu, voir une charnière travailler). */
+const slide: ActionType<Hinge> = {
+  describe: 'curseur (0 à 100 %) : fait tourner les planches de chaque pas de « steps » ([{ panels, by (degrés, ordre XYZ), pivot }]) autour de son pivot, de « by » × valeur / 100 ; montre « show » et cache « hide » dès que la valeur n’est pas nulle',
+  check: hinge.check,
+  param: (_s, key, label, def) => (isNum(def) && def >= 0 && def <= 100 ? { key, label, type: 'number', default: def, min: 0, max: 100, step: 1, unit: '%' } : fail('"default" doit être un nombre de 0 à 100')),
+  apply: (panels, h, value) => {
+    const k = isNum(value) ? Math.min(100, Math.max(0, value)) / 100 : 0
+    return h.steps.map((s) => ({ ...s, by: s.by.map((d) => d * k) as Vec3 })).reduce(swing, setVisible(panels, h, k > 0))
+  },
+}
+
+export const ACTION_TYPES: Record<string, ActionType<unknown>> = { move, turn, hinge, swing: slide, choice }

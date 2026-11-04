@@ -33,6 +33,12 @@ const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFin
 const isPt = (v: unknown): v is Pt => Array.isArray(v) && v.length === 2 && isNum(v[0]) && isNum(v[1])
 const isRing = (v: unknown): v is Pt[] => Array.isArray(v) && v.length >= 3 && v.every(isPt)
 const isVec3 = (v: unknown): v is [number, number, number] => Array.isArray(v) && v.length === 3 && v.every(isNum)
+const isGrid = (v: unknown): v is number[] => Array.isArray(v) && v.length >= 2 && v.every(isNum) && v.every((n, i) => i === 0 || n > (v as number[])[i - 1])
+const isSolid = (v: unknown): v is { x: number[]; y: number[]; z: number[]; runs: number[] } => {
+  const s = v as { x?: unknown; y?: unknown; z?: unknown; runs?: unknown } | null
+  if (!s || typeof s !== 'object' || !isGrid(s.x) || !isGrid(s.y) || !isGrid(s.z) || !Array.isArray(s.runs) || !s.runs.every((n) => Number.isInteger(n) && n >= 0)) return false
+  return (s.runs as number[]).reduce((a, b) => a + b, 0) === (s.x.length - 1) * (s.y.length - 1) * (s.z.length - 1)
+}
 
 const fail = (msg: string): never => {
   throw new Error(msg)
@@ -52,9 +58,12 @@ const panelOf = (raw: unknown, i: number): Panel => {
   if (!isVec3(p.position)) return fail(`${at} (${p.id}) : "position" doit être [x, y, z]`)
   if (p.rotation !== undefined && !isVec3(p.rotation)) return fail(`${at} (${p.id}) : "rotation" doit être [rx, ry, rz] en degrés`)
   if (p.visible !== undefined && typeof p.visible !== 'boolean') return fail(`${at} (${p.id}) : "visible" vaut true ou false`)
+  if (p.tube !== undefined && !(p.tube && typeof p.tube === 'object' && Array.isArray((p.tube as { path?: unknown }).path) && ((p.tube as { path: unknown[] }).path.length >= 2) && (p.tube as { path: unknown[] }).path.every(isVec3))) return fail(`${at} (${p.id}) : "tube" doit être { path: [[x, y, z], …] } (au moins deux points)`)
+  if (p.solid !== undefined && !isSolid(p.solid)) return fail(`${at} (${p.id}) : "solid" doit être { x, y, z, runs } (plans de la grille croissants, longueurs de cellules vides / pleines dont la somme est le nombre de cellules)`)
+  if (p.cut !== undefined && typeof p.cut !== 'boolean') return fail(`${at} (${p.id}) : "cut" vaut true ou false`)
   if (p.rotate !== undefined && p.rotate !== 'any90' && p.rotate !== 'none') return fail(`${at} (${p.id}) : "rotate" vaut "any90" ou "none"`)
   if (p.labels !== undefined && !(Array.isArray(p.labels) && p.labels.every((l) => l && typeof (l as LabelLike).text === 'string' && isNum((l as LabelLike).x) && isNum((l as LabelLike).y) && isNum((l as LabelLike).h)))) return fail(`${at} (${p.id}) : "labels" doit être une liste de { text, x, y, h }`)
-  if (p.rules !== undefined && !(Array.isArray(p.rules) && p.rules.every((r) => Array.isArray(r) && r.length === 4 && r.every(isNum)))) return fail(`${at} (${p.id}) : "rules" doit être une liste de [x0, y0, x1, y1]`)
+  if (p.rules !== undefined && !(Array.isArray(p.rules) && p.rules.every((r) => Array.isArray(r) && (r.length === 4 || r.length === 5) && r.every(isNum)))) return fail(`${at} (${p.id}) : "rules" doit être une liste de [x0, y0, x1, y1] (ou [x0, y0, x1, y1, largeur])`)
   if (p.snugDepths !== undefined && !(Array.isArray(p.snugDepths) && p.snugDepths.every(isNum))) return fail(`${at} (${p.id}) : "snugDepths" doit être une liste de nombres`)
   const out: Panel = { id: p.id, thickness: p.thickness, outer: p.outer, position: p.position }
   if (typeof p.category === 'string') out.category = p.category
@@ -62,6 +71,9 @@ const panelOf = (raw: unknown, i: number): Panel => {
   if (p.rotation !== undefined) out.rotation = p.rotation
   if (p.rotate !== undefined) out.rotate = p.rotate
   if (p.visible !== undefined) out.visible = p.visible
+  if (p.cut !== undefined) out.cut = p.cut
+  if (p.tube !== undefined) out.tube = p.tube as Panel['tube']
+  if (p.solid !== undefined) out.solid = p.solid as Panel['solid']
   if (typeof p.material === 'string') out.material = p.material
   if (p.labels !== undefined) out.labels = p.labels as Panel['labels']
   if (p.rules !== undefined) out.rules = p.rules as Panel['rules']

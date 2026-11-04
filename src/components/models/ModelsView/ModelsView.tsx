@@ -7,13 +7,14 @@ import { panelsToCutParts } from '@/models/toCutParts'
 import { cleanParams, defaultParams } from '@/models/types'
 import { Viewer3D } from '@/models/viewer3d'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
-import { modelsActions } from '@/store/models'
+import { modelsActions, type SectionState } from '@/store/models'
 import { projectActions, replaceTexts } from '@/store/project'
 import { uiActions } from '@/store/ui'
 import ContextMenu from './ContextMenu'
 import CutActions from './CutActions'
 import ModelList from './ModelList'
 import ModelSettings from './ModelSettings'
+import SectionTool from './SectionTool'
 import ViewToolbar from './ViewToolbar'
 import { build, groupName, groupOf } from './helpers'
 import { SYNC_DELAY } from './constants'
@@ -31,8 +32,10 @@ export const ModelsView = () => {
   const savedParams = useAppSelector((s) => s.models.params)
   const explode = useAppSelector((s) => s.models.explode)
   const colored = useAppSelector((s) => s.models.colored)
+  const marks = useAppSelector((s) => s.models.marks)
   const measuring = useAppSelector((s) => s.models.measuring)
   const hidden = useAppSelector((s) => s.models.hidden)
+  const section = useAppSelector((s) => s.models.section)
   const report = useAppSelector((s) => s.ui.modelReport)
   const [selected, setSelected] = useState(-1)
   const [hiddenCount, setHiddenCount] = useState(0)
@@ -89,8 +92,10 @@ export const ModelsView = () => {
   }, [result, model?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => viewer.current?.setExplode(explode), [explode])
   useEffect(() => viewer.current?.setColors(colored), [colored])
+  useEffect(() => viewer.current?.setMarks(marks), [marks])
   useEffect(() => viewer.current?.select(selected), [selected])
   useEffect(() => viewer.current?.setMeasure(measuring), [measuring])
+  useEffect(() => viewer.current?.setSection(section.axis, section.t, section.flip), [section])
 
   // choisir un modèle ou changer un réglage envoie les planches à la découpe toutes seules (voir plus bas) ; recharger la page ne touche à rien
   const syncCut = useRef(false)
@@ -124,7 +129,9 @@ export const ModelsView = () => {
   }
   const setExplode = (k: number) => dispatch(modelsActions.explodeSet(k))
   const setColored = (on: boolean) => dispatch(modelsActions.coloredSet(on))
+  const setMarks = (on: boolean) => dispatch(modelsActions.marksSet(on))
   const setMeasuring = (on: boolean) => dispatch(modelsActions.measuringSet(on))
+  const setSection = (s: Partial<SectionState>) => dispatch(modelsActions.sectionSet(s))
   const setHidden = (indices: number[]) => dispatch(modelsActions.hiddenSet({ modelId, indices }))
   const hide = (i: number) => {
     if (i < 0 || i >= count) return
@@ -164,7 +171,7 @@ export const ModelsView = () => {
   // le modèle figé en JSON : à déposer dans `models/` pour l'avoir dans la liste sans code
   const downloadModel = () => result && model && saveText(JSON.stringify(modelToJson(model, result.raw), null, 2), `${model.id}.model.json`)
 
-  useCnc3dApi({ pick, setParam, toCut, hide, hideMany, showAll, model, params, result, cut, selected }, { viewer, setMeasuring, setExplode })
+  useCnc3dApi({ pick, setParam, toCut, hide, hideMany, showAll, model, params, result, cut, selected }, { viewer, setMeasuring, setExplode, setSection })
 
   const sel = selected >= 0 ? result?.panels[selected] : undefined
   const menuPanel = menu && menu.index >= 0 ? result?.panels[menu.index] : undefined
@@ -181,7 +188,7 @@ export const ModelsView = () => {
     <div className="grid gap-3 lg:grid-cols-[17rem_1fr]">
       <div className="space-y-3">
         <ModelList models={MODELS} currentId={model?.id} onPick={toggle} />
-        {model && <ModelSettings model={model} params={params} explode={explode} colored={colored} onColored={setColored} onParam={setParam} onReset={reset} onExplode={setExplode} />}
+        {model && <ModelSettings model={model} params={params} explode={explode} colored={colored} onColored={setColored} marks={marks} onMarks={setMarks} onParam={setParam} onReset={reset} onExplode={setExplode} />}
         {cut && model && <CutActions report={report} onRefresh={() => void toCut()} onDownload={download} onDownloadModel={downloadModel} />}
       </div>
 
@@ -189,6 +196,7 @@ export const ModelsView = () => {
         <div className="relative overflow-hidden rounded-lg border border-stone-200 bg-stone-100 shadow-sm">
           <div ref={host} className="h-[calc(100dvh-6.5rem)] min-h-96 w-full" />
           <ViewToolbar measuring={measuring} hiddenCount={hiddenCount} onMeasure={() => setMeasuring(!measuring)} onFit={() => viewer.current?.fit()} onShowAll={showAll} />
+          <SectionTool section={section} onAxis={(axis) => setSection({ axis })} onPosition={(t) => setSection({ t })} onFlip={() => setSection({ flip: !section.flip })} />
           {menu && result && (menuPanel || hiddenItems.length > 0) && (
             <ContextMenu
               x={menu.x}

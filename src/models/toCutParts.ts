@@ -7,8 +7,8 @@ const r3 = (v: number) => Math.round(v * 1000) / 1000
 const round = (poly: Pt[]): Pt[] => poly.map(([x, y]) => [r3(x), r3(y)])
 
 /** Un trait gravé : rectangle fin autour du segment (droit ou oblique), un demi-trait de rallonge à chaque bout. */
-export const ruleRect = ([x0, y0, x1, y1]: [number, number, number, number]): Pt[] => {
-  const h = RULE_W / 2
+export const ruleRect = ([x0, y0, x1, y1, w]: [number, number, number, number] | [number, number, number, number, number]): Pt[] => {
+  const h = (w ?? RULE_W) / 2 // 5e valeur (option) : largeur de ce trait, sinon RULE_W
   const len = Math.hypot(x1 - x0, y1 - y0) || 1
   const [ux, uy] = [((x1 - x0) / len) * h, ((y1 - y0) / len) * h]
   const [ax, ay, bx, by] = [x0 - ux, y0 - uy, x1 + ux, y1 + uy]
@@ -16,7 +16,7 @@ export const ruleRect = ([x0, y0, x1, y1]: [number, number, number, number]): Pt
 }
 
 /** Rectangles gravés des textes et des traits d'une planche (même police que le nom). */
-export const labelRects = (p: Panel): Pt[][] => [...(p.labels ?? []).flatMap((l) => digitRects(l.text, l.x, l.y, l.h)), ...(p.rules ?? []).map(ruleRect)].map(round)
+export const labelRects = (p: Panel): Pt[][] => [...(p.labels ?? []).flatMap((l) => digitRects(l.text, l.x, l.y, l.h, 2, l.font)), ...(p.rules ?? []).map(ruleRect)].map(round)
 
 /** Clé des textes d'une planche : deux planches au même contour mais aux textes différents sont deux pièces. */
 const labelKey = (p: Panel) => [...(p.labels ?? []).map((l) => `${l.text}@${r3(l.x)},${r3(l.y)},${r3(l.h)}`), ...(p.rules ?? []).map((r) => r.map(r3).join(','))].join(';')
@@ -65,11 +65,12 @@ export interface CutPartsResult {
   warnings: string[]
 }
 
-/** Planches d'un modèle → fichier `cnc-parts` : les planches de même id sont regroupées (`qty`). */
+/** Planches d'un modèle → fichier `cnc-parts` : les planches de même id sont regroupées (`qty`) ; une planche `cut: false` n'y est pas. */
 export const panelsToCutParts = (panels: Panel[], project: string): CutPartsResult => {
   const warnings: string[] = []
   const byId = new Map<string, { sig: string; part: Record<string, unknown> & { qty: number } }>()
   for (const p of panels) {
+    if (p.cut === false) continue // tuyau, quincaillerie : vue 3D seulement
     const outer = round(p.outer)
     const holes = (p.holes ?? []).map(round)
     const sig = `${signature(outer, holes)}|${labelKey(p)}`
