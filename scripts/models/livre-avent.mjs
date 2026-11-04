@@ -38,8 +38,10 @@ const LIDWX = PITX - 2 * PLAY // 57,6 : couvercle (déborde de 3 mm de la boîte
 const LIDWZ = PITZ - 2 * PLAY // 65,6
 const CORNER_B = 16 // largeur d'un bras
 const CORNER_R = 16 // rayon du creux arrondi dans l'angle
+// couleurs des boîtes (la vue 3D colore par catégorie) : les boîtes 1 et 24 en rouge (comme la couverture), les 22 autres en beige
+const PAINTS = { 'Peint rouge': '#c0392b', 'Peint beige': '#e6d3b0' }
 const OPEN_GAP = 1 // écart entre les deux faces livre ouvert (la charnière est au milieu de l'écart ; fermé, les faces se touchent)
-const NOTCH = 7 // rayon du demi-rond pour le doigt (bord haut du couvercle, repris dans la cloison dessous)
+const NOTCH = 10 // rayon du demi-rond pour le doigt (bord haut du couvercle, repris dans la cloison dessous)
 
 // ---- contours crantés à languettes placées (même dessin que plateOutline, crans choisis à la main) ----
 const edge = (len, feats = []) => {
@@ -86,7 +88,7 @@ const cellDips = (big, row, off = 0) => {
 
 // ---- une face de 12 cases ; bx = x du bord de la face côté extérieur (gauche), zc = 0 ----
 const box1 = [] // indices des planches de la boîte 1 (couvercle, fond, 3 parois), pour l'action « Boîte 1 sortie »
-const half = (bx, firstNumber, { free = false, big = null } = {}) => {
+const half = (bx, colOff, { free = false, big = null } = {}) => {
   // big : { row, col } = la grosse boîte de cette face occupe les cases (col, row) et (col + 1, row) ; la cloison entre les deux est raccourcie
   const xw = (u) => bx + u // u (0 = paroi extérieure) → x monde
   const zw = (v) => -H / 2 + v // v (0 = bord haut du livre) → z monde
@@ -135,7 +137,10 @@ const half = (bx, firstNumber, { free = false, big = null } = {}) => {
     ]),
   ]
   panels.push({ id: 'C', category: 'Couverture', thickness: t, outer: rect(0, 0, WC, HC), rules: coverDeco, position: [xw(free ? W / 2 + OVER / 2 : W / 2 - OVER / 2), t / 2, 0], rotation: [90, 0, 180] }) // les deux couvertures : face gravée dehors, orientée pour que le texte se lise à l'endroit une fois le livre debout (la face de droite lue de dos)
-  panels.push({ id: 'PL', category: 'Planche', thickness: t, outer: outline(W, H, { left: crans(H, -t), right: crans(H, -t), top: crans(WI, -t, wallL), bottom: crans(WI, -t, wallL) }), position: [xw(W / 2), t + t / 2, 0], rotation: [-90, 0, 0] })
+  // la plaque unie du flanc extérieur (F-05, à 9 mm du bord libre) est incrustée dans la planche : fenêtres de 3 mm en face de ses crans du bas
+  const f5x = free ? W - 4 * t : 3 * t // x (u) du début de F-05 sur la planche
+  const f5Windows = crans(H, t).map(({ u0, u1 }) => rect(f5x, u0, t, u1 - u0))
+  panels.push({ id: 'PL', category: 'Planche', thickness: t, outer: outline(W, H, { left: crans(H, -t), right: crans(H, -t), top: crans(WI, -t, wallL), bottom: crans(WI, -t, wallL) }), holes: f5Windows, position: [xw(W / 2), t + t / 2, 0], rotation: [-90, 0, 0] })
   // 4 coins « à cheval » sur les angles de la couverture : une plaque en L sur la face extérieure (3 mm, bras de 59,5 mm sur 16 de large, creux arrondi dans
   // l'angle, étoile ajourée) qui déborde de 3 mm au-delà du bord, et sous ce débord des ailes de 3 mm appliquées sur les côtés qui touchent l'angle : en haut /
   // en bas (aile de bout) et, côté dehors, le long du bord libre (aile du bord libre). Côté charnière, pas d'aile du bord libre ni de débord le long du bord
@@ -232,30 +237,39 @@ const half = (bx, firstNumber, { free = false, big = null } = {}) => {
   // leur place de 6 mm reste libre
   const flatFlank = outline(H, HW, {})
   // la plaque unie à 9 mm (F-05) reste d'un seul tenant : elle a des encoches de 6 mm (demi-hauteur du haut) où passent les cloisons en travers (DX), à mi-bois
-  const flatFlank5 = outline(H, HW, { top: Array.from({ length: NZ - 1 }, (_, j) => ({ u0: t + CELLZ + j * PITZ, u1: t + CELLZ + j * PITZ + DIV, d: -HW / 2 })) })
+  const flatFlank5 = outline(H, HW, { top: Array.from({ length: NZ - 1 }, (_, j) => ({ u0: t + CELLZ + j * PITZ, u1: t + CELLZ + j * PITZ + DIV, d: -HW / 2 })), bottom: crans(H, t) })
   panels.push({ id: 'FL', category: 'Pages', thickness: t, outer: flatFlank5, position: [xw(free ? W - t / 2 - 3 * t : t / 2 + 3 * t), yc(flatFlank5, BASE + HW), 0], rotation: [0, -90, 0] })
   // le flanc du côté charnière garde la longueur H (la pile de gonds est juste à côté) ; il n'a pas de traits de pages (c'est le derrière du livre, vers la charnière)
   panels.push({ id: 'FL', category: 'Pages', thickness: t, outer: flanc, position: [xw(free ? t / 2 : W - t / 2), yc(flanc, BASE + HW), 0], rotation: [0, -90, 0] })
   // bouts (le long de x) entre les flancs : collés contre eux ; celui du haut porte les creux pour le doigt de la première rangée
-  const bout = (feats) => {
-    const outer = outline(WI, HW, { top: feats, bottom: crans(WI, t) })
+  const bout = (feats, skip = -1) => {
+    // reçoivent les languettes des cloisons DZ (pas là où la cloison est raccourcie par la grosse boîte : elle ne touche pas ce bout)
+    const dzNotches = Array.from({ length: NX - 1 }, (_, i) => ({ u0: CELLX + i * PITX, u1: CELLX + i * PITX + DIV, d: -HW / 2 })).filter((_, i) => i !== skip)
+    const outer = outline(WI, HW, { top: [...feats, ...dzNotches], bottom: crans(WI, t) })
     return { id: 'BT', category: 'Pages', thickness: t, outer, rotation: [0, 0, 0], y: yc(outer, BASE + HW) }
   }
   // pas de traits de pages sur les bouts (BT) : leur face est cachée par les blocs de charnière ; voir hingeParts pour les planches du dessus et du dessous
-  for (const [feats, z, rules, rot] of [[cellDips(big, 0), zw(t / 2), undefined, [0, 0, 0]], [[], zw(H - t / 2), undefined, [0, 0, 0]]]) {
-    const { y, ...b } = bout(feats)
+  for (const [feats, z, rules, rot, skip] of [[cellDips(big, 0), zw(t / 2), undefined, [0, 0, 0], big && big.row === 0 ? big.col : -1], [[], zw(H - t / 2), undefined, [0, 0, 0], big && big.row === NZ - 1 ? big.col : -1]]) {
+    const { y, ...b } = bout(feats, skip)
     panels.push({ ...b, rules, rotation: rot, position: [xIn(WI / 2), y, z] }) // le bout du bas est retourné (contour symétrique) : sa face gravée regarde vers l'intérieur du livre (z -)
   }
   // quadrillage doublé : chaque cloison = deux plaques côte à côte, à mi-bois entre elles (fentes de 6 mm), collées sur la couverture et contre les parois
-  const dz = { id: 'DZ', category: 'Cloison', thickness: t, outer: outline(HI, HW, { top: slots(NZ - 1, -HW / 2, CELLZ, PITZ) }), rotation: [0, -90, 0] }
-  // à la grosse boîte, la cloison entre ses deux cases est raccourcie : en haut (rangée 0) elle commence au premier croisement, en bas (dernière
-  // rangée) elle s'arrête au dernier : son bout garde la demi-hauteur de la fente et s'encastre dans la cloison en travers (DX), comme un croisement à mi-bois
+  // les cloisons le long de z (DZ) s'intercalent dans les bouts (BT) : à chaque bout qui touche un bout de planche, une languette de 3 mm sur la demi-hauteur du haut entre dans une
+  // encoche de 6 mm du bout (demi-hauteur du haut), à mi-bois comme les croisements. À la grosse boîte, la cloison est raccourcie : en haut (rangée 0) elle commence au premier
+  // croisement avec la cloison en travers (DX), où son bout garde la demi-hauteur de la fente et s'encastre dans elle ; en bas (dernière rangée) elle s'arrête au dernier croisement
+  const tabEnd = [{ u0: 0, u1: HW / 2, d: t }]
+  const dzPlate = (len, topFeats, left, right, z0) => {
+    const outer = outline(len, HW, { top: topFeats, ...(left ? { left: tabEnd } : {}), ...(right ? { right: tabEnd } : {}) })
+    const us = outer.map((q) => q[0])
+    return { id: 'DZ', category: 'Cloison', thickness: t, outer, rotation: [0, -90, 0], z: z0 + (Math.min(...us) + Math.max(...us)) / 2 - len / 2 }
+  }
+  const dzFull = dzPlate(HI, slots(NZ - 1, -HW / 2, CELLZ, PITZ), true, true, 0)
   const dzShort = big && (big.row === 0
-    ? { id: 'DZ', category: 'Cloison', thickness: t, outer: outline(HI - CELLZ, HW, { top: slots(NZ - 1, -HW / 2, 0, PITZ) }), rotation: [0, -90, 0], z: CELLZ / 2 }
-    : { id: 'DZ', category: 'Cloison', thickness: t, outer: outline((NZ - 1) * PITZ, HW, { top: slots(NZ - 1, -HW / 2, CELLZ, PITZ) }), rotation: [0, -90, 0], z: (-HI + (NZ - 1) * PITZ) / 2 })
+    ? dzPlate(HI - CELLZ, slots(NZ - 1, -HW / 2, 0, PITZ), false, true, CELLZ / 2)
+    : dzPlate((NZ - 1) * PITZ, slots(NZ - 1, -HW / 2, CELLZ, PITZ), true, false, (-HI + (NZ - 1) * PITZ) / 2))
   for (let i = 0; i < NX - 1; i++)
     for (const k of [0, 1]) {
-      const { z, ...d } = big && i === big.col ? dzShort : { ...dz, z: 0 }
+      const { z, ...d } = big && i === big.col ? dzShort : dzFull
       panels.push({ ...d, position: [xIn(CELLX + i * PITX + t / 2 + k * t), yWall, z] })
     }
   // cloisons le long de x : la plaque côté rangée du dessous (z +) porte les creux pour le doigt
@@ -271,7 +285,7 @@ const half = (bx, firstNumber, { free = false, big = null } = {}) => {
   const dxCx = (o) => (Math.min(...o.map((q) => q[0])) + Math.max(...o.map((q) => q[0]))) / 2 // centre en u de la cloison, languette comprise
   const dx = (feats) => { const outer = dxOuter(feats); return { id: 'DX', category: 'Cloison', thickness: t, outer, rotation: [0, 0, 0], cx: dxCx(outer) } }
   for (let j = 0; j < NZ - 1; j++) for (const [feats, k] of [[[], 0], [cellDips(big, j + 1, dxOff), 1]]) { const { cx, ...d } = dx(feats); panels.push({ ...d, position: [xw(t + cx), yWall, zw(t + CELLZ + j * PITZ + t / 2 + k * t)] }) }
-  // une boîte par case (sauf les deux grosses : la 1 à gauche et la 24 à droite, deux cases de large), qui la remplit : fond + paroi basse + 2 côtés (ouverte côté haut) + couvercle numéroté qui déborde de 3 mm et repose sur
+  // une boîte par case (24 au total), qui la remplit : fond + paroi basse + 2 côtés (ouverte côté haut) + couvercle numéroté qui déborde de 3 mm et repose sur
   // le quadrillage ; demi-rond au bord haut du couvercle, repris dans la cloison dessous : le doigt passe dans la boîte et la soulève. Petit
   // crantage (crans de 6 mm) : les côtés BB ont des languettes dans les encoches de la paroi basse BA, et chaque paroi des languettes en bas dans des encoches
   // du fond (affleurantes dessous) ; 3 petits carrés discrets : une languette de 3 × 3 au milieu du haut de chaque paroi traverse le couvercle
@@ -309,13 +323,13 @@ const half = (bx, firstNumber, { free = false, big = null } = {}) => {
   }
   const small = makeBox(BOXX, LIDWX)
   const large = makeBox(2 * CELLX + DIV - 2 * PLAY, 2 * PITX - 2 * PLAY) // la grosse boîte : deux cases de large, sans la cloison entre elles
-  const put = (bx, text, cx, cz) => {
+  const put = (bx, text, cx, cz, paint) => {
     const { w } = markSize(text, numH)
     if (text === '1') box1.push(panels.length, panels.length + 1, panels.length + 2, panels.length + 3, panels.length + 4) // les 5 planches de la boîte 1
-    panels.push({ id: 'T', category: 'Couvercle', thickness: t, outer: bx.lid, holes: bx.lidWindows, labels: [{ text, x: r2(bx.lw / 2 - w / 2), y: 20, h: numH, font: 'round' }], rules: bx.deco, position: [cx, lidY, cz], rotation: [-90, 0, 0] })
-    panels.push({ id: 'BF', category: 'Boîte', thickness: t, outer: bx.floor, position: [cx, yBox - BH - t / 2, cz], rotation: [-90, 0, 0] })
-    panels.push({ id: 'BA', category: 'Boîte', thickness: t, outer: bx.back, position: [cx, yc(bx.back, yBox), cz + (BOXZ - t) / 2], rotation: [0, 0, 0] })
-    for (const sg of [-1, 1]) panels.push({ id: 'BB', category: 'Boîte', thickness: t, outer: bx.side, position: [cx + (sg * (bx.bw - t)) / 2, yc(bx.side, yBox), zc(bx.side, cz - BOXZ / 2)], rotation: [0, -90, 0] })
+    panels.push({ id: 'T', category: paint, thickness: t, outer: bx.lid, holes: bx.lidWindows, labels: [{ text, x: r2(bx.lw / 2 - w / 2), y: 20, h: numH, font: 'round' }], rules: bx.deco, position: [cx, lidY, cz], rotation: [-90, 0, 0] })
+    panels.push({ id: 'BF', category: paint, thickness: t, outer: bx.floor, position: [cx, yBox - BH - t / 2, cz], rotation: [-90, 0, 0] })
+    panels.push({ id: 'BA', category: paint, thickness: t, outer: bx.back, position: [cx, yc(bx.back, yBox), cz + (BOXZ - t) / 2], rotation: [0, 0, 0] })
+    for (const sg of [-1, 1]) panels.push({ id: 'BB', category: paint, thickness: t, outer: bx.side, position: [cx + (sg * (bx.bw - t)) / 2, yc(bx.side, yBox), zc(bx.side, cz - BOXZ / 2)], rotation: [0, -90, 0] })
   }
   for (let j = 0; j < NZ; j++)
     for (let i = 0; i < NX; i++) {
@@ -323,9 +337,11 @@ const half = (bx, firstNumber, { free = false, big = null } = {}) => {
       if (big && big.row === j && i === big.col + 1) continue // la case est dans la grosse boîte
       const cx = xIn(i * PITX + CELLX / 2 + (isBig ? (CELLX + DIV) / 2 : 0))
       const cz = zw(t + j * PITZ + CELLZ / 2)
-      // la grosse boîte porte le plus petit numéro de ses deux cases côté gauche (1), côté droit le plus grand (24)
-      const text = String(firstNumber + i + NX * j + (isBig && free ? 1 : 0))
-      put(isBig ? large : small, text, cx, cz)
+      // numérotation de gauche à droite, rangée par rangée, sur les deux faces (livre ouvert, 6 colonnes) : 1 2 3 | 4 5 6, puis 7 8 9 | 10 11 12, …, 22 23 24 en bas à droite
+      const gc = colOff + i // colonne sur les deux faces, de 0 (bord gauche) à 5 (bord droit)
+      const text = String(2 * NX * j + gc + 1)
+      // peinture : les boîtes 1 et 24 en rouge, les autres en beige
+      put(isBig ? large : small, text, cx, cz, text === '1' || text === '24' ? 'Peint rouge' : 'Peint beige')
     }
   return panels
 }
@@ -400,8 +416,8 @@ const dowels = [1, -1].flatMap((e) => [
 ])
 const hinges = hingeParts()
 
-const left = [...half(-W, 1, { big: { row: 0, col: 0 } }), ...hinges.left, ...dowels]
-const right = [...half(OPEN_GAP, 1 + NX * NZ, { free: true, big: { row: NZ - 1, col: 1 } }), ...hinges.right]
+const left = [...half(-W, 0), ...hinges.left, ...dowels]
+const right = [...half(OPEN_GAP, NX, { free: true }), ...hinges.right]
 const title = (text, h, dy) => ({ text, x: r2((W + OVER) / 2 - markSize(text, h).w / 2), y: r2((H + 2 * OVER_Z) / 2 - h / 2 + dy), h, font: 'round' }) // même police arrondie que les numéros
 left[0].labels = [title('CALENDRIER', 18, -14), title("DE L'AVENT", 18, 14)]
 // quatrième de couverture : un court poème gravé, dans l'esprit des marchombres, signé Ellundril Chariakin (police à segments : majuscules sans accents ni virgules), centré
@@ -410,7 +426,7 @@ const BH_TXT = 6 // hauteur des lettres
 const TXT_STEP = 11
 right[0].labels = blurb.flatMap((text, k) => (text ? [{ text, x: r2((W + OVER) / 2 - markSize(text, BH_TXT).w / 2), y: r2((H + 2 * OVER_Z) / 2 - (blurb.length * TXT_STEP) / 2 + k * TXT_STEP), h: BH_TXT }] : []))
 // quatre groupes pour la vue 3D et les planches (un groupe = les planches dont l'id a les mêmes lettres) : B = toutes les pièces des mini boîtes
-// (couvercle, fond, parois), CH = les blocs de la charnière (gond de droite, cale de gauche, ronds et goujons de l'axe), CN = les coins en L (plaques de face et ailes), marron clair ; F = tout le reste (faces, quadrillage, gond de gauche et cale de droite)
+// (couvercle, fond, parois), CH = les blocs de la charnière (gond de droite, cale de gauche, ronds et goujons de l'axe), CN = les coins en L (plaques de face et ailes), marron foncé ; F = tout le reste (faces, quadrillage, gond de gauche et cale de droite)
 const GROUP = { T: 'B', BF: 'B', BA: 'B', BB: 'B', GG: 'F', CLD: 'F', CO: 'CN', CW: 'CN', GD: 'CH', CLG: 'CH', RO: 'CH', G: 'CH' }
 const flat = [...left, ...right].map((p) => ({ ...p, id: GROUP[p.id] ?? 'F' }))
 
@@ -440,7 +456,7 @@ const model = {
   id: 'livre-avent',
   name: 'Livre de l’Avent',
   description: 'Boîte-livre : 24 cases (12 par face) avec leur boîte (ouvertes côté haut, retrait par le haut, demi-rond pour le doigt) ; charnière en bois au milieu (gonds sur tourillons).',
-  colors: { Couverture: '#8b2f2f', Pages: '#f3e9d2', Cloison: '#e2cfae', Fermoir: '#c69c6d', Planche: '#b9936a', Gond: '#c69c6d', Coin: '#c49a6c', Axe: '#7a5a34', Goujon: '#d9b277', Couvercle: '#d9a84a', Boîte: '#b98a4a' },
+  colors: { Couverture: '#c0392b', Pages: '#f3e9d2', Cloison: '#e2cfae', Fermoir: '#c69c6d', Planche: '#b9936a', Gond: '#c69c6d', Coin: '#5c3a21', Axe: '#7a5a34', Goujon: '#d9b277', ...PAINTS },
   panels,
   actions: [
     // curseur : la face droite se retourne sur la gauche autour de l'axe de la charnière (0 % ouvert à plat, 100 % fermé)
