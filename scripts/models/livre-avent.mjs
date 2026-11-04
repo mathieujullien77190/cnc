@@ -40,6 +40,12 @@ const CORNER_B = 16 // largeur d'un bras
 const CORNER_R = 16 // rayon du creux arrondi dans l'angle
 // couleurs des boîtes (la vue 3D colore par catégorie) : les boîtes 1 et 24 en rouge (comme la couverture), les 22 autres en beige
 const PAINTS = { 'Peint rouge': '#c0392b', 'Peint beige': '#e6d3b0' }
+// goujons de la pile de charnière (bout F-06, gond F-11, cale CH-01, gond F-13) : 4 par bout et par face, deux sous chaque aile de coin (x, hauteur y à plat), face de gauche ;
+// la face de droite en est le miroir par rapport à l'axe. Coin du bord libre (x de -174 à -118) : deux dans le bras le long du bout, à 24 et 44 mm du bord. Coin côté charnière
+// (x de -56 à 0) : un dans le bras le long du bout (24 mm de la charnière), un dans le bras le long de la charnière. Ils tombent dans les bras de 16 mm de large des coins en L. Chaque goujon (lamelle de 3,4 mm, 12 mm de long) traverse les quatre plaques par un trou de 3 × 3 mm.
+const GJ_LEFT = [[-150, 9.5], [-130, 9.5], [-24, 9.5], [-8, 27]]
+const GJ_SIDE = (right) => GJ_LEFT.map(([x, y]) => [right ? 1 - x : x, y]) // 1 = OPEN_GAP : l'axe est à 0,5
+const GJ_HOLE = (u, v) => rect(r2(u - t / 2), r2(v - t / 2), t, t)
 const OPEN_GAP = 1 // écart entre les deux faces livre ouvert (la charnière est au milieu de l'écart ; fermé, les faces se touchent)
 const NOTCH = 10 // rayon du demi-rond pour le doigt (bord haut du couvercle, repris dans la cloison dessous)
 
@@ -246,7 +252,8 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
     // reçoivent les languettes des cloisons DZ (pas là où la cloison est raccourcie par la grosse boîte : elle ne touche pas ce bout)
     const dzNotches = Array.from({ length: NX - 1 }, (_, i) => ({ u0: CELLX + i * PITX, u1: CELLX + i * PITX + DIV, d: -HW / 2 })).filter((_, i) => i !== skip)
     const outer = outline(WI, HW, { top: [...feats, ...dzNotches], bottom: crans(WI, t) })
-    return { id: 'BT', category: 'Pages', thickness: t, outer, rotation: [0, 0, 0], y: yc(outer, BASE + HW) }
+    const holes = GJ_SIDE(free).map(([x, y]) => GJ_HOLE(x - (bx + wallL), BASE + HW - y)) // trous des goujons de la pile de charnière
+    return { id: 'BT', category: 'Pages', thickness: t, outer, holes, rotation: [0, 0, 0], y: yc(outer, BASE + HW) }
   }
   // pas de traits de pages sur les bouts (BT) : leur face est cachée par les blocs de charnière ; voir hingeParts pour les planches du dessus et du dessous
   for (const [feats, z, rules, rot, skip] of [[cellDips(big, 0), zw(t / 2), undefined, [0, 0, 0], big && big.row === 0 ? big.col : -1], [[], zw(H - t / 2), undefined, [0, 0, 0], big && big.row === NZ - 1 ? big.col : -1]]) {
@@ -356,14 +363,14 @@ const AXIS = [OPEN_GAP / 2, HALF] // axe de la charnière (x, y), repère à pla
 const STEP_AT = 10 // à 1 cm du rond de l'œil, le bord haut du pied d'un gond (et de sa cale) fait un décrochement
 const STEP = 3 // de 3 mm vers le fond du livre (vers la couverture), puis repart vers l'extérieur
 const FOOT = W + OPEN_GAP / 2 - 3 // le gond couvre le bout de sa face, de la charnière jusqu'à 3 mm du bord extérieur (la cale, côté opposé, fait la même longueur)
-const knuckle = (side, holeR) => {
+const knuckle = (side, holeR, gj = []) => {
   // side = -1 : gond de la face gauche (pied vers x < 0) ; +1 : face droite (miroir)
   const arc = Array.from({ length: 19 }, (_, k) => [KN * Math.cos(-Math.PI / 2 + ((k + 1) * Math.PI * 1.5) / 20), HALF + KN * Math.sin(-Math.PI / 2 + ((k + 1) * Math.PI * 1.5) / 20)])
   const pts = [[-FOOT, t], [0, t], [0, HALF - KN], ...arc, [-KN, HALF], [-KN - STEP_AT, HALF], [-KN - STEP_AT, HALF - STEP], [-FOOT, HALF - STEP]].map(([x, y]) => [side === -1 ? x : -x, y])
   const xs = pts.map((q) => q[0])
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y1 = HALF + KN
   const local = (pts2) => pts2.map(([x, y]) => [r2(x - x0), r2(y1 - y)])
-  return { outer: local(side === -1 ? pts : [...pts].reverse()), holes: [circle(r2(-x0), r2(y1 - HALF), holeR)], center: [(x0 + x1) / 2, (t + y1) / 2] }
+  return { outer: local(side === -1 ? pts : [...pts].reverse()), holes: [circle(r2(-x0), r2(y1 - HALF), holeR), ...gj.map(([x, y]) => GJ_HOLE(x - AXIS[0] - x0, y1 - y))], center: [(x0 + x1) / 2, (t + y1) / 2] }
 }
 // Un bout : trois plaques empilées enfilées sur le tourillon, la face de gauche en prend deux (GG au-dessus et au-dessous) et emprisonne le gond
 // de la face de droite (GD) au milieu. A (contre les parois) : GG + cale droite ; B : GD + cale gauche ; C : GG + cale droite (au-dessus de GD). Les cales relient les gonds à leur face.
@@ -376,7 +383,7 @@ const faceUp = (pl) => {
   const fu = ([u, v]) => [r2(umax - u), v]
   return { ...pl, outer: pl.outer.map(fu), holes: pl.holes?.map((h) => h.map(fu)), rules: pl.rules?.map(([x0, y0, x1, y1]) => [r2(umax - x0), y0, r2(umax - x1), y1]), rotation: [0, 180, 0] }
 }
-const spacerFor = (side, lines = false, flip = false) => {
+const spacerFor = (side, lines = false, flip = false, gj = []) => {
   // la cale épouse le rond de l'œil du gond d'en face : creux de rayon KN + 0,2 mm autour de l'axe
   const R = KN + PLAY
   const cp = [[0, t], [FOOT, t], [FOOT, HALF - STEP], [KN + STEP_AT, HALF - STEP], [KN + STEP_AT, HALF], [R, HALF], ...Array.from({ length: 17 }, (_, i) => [R * Math.cos((-i * Math.PI) / 32), HALF + R * Math.sin((-i * Math.PI) / 32)]), [0, t]].map(([x, y]) => [side * x, y])
@@ -385,13 +392,14 @@ const spacerFor = (side, lines = false, flip = false) => {
   // la cale de droite (CLD) est rangée avec les faces (F) et porte les mêmes traits de pages que les flancs, d'un bout à l'autre du pied (sous le creux de l'œil)
   // mêmes hauteurs que les traits du gond de gauche (y = HALF - 6,5 - 3 k) : ils tombent en face les uns des autres ; ils s'arrêtent au décroché
   const rules = side === 1 && lines ? Array.from({ length: 13 }, (_, k) => [KN + STEP_AT, KN - 3 + PAGE * k, FOOT - EDGE, KN - 3 + PAGE * k]) : undefined // traits de pages sur la plaque du bout (visible du dessus / du dessous)
-  const sp = { id: side === 1 ? 'CLD' : 'CLG', category: side === 1 ? 'Pages' : 'Gond', thickness: t, rules, outer: cp.map(([x, y]) => [r2(x - c0), r2(HALF - y)]), position: [AXIS[0] + (c0 + c1) / 2, (t + HALF) / 2, 0], rotation: [0, 0, 0] }
+  const sp = { id: side === 1 ? 'CLD' : 'CLG', category: side === 1 ? 'Pages' : 'Gond', thickness: t, rules, outer: cp.map(([x, y]) => [r2(x - c0), r2(HALF - y)]), holes: gj.map(([x, y]) => GJ_HOLE(x - AXIS[0] - c0, HALF - y)), position: [AXIS[0] + (c0 + c1) / 2, (t + HALF) / 2, 0], rotation: [0, 0, 0] }
   return sp.rules && flip ? faceUp(sp) : sp
 }
 const hingeParts = () => {
   // le gond de gauche (GG) est rangé avec les faces (F) et porte lui aussi des traits de pages, du bout du pied jusqu'avant l'œil
   const ggRules = Array.from({ length: 13 }, (_, k) => [EDGE, 16 + PAGE * k, FOOT - KN - STEP_AT, 16 + PAGE * k]) // traits de pages du gond de gauche (plaque du bout), jusqu'au décroché
-  const gg = knuckle(-1, AXLE_R), gd = knuckle(1, AXLE_R + PLAY) // le gond du milieu (GD) tourne : trou de 0,2 mm plus grand de chaque côté
+  const gjL = GJ_SIDE(false), gjR = GJ_SIDE(true)
+  const gg = knuckle(-1, AXLE_R, gjL), gd = knuckle(1, AXLE_R + PLAY, gjR) // le gond du milieu (GD) tourne : trou de 0,2 mm plus grand de chaque côté
   const plate = (id, k, rules, flip = false) => {
     const pl = { id, category: id === 'GG' ? 'Pages' : 'Gond', thickness: t, rules, outer: k.outer, holes: k.holes, position: [AXIS[0] + k.center[0], k.center[1], 0], rotation: [0, 0, 0] }
     return rules && flip ? faceUp(pl) : pl
@@ -403,8 +411,11 @@ const hingeParts = () => {
     const zA = e * (zEnd + t / 2), zB = e * (zEnd + 1.5 * t), zC = e * (zEnd + 2.5 * t)
     // les traits de pages ne sont que sur la plaque du bout (zC) du gond de gauche et de la cale de droite : c'est elle qu'on voit du dessus et du dessous du livre ; gravée sur la face
     // qui regarde vers l'extérieur (bas : z +, rien à faire ; haut : z -, planche retournée de 180°)
-    L.push(at(plate('GG', gg), zA), at(spacerFor(-1), zB), at(plate('GG', gg, ggRules, e < 0), zC))
-    R.push(at(spacerFor(1), zA), at(plate('GD', gd), zB), at(spacerFor(1, true, e < 0), zC)) // une cale au-dessus de GD aussi : la pile est pleine des deux côtés de la charnière
+    L.push(at(plate('GG', gg), zA), at(spacerFor(-1, false, false, gjL), zB), at(plate('GG', gg, ggRules, e < 0), zC))
+    R.push(at(spacerFor(1, false, false, gjR), zA), at(plate('GD', gd), zB), at(spacerFor(1, true, e < 0, gjR), zC))
+    // les goujons : lamelles de 3,4 mm de large et 12 mm de long (le bout BT + les trois plaques du bloc), au ras des faces
+    for (const [x, y] of gjL) L.push({ id: 'G', category: 'Goujon', thickness: t, outer: rect(0, 0, 4 * t, 3.4), position: [x, y, e * (zEnd + t)], rotation: [0, -90, 0] })
+    for (const [x, y] of gjR) R.push({ id: 'G', category: 'Goujon', thickness: t, outer: rect(0, 0, 4 * t, 3.4), position: [x, y, e * (zEnd + t)], rotation: [0, -90, 0] }) // une cale au-dessus de GD aussi : la pile est pleine des deux côtés de la charnière
   }
   return { left: L, right: R }
 }
