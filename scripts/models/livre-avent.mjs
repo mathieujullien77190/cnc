@@ -46,6 +46,15 @@ const PAINTS = { 'Peint rouge': '#c0392b', 'Peint beige': '#e6d3b0' }
 const GJ_LEFT = [[-150, 9.5], [-130, 9.5], [-24, 9.5], [-8, 27]]
 const GJ_SIDE = (right) => GJ_LEFT.map(([x, y]) => [right ? 1 - x : x, y]) // 1 = OPEN_GAP : l'axe est à 0,5
 const GJ_HOLE = (u, v) => rect(r2(u - t / 2), r2(v - t / 2), t, t)
+// un trait [u0, u1] à la hauteur v, coupé autour des trous des goujons (centres { u, v }) : on laisse 1,8 mm de bois autour de chaque trou de 3 × 3
+const lineAround = (u0, u1, v, holes, w) => {
+  let segs = [[u0, u1]]
+  for (const h of holes) {
+    if (Math.abs(v - h.v) >= t / 2 + 1.8) continue
+    segs = segs.flatMap(([a, b]) => (h.u + t / 2 + 1.8 <= a || h.u - t / 2 - 1.8 >= b ? [[a, b]] : [[a, Math.min(b, h.u - t / 2 - 1.8)], [Math.max(a, h.u + t / 2 + 1.8), b]]))
+  }
+  return segs.filter(([a, b]) => b - a > 1).map(([a, b]) => (w ? [r2(a), r2(v), r2(b), r2(v), w] : [r2(a), r2(v), r2(b), r2(v)]))
+}
 const OPEN_GAP = 1 // écart entre les deux faces livre ouvert (la charnière est au milieu de l'écart ; fermé, les faces se touchent)
 const NOTCH = 10 // rayon du demi-rond pour le doigt (bord haut du couvercle, repris dans la cloison dessous)
 
@@ -144,9 +153,11 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
   ]
   panels.push({ id: 'C', category: 'Couverture', thickness: t, outer: rect(0, 0, WC, HC), rules: coverDeco, position: [xw(free ? W / 2 + OVER / 2 : W / 2 - OVER / 2), t / 2, 0], rotation: [90, 0, 180] }) // les deux couvertures : face gravée dehors, orientée pour que le texte se lise à l'endroit une fois le livre debout (la face de droite lue de dos)
   // la plaque unie du flanc extérieur (F-05, à 9 mm du bord libre) est incrustée dans la planche : fenêtres de 3 mm en face de ses crans du bas
-  const f5x = free ? W - 4 * t : 3 * t // x (u) du début de F-05 sur la planche
+  const px0 = free ? 0 : t // la planche est 3 mm moins large côté bord libre : le flanc extérieur la recouvre
+  const PW = W - t
+  const f5x = (free ? W - 4 * t : 3 * t) - px0 // x (u) du début de F-05 sur la planche
   const f5Windows = crans(H, t).map(({ u0, u1 }) => rect(f5x, u0, t, u1 - u0))
-  panels.push({ id: 'PL', category: 'Planche', thickness: t, outer: outline(W, H, { left: crans(H, -t), right: crans(H, -t), top: crans(WI, -t, wallL), bottom: crans(WI, -t, wallL) }), holes: f5Windows, position: [xw(W / 2), t + t / 2, 0], rotation: [-90, 0, 0] })
+  panels.push({ id: 'PL', category: 'Planche', thickness: t, outer: outline(PW, H, { ...(free ? { left: crans(H, -t) } : { right: crans(H, -t) }), top: crans(WI, -t, wallL - px0), bottom: crans(WI, -t, wallL - px0) }), holes: f5Windows, position: [xw(px0 + PW / 2), t + t / 2, 0], rotation: [-90, 0, 0] })
   // 4 coins « à cheval » sur les angles de la couverture : une plaque en L sur la face extérieure (3 mm, bras de 59,5 mm sur 16 de large, creux arrondi dans
   // l'angle, étoile ajourée) qui déborde de 3 mm au-delà du bord, et sous ce débord des ailes de 3 mm appliquées sur les côtés qui touchent l'angle : en haut /
   // en bas (aile de bout) et, côté dehors, le long du bord libre (aile du bord libre). Côté charnière, pas d'aile du bord libre ni de débord le long du bord
@@ -158,7 +169,11 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
       const sz = zc < 0 ? 1 : -1
       const outerX = xc === (free ? bx + W : bx) // vrai : coin du bord libre (dehors) ; faux : coin côté charnière
       const ex = 0 // la plaque de face est à ras du bord : elle ne déborde pas sous les ailes
-      const L0 = [[0, 0], [CORNER_A, 0], [CORNER_A, CORNER_B], [CORNER_B + CORNER_R, CORNER_B], ...Array.from({ length: 9 }, (_, k) => [CORNER_B + CORNER_R + CORNER_R * Math.cos(((-90 - (k + 1) * 10) * Math.PI) / 180), CORNER_B + CORNER_R + CORNER_R * Math.sin(((-90 - (k + 1) * 10) * Math.PI) / 180)]), [CORNER_B, CORNER_B + CORNER_R], [CORNER_B, CORNER_A], [0, CORNER_A]]
+      // contour en L ; bu = largeur du bras le long de v (le bras le long de u fait toujours CORNER_B)
+      const lOf = (bu) => [[0, 0], [CORNER_A, 0], [CORNER_A, CORNER_B], [bu + CORNER_R, CORNER_B], ...Array.from({ length: 9 }, (_, k) => [bu + CORNER_R + CORNER_R * Math.cos(((-90 - (k + 1) * 10) * Math.PI) / 180), CORNER_B + CORNER_R + CORNER_R * Math.sin(((-90 - (k + 1) * 10) * Math.PI) / 180)]), [bu, CORNER_B + CORNER_R], [bu, CORNER_A], [0, CORNER_A]]
+      const L0 = lOf(CORNER_B)
+      // les ailes qui s'emboîtent (languettes de 3 mm sur leur bord) : le bras le long de v fait 13 mm de corps + 3 mm de languettes = 16 mm, comme l'autre bras
+      const L0w = lOf(CORNER_B - t)
       // petit crénelage, propre aux coins et uniforme partout où deux pièces de coin se touchent (plaque ↔ ailes, aile ↔ aile) : mêmes dents de 6 mm environ,
       // nombre impair, une dent sur deux, bouts droits, sur les bras de 59,5 mm (4 languettes)
       const small = (d) => {
@@ -201,8 +216,8 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
         const bottom = ws.flatMap(({ u0, u1 }) => [[u0, 0], [u0, t], [u1, t], [u1, 0]]) // encoches du bas : les languettes de la plaque de face y entrent
         const desc = [...IL].reverse()
         const pts = kind === 'z'
-          ? [[0, 0], ...bottom, ...L0.slice(1), ...(mate ? desc.flatMap(({ v1, v2 }) => [[0, v2], [-t, v2], [-t, v1], [0, v1]]) : [])] // pas d'aile voisine côté charnière : bord droit
-          : [[-OUT, 0], ...bottom, [CORNER_A, 0], ...L0.slice(2, -1), [-OUT, CORNER_A], ...desc.flatMap(({ v1, v2 }) => [[-OUT, v2], [0, v2], [0, v1], [-OUT, v1]])]
+          ? [[0, 0], ...bottom, ...(mate ? L0w : L0).slice(1), ...(mate ? desc.flatMap(({ v1, v2 }) => [[0, v2], [-t, v2], [-t, v1], [0, v1]]) : [])] // pas d'aile voisine côté charnière : bord droit
+          : [[-OUT, 0], ...bottom, [CORNER_A, 0], ...L0w.slice(2, -1), [-OUT, CORNER_A], ...desc.flatMap(({ v1, v2 }) => [[-OUT, v2], [0, v2], [0, v1], [-OUT, v1]])]
         const wo2 = pts.map(([u, v]) => [xs + along * u, v - t]) // l'aile descend de 3 mm : son pied est à la hauteur de la plaque de face (y de -3 à 0)
         const mn = Math.min(...wo2.map((q) => q[0])), mx = Math.max(...wo2.map((q) => q[0])), mxy = Math.max(...wo2.map((q) => q[1])), mny = Math.min(...wo2.map((q) => q[1]))
         const loc2 = (pp) => pp.map(([a2, y]) => [r2(a2 - mn), r2(mxy - y)])
@@ -231,11 +246,9 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
   // par les gonds, qui s'arrêtent à 3 mm du bord : ils couvrent toute la longueur de la couverture (H + 2 × 9 mm), jusqu'au bout des blocs de charnière.
   // Leur bas descend jusqu'à la couverture dans ces bouts (là où il n'y a pas de planche) ; les bouts (BT) sont simplement collés contre les flancs, sans crans.
   const LZ = H + 2 * OVER_Z
-  const tabs = crans(H, t, OVER_Z)
-  const outerFlank = [[0, 0], [LZ, 0], [LZ, HW + t], [LZ - OVER_Z, HW + t], [LZ - OVER_Z, HW]]
-  for (const { u0, u1 } of [...tabs].sort((a, b) => b.u0 - a.u0)) outerFlank.push([u1, HW], [u1, HW + t], [u0, HW + t], [u0, HW])
-  outerFlank.push([OVER_Z, HW], [OVER_Z, HW + t], [0, HW + t])
-  const pages = [[EDGE, EDGE_LINE / 2 + 0.05, LZ - EDGE, EDGE_LINE / 2 + 0.05, EDGE_LINE], ...Array.from({ length: 13 }, (_, k) => [EDGE, PAGE + PAGE * k, LZ - EDGE, PAGE + PAGE * k])] // + un trait pile sur le bord du dessus (tout juste sur le bois : à 0,2 mm du bord), moitié moins large // 13 traits d'un bout à l'autre de la planche, espacés de 3 mm (le premier à 3 mm du trait du bord)
+  // le flanc extérieur (F-04) passe par-dessus la planche : il descend jusqu'à la couverture sur toute sa longueur et recouvre le chant de la planche (qui est donc 3 mm moins large de ce côté)
+  const outerFlank = [[0, 0], [LZ, 0], [LZ, HW + t], [0, HW + t]]
+  const pages = [[EDGE, EDGE_LINE / 2 + 0.05, LZ - EDGE, EDGE_LINE / 2 + 0.05, EDGE_LINE], ...Array.from({ length: 14 }, (_, k) => [EDGE, PAGE + PAGE * k, LZ - EDGE, PAGE + PAGE * k]), [EDGE, HW + t - EDGE_LINE / 2 - 0.05, LZ - EDGE, HW + t - EDGE_LINE / 2 - 0.05, EDGE_LINE]] // un trait fin sur le bord du haut, 14 traits de pages espacés de 3 mm, un trait fin juste au-dessus de la couverture
   const flankOuter = { id: 'FL', category: 'Pages', thickness: t, outer: outerFlank.map(([u, v]) => [r2(u), r2(v)]), rules: pages, rotation: [0, -90, 0] }
   // le flanc extérieur de la face de droite est tourné de 180° (contour symétrique) : sa face gravée regarde dehors (+x), comme celle du flanc de gauche (-x)
   panels.push({ ...flankOuter, rotation: free ? [0, 90, 0] : [0, -90, 0], position: [xw(free ? W - t / 2 : t / 2), yc(outerFlank, BASE + HW), 0] })
@@ -381,7 +394,7 @@ const knuckle = (side, holeR, gj = []) => {
 const faceUp = (pl) => {
   const umax = Math.max(...pl.outer.map((q) => q[0]))
   const fu = ([u, v]) => [r2(umax - u), v]
-  return { ...pl, outer: pl.outer.map(fu), holes: pl.holes?.map((h) => h.map(fu)), rules: pl.rules?.map(([x0, y0, x1, y1]) => [r2(umax - x0), y0, r2(umax - x1), y1]), rotation: [0, 180, 0] }
+  return { ...pl, outer: pl.outer.map(fu), holes: pl.holes?.map((h) => h.map(fu)), rules: pl.rules?.map(([x0, y0, x1, y1, ...w]) => [r2(umax - x0), y0, r2(umax - x1), y1, ...w]), rotation: [0, 180, 0] }
 }
 const spacerFor = (side, lines = false, flip = false, gj = []) => {
   // la cale épouse le rond de l'œil du gond d'en face : creux de rayon KN + 0,2 mm autour de l'axe
@@ -391,14 +404,41 @@ const spacerFor = (side, lines = false, flip = false, gj = []) => {
   const c0 = Math.min(...cxs), c1 = Math.max(...cxs)
   // la cale de droite (CLD) est rangée avec les faces (F) et porte les mêmes traits de pages que les flancs, d'un bout à l'autre du pied (sous le creux de l'œil)
   // mêmes hauteurs que les traits du gond de gauche (y = HALF - 6,5 - 3 k) : ils tombent en face les uns des autres ; ils s'arrêtent au décroché
-  const rules = side === 1 && lines ? Array.from({ length: 13 }, (_, k) => [KN + STEP_AT, KN - 3 + PAGE * k, FOOT - EDGE, KN - 3 + PAGE * k]) : undefined // traits de pages sur la plaque du bout (visible du dessus / du dessous)
+  // traits de pages sur la plaque du bout (visible du dessus / du dessous) : du bout du pied jusqu'au creux arrondi de l'œil (ils s'arrêtent sur son contour, ou au bord de la plaque
+  // sous lui), coupés autour des trous des goujons ; plus un trait fin juste au-dessus de la couverture
+  const holesC = gj.map(([x, y]) => ({ u: x - AXIS[0] - c0, v: HALF - y }))
+  const rules = side === 1 && lines
+    ? [
+        // un trait de 0,6 mm est un rectangle qui dépasse de 0,3 mm ; on s'écarte du creux d'autant, mesuré sur le bord du trait le plus proche du centre du rond
+        ...Array.from({ length: 14 }, (_, k) => KN - 3 + PAGE * k).flatMap((v) => lineAround(Math.max(...[v - 0.3, v + 0.3].map((w) => (Math.abs(w) < R ? Math.sqrt(R * R - w * w) : 0))) + 0.7, FOOT - EDGE, v, holesC)),
+        ...lineAround(EDGE, FOOT - EDGE, HALF - t - EDGE_LINE / 2 - 0.05, holesC, EDGE_LINE),
+        // un trait fin pile sur le bord du haut (comme sur F-04) : en deux morceaux, avant et après le décroché (le bord descend de 3 mm), à 0,2 mm du bord
+        [r2(R + 0.7), EDGE_LINE / 2 + 0.05, r2(KN + STEP_AT - 0.5), EDGE_LINE / 2 + 0.05, EDGE_LINE],
+        [r2(KN + STEP_AT + 0.5), STEP + EDGE_LINE / 2 + 0.05, FOOT - EDGE, STEP + EDGE_LINE / 2 + 0.05, EDGE_LINE],
+      ]
+    : undefined
   const sp = { id: side === 1 ? 'CLD' : 'CLG', category: side === 1 ? 'Pages' : 'Gond', thickness: t, rules, outer: cp.map(([x, y]) => [r2(x - c0), r2(HALF - y)]), holes: gj.map(([x, y]) => GJ_HOLE(x - AXIS[0] - c0, HALF - y)), position: [AXIS[0] + (c0 + c1) / 2, (t + HALF) / 2, 0], rotation: [0, 0, 0] }
   return sp.rules && flip ? faceUp(sp) : sp
 }
 const hingeParts = () => {
   // le gond de gauche (GG) est rangé avec les faces (F) et porte lui aussi des traits de pages, du bout du pied jusqu'avant l'œil
-  const ggRules = Array.from({ length: 13 }, (_, k) => [EDGE, 16 + PAGE * k, FOOT - KN - STEP_AT, 16 + PAGE * k]) // traits de pages du gond de gauche (plaque du bout), jusqu'au décroché
+  // traits de pages du gond de gauche (plaque du bout) : du bord du pied jusqu'au rond de la charnière (l'œil de rayon KN centré à v = KN du haut) ; les traits qui
+  // rencontrent le rond s'arrêtent sur son contour, les autres vont jusqu'au bord de la plaque (x = 0), à 0,6 mm près pour rester sur le bois
   const gjL = GJ_SIDE(false), gjR = GJ_SIDE(true)
+  const y1 = HALF + KN
+  const holesG = gjL.map(([x, y]) => ({ u: x - AXIS[0] + FOOT, v: y1 - y }))
+  const ggRules = [
+    ...Array.from({ length: 14 }, (_, k) => 16 + PAGE * k).flatMap((v) => {
+      const dv = v - KN
+      // un trait qui croiserait le rond de la charnière (l'œil de rayon KN) s'arrête juste avant lui, côté pied ; les autres vont jusqu'au bord de la plaque (x = 0)
+      const reach = Math.max(...[dv - 0.3, dv + 0.3].map((d) => (Math.abs(d) < KN ? Math.sqrt(KN * KN - d * d) : 0)))
+      return lineAround(EDGE, reach > 0 ? FOOT - reach - 0.7 : FOOT - 0.7, v, holesG)
+    }),
+    ...lineAround(EDGE, FOOT - 0.6, y1 - t - EDGE_LINE / 2 - 0.05, holesG, EDGE_LINE), // un trait fin juste au-dessus de la couverture
+    // un trait fin pile sur le bord du haut du pied (comme sur F-04) : en deux morceaux, avant et après le décroché (le bord remonte de 3 mm)
+    [EDGE, r2(y1 - (HALF - STEP) + EDGE_LINE / 2 + 0.05), r2(FOOT - KN - STEP_AT - 0.5), r2(y1 - (HALF - STEP) + EDGE_LINE / 2 + 0.05), EDGE_LINE],
+    [r2(FOOT - KN - STEP_AT + 0.5), r2(y1 - HALF + EDGE_LINE / 2 + 0.05), r2(FOOT - KN - 0.5), r2(y1 - HALF + EDGE_LINE / 2 + 0.05), EDGE_LINE],
+  ]
   const gg = knuckle(-1, AXLE_R, gjL), gd = knuckle(1, AXLE_R + PLAY, gjR) // le gond du milieu (GD) tourne : trou de 0,2 mm plus grand de chaque côté
   const plate = (id, k, rules, flip = false) => {
     const pl = { id, category: id === 'GG' ? 'Pages' : 'Gond', thickness: t, rules, outer: k.outer, holes: k.holes, position: [AXIS[0] + k.center[0], k.center[1], 0], rotation: [0, 0, 0] }
@@ -438,7 +478,7 @@ const TXT_STEP = 11
 right[0].labels = blurb.flatMap((text, k) => (text ? [{ text, x: r2((W + OVER) / 2 - markSize(text, BH_TXT).w / 2), y: r2((H + 2 * OVER_Z) / 2 - (blurb.length * TXT_STEP) / 2 + k * TXT_STEP), h: BH_TXT }] : []))
 // quatre groupes pour la vue 3D et les planches (un groupe = les planches dont l'id a les mêmes lettres) : B = toutes les pièces des mini boîtes
 // (couvercle, fond, parois), CH = les blocs de la charnière (gond de droite, cale de gauche, ronds et goujons de l'axe), CN = les coins en L (plaques de face et ailes), marron foncé ; F = tout le reste (faces, quadrillage, gond de gauche et cale de droite)
-const GROUP = { T: 'B', BF: 'B', BA: 'B', BB: 'B', GG: 'F', CLD: 'F', CO: 'CN', CW: 'CN', GD: 'CH', CLG: 'CH', RO: 'CH', G: 'CH' }
+const GROUP = { T: 'B', BF: 'B', BA: 'B', BB: 'B', GG: 'F', CLD: 'F', CO: 'CN', CW: 'CN', LQ: 'CH', RB: 'CH', AL: 'CH', TQ: 'CH', GD: 'CH', CLG: 'CH', RO: 'CH', G: 'CH' }
 const flat = [...left, ...right].map((p) => ({ ...p, id: GROUP[p.id] ?? 'F' }))
 
 // ---- livre debout : tout le modèle tourne de 90° autour de x (le plan des couvertures devient vertical, face au spectateur) ----
