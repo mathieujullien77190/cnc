@@ -36,6 +36,7 @@ const BOXX = CELLX - 2 * PLAY // 51,6 : boîte hors tout
 const BOXZ = CELLZ - 2 * PLAY // 59,6
 const LIDWX = PITX - 2 * PLAY // 57,6 : couvercle (déborde de 3 mm de la boîte, repose sur le quadrillage doublé)
 const LIDWZ = PITZ - 2 * PLAY // 65,6
+const CT = 2 // épaisseur des coins marron (plaque de face et ailes)
 const CORNER_B = 16 // largeur d'un bras
 const CORNER_R = 16 // rayon du creux arrondi dans l'angle
 // couleurs des boîtes (la vue 3D colore par catégorie) : les boîtes 1 et 24 en rouge (comme la couverture), les 22 autres en beige
@@ -126,7 +127,7 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
   const stars = []
   // répartition régulière (meilleur candidat) : à chaque étoile, on tire 40 positions et on garde la plus éloignée des étoiles déjà posées ; les croix doubles (avec diagonale)
   // sont les plus grandes (rayon 4,5 à 7 mm), les simples plus petites (1,5 à 3,5 mm)
-  const BAND_HALF = free ? 70 : 34 // bande du milieu laissée libre : le poème au dos (de 79 à 195 mm), le titre devant
+  const BAND_HALF = free ? 70 : 34 // bande du milieu laissée libre : le dos (de 79 à 195 mm), où est gravé le poème (3 lignes centrées), le titre devant
   const free2 = (x, y) => !((x < CK + 4 || x > WC - CK - 4) && (y < CK + 4 || y > HC - CK - 4)) && !(y > HC / 2 - BAND_HALF && y < HC / 2 + BAND_HALF)
   const M = 11 + 10 + 7 // une étoile reste à 1 cm au moins du cadre intérieur (à 11 mm du bord), croix la plus grande comprise (rayon 7)
   for (let n = 0; n < (free ? 7 : 14); n++) { // moins d'étoiles au dos (7) que devant (14)
@@ -162,7 +163,7 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
   // l'angle, étoile ajourée) qui déborde de 3 mm au-delà du bord, et sous ce débord des ailes de 3 mm appliquées sur les côtés qui touchent l'angle : en haut /
   // en bas (aile de bout) et, côté dehors, le long du bord libre (aile du bord libre). Côté charnière, pas d'aile du bord libre ni de débord le long du bord
   // (l'écart entre les faces n'est que de 1 mm). Les ailes sont les mêmes L que la plaque de face, sans l'étoile.
-  const OUT = 3 // le coin dépasse de 3 mm du livre
+  const OUT = CT // le coin dépasse de 2 mm du livre
   for (const xc of [bx, bx + W])
     for (const zc of [-H / 2 - OVER_Z, H / 2 + OVER_Z]) {
       const sx = xc === bx ? 1 : -1 // sens des bras en x depuis le coin (vers l'intérieur)
@@ -173,7 +174,7 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
       const lOf = (bu) => [[0, 0], [CORNER_A, 0], [CORNER_A, CORNER_B], [bu + CORNER_R, CORNER_B], ...Array.from({ length: 9 }, (_, k) => [bu + CORNER_R + CORNER_R * Math.cos(((-90 - (k + 1) * 10) * Math.PI) / 180), CORNER_B + CORNER_R + CORNER_R * Math.sin(((-90 - (k + 1) * 10) * Math.PI) / 180)]), [bu, CORNER_B + CORNER_R], [bu, CORNER_A], [0, CORNER_A]]
       const L0 = lOf(CORNER_B)
       // les ailes qui s'emboîtent (languettes de 3 mm sur leur bord) : le bras le long de v fait 13 mm de corps + 3 mm de languettes = 16 mm, comme l'autre bras
-      const L0w = lOf(CORNER_B - t)
+      const L0w = lOf(CORNER_B - CT)
       // petit crénelage, propre aux coins et uniforme partout où deux pièces de coin se touchent (plaque ↔ ailes, aile ↔ aile) : mêmes dents de 6 mm environ,
       // nombre impair, une dent sur deux, bouts droits, sur les bras de 59,5 mm (4 languettes)
       const small = (d) => {
@@ -181,14 +182,14 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
         const sg = CORNER_A / n
         return Array.from({ length: Math.floor(n / 2) }, (_, i) => ({ u0: r2((2 * i + 1) * sg), u1: r2((2 * i + 2) * sg), d }))
       }
-      const spans = small(t)
+      const spans = small(CT)
       const spansX = spans
-      const notchesZ = spans.flatMap(({ u0, u1 }) => [[u0, -OUT], [u0, -OUT + t], [u1, -OUT + t], [u1, -OUT]])
-      const notchesX = outerX ? [...spansX].reverse().flatMap(({ u0, u1 }) => [[-ex, u1], [-ex + t, u1], [-ex + t, u0], [-ex, u0]]) : []
+      const notchesZ = spans.flatMap(({ u0, u1 }) => [[u0, -OUT], [u0, -OUT + CT], [u1, -OUT + CT], [u1, -OUT]])
+      const notchesX = outerX ? [...spansX].reverse().flatMap(({ u0, u1 }) => [[-ex, u1], [-ex + CT, u1], [-ex + CT, u0], [-ex, u0]]) : []
       // petits crans entre la plaque de face (à ras du bord) et les ailes : la plaque a des languettes de 3 mm qui sortent de son bord et entrent dans des encoches du bas des ailes
       // (les ailes descendent de 3 mm, jusqu'à l'épaisseur de la plaque, et touchent son chant) ; elles restent dans l'épaisseur de l'aile, rien ne dépasse
-      const tabsZ = spans.flatMap(({ u0, u1 }) => [[u0, 0], [u0, -t], [u1, -t], [u1, 0]])
-      const tabsXe = outerX ? [...spansX].reverse().flatMap(({ u0, u1 }) => [[0, u1], [-t, u1], [-t, u0], [0, u0]]) : []
+      const tabsZ = spans.flatMap(({ u0, u1 }) => [[u0, 0], [u0, -CT], [u1, -CT], [u1, 0]])
+      const tabsXe = outerX ? [...spansX].reverse().flatMap(({ u0, u1 }) => [[0, u1], [-CT, u1], [-CT, u0], [0, u0]]) : []
       // les angles de la plaque qui ne touchent aucune autre pièce de coin et ne sont pas au bord crénelé (bouts des deux bras, côté intérieur) sont arrondis (rayon 5)
       const RT = 5
       const arcAt = (cu, cv, a0, a1) => Array.from({ length: 7 }, (_, k) => [r2(cu + RT * Math.cos(((a0 + ((a1 - a0) * k) / 6) * Math.PI) / 180)), r2(cv + RT * Math.sin(((a0 + ((a1 - a0) * k) / 6) * Math.PI) / 180))])
@@ -207,21 +208,21 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
       const wo = world(L)
       const mnx = Math.min(...wo.map((q) => q[0])), mxx = Math.max(...wo.map((q) => q[0])), mnz = Math.min(...wo.map((q) => q[1])), mxz = Math.max(...wo.map((q) => q[1]))
       const loc = (pts) => pts.map(([x, z]) => [r2(x - mnx), r2(z - mnz)])
-      panels.push({ id: 'CO', category: 'Coin', thickness: t, outer: loc(wo), holes: [loc(world(star))], position: [(mnx + mxx) / 2, -t / 2, (mnz + mxz) / 2], rotation: [-90, 0, 0] })
+      panels.push({ id: 'CO', category: 'Coin', thickness: CT, outer: loc(wo), holes: [loc(world(star))], position: [(mnx + mxx) / 2, -CT / 2, (mnz + mxz) / 2], rotation: [-90, 0, 0] })
       // les deux ailes d'un même coin se touchent et s'emboîtent : l'aile de bout (z) a 2 languettes de 3 mm qui traversent 2 encoches de l'aile du bord libre (x),
       // dont le bord déborde de 3 mm pour couvrir l'angle
-      const IL = small(t).map(({ u0, u1 }) => ({ v1: u0, v2: u1 })) // languettes d'emboîtement : le même petit crénelage uniforme
+      const IL = small(CT).map(({ u0, u1 }) => ({ v1: u0, v2: u1 })) // languettes d'emboîtement : le même petit crénelage uniforme
       const wing = (xs, along, rot, pos, ws, kind, mate = true) => {
         // xs : origine le long du côté ; along : sens du côté vers l'intérieur ; ws : crans du bord bas (dans la plaque de face)
-        const bottom = ws.flatMap(({ u0, u1 }) => [[u0, 0], [u0, t], [u1, t], [u1, 0]]) // encoches du bas : les languettes de la plaque de face y entrent
+        const bottom = ws.flatMap(({ u0, u1 }) => [[u0, 0], [u0, CT], [u1, CT], [u1, 0]]) // encoches du bas : les languettes de la plaque de face y entrent
         const desc = [...IL].reverse()
         const pts = kind === 'z'
-          ? [[0, 0], ...bottom, ...(mate ? L0w : L0).slice(1), ...(mate ? desc.flatMap(({ v1, v2 }) => [[0, v2], [-t, v2], [-t, v1], [0, v1]]) : [])] // pas d'aile voisine côté charnière : bord droit
+          ? [[0, 0], ...bottom, ...(mate ? L0w : L0).slice(1), ...(mate ? desc.flatMap(({ v1, v2 }) => [[0, v2], [-CT, v2], [-CT, v1], [0, v1]]) : [])] // pas d'aile voisine côté charnière : bord droit
           : [[-OUT, 0], ...bottom, [CORNER_A, 0], ...L0w.slice(2, -1), [-OUT, CORNER_A], ...desc.flatMap(({ v1, v2 }) => [[-OUT, v2], [0, v2], [0, v1], [-OUT, v1]])]
-        const wo2 = pts.map(([u, v]) => [xs + along * u, v - t]) // l'aile descend de 3 mm : son pied est à la hauteur de la plaque de face (y de -3 à 0)
+        const wo2 = pts.map(([u, v]) => [xs + along * u, v - CT]) // l'aile descend de 3 mm : son pied est à la hauteur de la plaque de face (y de -3 à 0)
         const mn = Math.min(...wo2.map((q) => q[0])), mx = Math.max(...wo2.map((q) => q[0])), mxy = Math.max(...wo2.map((q) => q[1])), mny = Math.min(...wo2.map((q) => q[1]))
         const loc2 = (pp) => pp.map(([a2, y]) => [r2(a2 - mn), r2(mxy - y)])
-        return { id: 'CW', category: 'Coin', thickness: t, outer: loc2(wo2), rotation: rot, position: pos((mn + mx) / 2, (mny + mxy) / 2) }
+        return { id: 'CW', category: 'Coin', thickness: CT, outer: loc2(wo2), rotation: rot, position: pos((mn + mx) / 2, (mny + mxy) / 2) }
       }
       panels.push(wing(xc, sx, [0, 0, 0], (c, y) => [c, y, zc + sz * (-OUT / 2)], spans, 'z', outerX))
       if (outerX) panels.push(wing(zc, sz, [0, -90, 0], (c, y) => [xc - sx * (OUT / 2), y, c], spansX, 'x'))
@@ -469,13 +470,10 @@ const hinges = hingeParts()
 
 const left = [...half(-W, 0), ...hinges.left, ...dowels]
 const right = [...half(OPEN_GAP, NX, { free: true }), ...hinges.right]
-const title = (text, h, dy) => ({ text, x: r2((W + OVER) / 2 - markSize(text, h).w / 2), y: r2((H + 2 * OVER_Z) / 2 - h / 2 + dy), h, font: 'round' }) // même police arrondie que les numéros
-left[0].labels = [title('CALENDRIER', 18, -14), title("DE L'AVENT", 18, 14)]
-// quatrième de couverture : un court poème gravé, dans l'esprit des marchombres, signé Ellundril Chariakin (police à segments : majuscules sans accents ni virgules), centré
-const blurb = ['UN MARCHOMBRE NE PRESSE PAS', 'LE TEMPS,', "IL APPREND A L'HABITER.", 'SUR LA VOIE, AVANCE LEGER,', 'SANS COMPTER.', '', 'VINGT-QUATRE JOURS,', 'VINGT-QUATRE SECRETS,', 'ET LA LUMIERE DE NOEL.', '', '- ELLUNDRIL CHARIAKIN']
-const BH_TXT = 6 // hauteur des lettres
-const TXT_STEP = 11
-right[0].labels = blurb.flatMap((text, k) => (text ? [{ text, x: r2((W + OVER) / 2 - markSize(text, BH_TXT).w / 2), y: r2((H + 2 * OVER_Z) / 2 - (blurb.length * TXT_STEP) / 2 + k * TXT_STEP), h: BH_TXT }] : []))
+const title = (text, h, dy) => ({ text, x: r2((W + OVER) / 2 - markSize(text, h, 'script').w / 2), y: r2((H + 2 * OVER_Z) / 2 - h / 2 + dy), h, font: 'script' }) // écriture manuscrite (Astoria) ; les numéros des boîtes gardent la police arrondie
+left[0].labels = [title('Calendrier', 18, -15), title("de l'Avent", 18, 15)]
+// le dos (couverture de droite) : le poème gravé, centré sur trois lignes (manuscrite, casse et accents naturels ; h = capitales, les jambages descendent de 0,35 h), dans la bande laissée libre au milieu
+right[0].labels = [title('Attente impatiente,', 12.5, -20), title('Joie insouciante,', 12.5, 0), title('Crépitement des flammes.', 12.5, 20)]
 // quatre groupes pour la vue 3D et les planches (un groupe = les planches dont l'id a les mêmes lettres) : B = toutes les pièces des mini boîtes
 // (couvercle, fond, parois), CH = les blocs de la charnière (gond de droite, cale de gauche, ronds et goujons de l'axe), CN = les coins en L (plaques de face et ailes), marron foncé ; F = tout le reste (faces, quadrillage, gond de gauche et cale de droite)
 const GROUP = { T: 'B', BF: 'B', BA: 'B', BB: 'B', GG: 'F', CLD: 'F', CO: 'CN', CW: 'CN', LQ: 'CH', RB: 'CH', AL: 'CH', TQ: 'CH', GD: 'CH', CLG: 'CH', RO: 'CH', G: 'CH' }

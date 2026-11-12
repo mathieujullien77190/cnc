@@ -172,6 +172,19 @@ try {
   check(single > 0 && double > 0, `${single} noms en un seul trait (minuscules), ${double} en trait double`)
   check(!missing.includes('G-46') && !missing.includes('G-47'), `pièces sans nom faute de place : ${[...new Set(missing)].join(', ') || 'aucune'}`)
 
+  // police manuscrite (textes gravés du livre de l'Avent) : un tracé par lettre, largeur proportionnelle, accents composés, texte vide sans plantage
+  const { markSize: scriptSize } = await server.ssrLoadModule('/src/core/marking.ts')
+  const poem = ['Attente impatiente,', 'Joie insouciante,', 'Crépitement des flammes.', 'Calendrier', "de l'Avent"]
+  check(poem.every((t) => [...t].filter((c) => c !== ' ').every((c) => digitRects(c, 0, 0, 10, 2, 'script').length > 0)), 'police manuscrite : chaque lettre du titre et du poème a un tracé')
+  check(digitRects('', 0, 0, 10, 2, 'script').length === 0 && scriptSize('', 10, 'script').w === 0, 'police manuscrite : texte vide sans plantage')
+  const wi = scriptSize('i', 10, 'script').w
+  const wm = scriptSize('m', 10, 'script').w
+  check(wm > wi * 1.5 && Math.abs(scriptSize('im', 10, 'script').w - (wi + wm)) < 3, `police manuscrite : largeurs proportionnelles (i ${wi.toFixed(1)} mm, m ${wm.toFixed(1)} mm)`)
+  check(digitRects('e', 0, 0, 10, 2, 'script').length < digitRects('é', 0, 0, 10, 2, 'script').length && scriptSize('é', 10, 'script').w === scriptSize('e', 10, 'script').w, 'police manuscrite : un accent ajoute un tracé sans changer la largeur')
+  const pr = poem.flatMap((t) => digitRects(t, 0, 0, 12.5, 2, 'script'))
+  check(pr.length < 4200 && pr.every((r) => r.length === 4 && r.flat().every(Number.isFinite)), `police manuscrite : ${pr.length} rectangles pour le poème et le titre, tous valides`)
+  check(digitRects('AB', 0, 0, 7).length === digitRects('ab', 0, 0, 7, 2, undefined).length, 'police à segments inchangée (casse ignorée, largeur à chasse fixe)')
+
   // parcours optimisé : déplacements à vide plus courts qu'au plus proche voisin, et le G-code les suit
   let sumNew = 0
   let sumOld = 0
@@ -230,7 +243,7 @@ try {
   const ct = crenelTestSheet(3, 300, 300).sheet
   const cmax = Math.max(...ct.items.map((i) => i.x + i.w))
   const cmin = Math.min(...ct.items.map((i) => i.y))
-  check(ct.items.length === 2 && conflicts(ct).size === 0 && ct.rejected.length === 0, 'essai de crantage : 2 plaques, sans conflit')
+  check(ct.items.length === 4 && conflicts(ct).size === 0 && ct.rejected.length === 0, 'essai de crantage : 4 petits bouts (2 paires), sans conflit')
   const { goujonTestSheet } = await server.ssrLoadModule('/src/models/goujonTest.ts')
   const gt = goujonTestSheet(3, 300, 300).sheet
   const gw = gt.items.filter((i) => i.part.id.startsWith('GJ')).map((i) => i.w).sort((a, b) => a - b)
