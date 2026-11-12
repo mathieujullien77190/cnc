@@ -182,7 +182,7 @@ try {
   check(wm > wi * 1.5 && Math.abs(scriptSize('im', 10, 'script').w - (wi + wm)) < 3, `police manuscrite : largeurs proportionnelles (i ${wi.toFixed(1)} mm, m ${wm.toFixed(1)} mm)`)
   check(digitRects('e', 0, 0, 10, 2, 'script').length < digitRects('é', 0, 0, 10, 2, 'script').length && scriptSize('é', 10, 'script').w === scriptSize('e', 10, 'script').w, 'police manuscrite : un accent ajoute un tracé sans changer la largeur')
   const pr = poem.flatMap((t) => digitRects(t, 0, 0, 12.5, 2, 'script'))
-  check(pr.length < 4200 && pr.every((r) => r.length === 4 && r.flat().every(Number.isFinite)), `police manuscrite : ${pr.length} rectangles pour le poème et le titre, tous valides`)
+  check(pr.length < 20000 && pr.every((r) => r.length >= 4 && r.flat().every(Number.isFinite)), `police manuscrite : ${pr.length} rectangles pour le poème et le titre, tous valides`)
   check(digitRects('AB', 0, 0, 7).length === digitRects('ab', 0, 0, 7, 2, undefined).length, 'police à segments inchangée (casse ignorée, largeur à chasse fixe)')
 
   // parcours optimisé : déplacements à vide plus courts qu'au plus proche voisin, et le G-code les suit

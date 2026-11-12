@@ -8,7 +8,7 @@ const { parse } = opentype
 const b = readFileSync(new URL('../fonts/Astoria.otf', import.meta.url))
 const font = parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.length))
 const CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.'-+:!? "
-const TOL = 3 // tolérance d'aplatissement (unités de 1/1000 em)
+const TOL = 1.5 // tolérance d'aplatissement (unités de 1/1000 em)
 
 const dist = (p, a, c) => {
   const dx = c[0] - a[0]

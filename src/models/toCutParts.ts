@@ -1,5 +1,5 @@
 import type { Pt } from '../core/types'
-import { digitRects } from '../core/marking'
+import { digitRects, filledWidths } from '../core/marking'
 import { snugPanel } from './snug'
 import { RULE_W, type Panel } from './types'
 
@@ -16,7 +16,7 @@ export const ruleRect = ([x0, y0, x1, y1, w]: [number, number, number, number] |
 }
 
 /** Rectangles gravés des textes et des traits d'une planche (même police que le nom). */
-export const labelRects = (p: Panel): Pt[][] => [...(p.labels ?? []).flatMap((l) => digitRects(l.text, l.x, l.y, l.h, 2, l.font)), ...(p.rules ?? []).map(ruleRect)].map(round)
+export const labelRects = (p: Panel): Pt[][] => [...(p.labels ?? []).flatMap((l) => digitRects(l.text, l.x, l.y, l.h, 2, l.font)), ...(p.rules ?? []).flatMap((r) => filledWidths(r[4] ?? RULE_W).map((w) => ruleRect([r[0], r[1], r[2], r[3], w])))].map(round)
 
 /** Clé des textes d'une planche : deux planches au même contour mais aux textes différents sont deux pièces. */
 const labelKey = (p: Panel) => [...(p.labels ?? []).map((l) => `${l.text}@${r3(l.x)},${r3(l.y)},${r3(l.h)}`), ...(p.rules ?? []).map((r) => r.map(r3).join(','))].join(';')

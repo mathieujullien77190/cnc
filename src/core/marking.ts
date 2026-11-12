@@ -114,6 +114,12 @@ const segmentRect = (a: Pt, b: Pt, w: number): Pt[] => {
 // (segments de largeur SCRIPT_STROKE) puis, là où le plein est épais, par un hachurage horizontal fin. Avance proportionnelle.
 const SCRIPT_STROKE = 0.5 // trait du contour, en mm (fixe : la finesse du laser ne dépend pas de la taille du texte)
 const SCRIPT_HATCH = 0.6 // pas du hachurage (mm), trait de 80 % du pas
+/** Largeurs de rectangles emboîtés (w, w - 0,25, … jusqu'à 0,1 mm) : le laser suit les contours, ils recouvrent tout le trait. */
+export const filledWidths = (w: number, step = 0.25, min = 0.1): number[] => {
+  const ws = [w]
+  while (ws[ws.length - 1] - step >= min) ws.push(ws[ws.length - 1] - step)
+  return ws
+}
 const SCRIPT_MIN_FILL = 0.4 // un plein de moins de cette largeur (mm) à l'intérieur du contour n'est pas hachuré
 
 /** Contours du texte manuscrit en unités de la police (y vers le haut) et largeur, après décalage pour que le bord gauche soit à 0. */
@@ -143,6 +149,17 @@ const scanSpans = (cs: number[][], yy: number): number[] => {
   return xs.sort((p, q) => p - q)
 }
 
+/** Angle de virage (rad) au sommet i d'un contour fermé à plat : les sommets presque droits n'ont pas besoin de jonction. */
+const turn = (c: number[], i: number) => {
+  const n = c.length / 2
+  const [p, q, r] = [(i + n - 1) % n, i, (i + 1) % n]
+  const d = Math.atan2(c[2 * r + 1] - c[2 * q + 1], c[2 * r] - c[2 * q]) - Math.atan2(c[2 * q + 1] - c[2 * p + 1], c[2 * q] - c[2 * p])
+  return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)))
+}
+
+/** Octogone de diamètre w centré en (x, y) : arrondit les jonctions entre segments successifs. */
+const joint = (x: number, y: number, w: number): Pt[] => Array.from({ length: 8 }, (_, k): Pt => [x + (w / 2) * Math.cos(((k + 0.5) * Math.PI) / 4), y + (w / 2) * Math.sin(((k + 0.5) * Math.PI) / 4)])
+
 const scriptRects = (text: string, x: number, y: number, h: number): Pt[][] => {
   const k = h / SCRIPT_CAP // mm par unité
   const { glyphs, x0 } = scriptLayout(text)
@@ -151,10 +168,11 @@ const scriptRects = (text: string, x: number, y: number, h: number): Pt[][] => {
   const out: Pt[][] = []
   const seg = (ax: number, ay: number, bx: number, by: number, w: number) => {
     if (Math.hypot(bx - ax, by - ay) < 1e-6) return
-    out.push(segmentRect(at(ax, ay), at(bx, by), w))
+    for (const sw of filledWidths(w)) out.push(segmentRect(at(ax, ay), at(bx, by), sw)) // le laser ne suit que les contours : traits emboîtés pour que l'intérieur soit brûlé aussi
   }
   for (const { g, pen } of glyphs) {
     for (const c of g.c) for (let i = 0, n = c.length / 2; i < n; i++) seg(pen + c[2 * i], c[2 * i + 1], pen + c[2 * ((i + 1) % n)], c[2 * ((i + 1) % n) + 1], SCRIPT_STROKE)
+    for (const c of g.c) for (let i = 0, n = c.length / 2; i < n; i++) if (turn(c, i) > 0.15) out.push(joint(...at(pen + c[2 * i], c[2 * i + 1]), SCRIPT_STROKE)) // sommet arrondi : pas d'encoche entre deux segments
     for (const c of g.o ?? []) for (let i = 0; i + 3 < c.length; i += 2) seg(pen + c[i], c[i + 1], pen + c[i + 2], c[i + 3], SCRIPT_STROKE * 1.2)
     if (!g.c.length) continue
     const step = SCRIPT_HATCH / k
