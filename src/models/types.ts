@@ -62,8 +62,8 @@ export const RULE_W = 0.6
 
 export interface PanelLabel {
   text: string
-  /** `round` : chiffres arrondis (numéros de jours) ; absent : police à segments. */
-  font?: 'round'
+  /** `round` : chiffres arrondis (numéros de jours) ; `script` : manuscrite (Astoria, casse et accents) ; absent : police à segments. */
+  font?: 'round' | 'script'
   x: number
   y: number
   h: number
