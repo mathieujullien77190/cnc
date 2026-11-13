@@ -11,7 +11,7 @@ Le moteur des modèles 3D. Les modèles eux-mêmes sont des fichiers `models/<id
 | `toCutParts.ts` | `finishPanels` (serrage puis numérotation : un numéro par contour distinct, dessins compris), `panelsToCutParts` (→ fichier `cnc-parts`) |
 | `snug.ts` | Serrage de 0,4 mm des crans dont la profondeur est un multiple de l'épaisseur (`snugDepths`) |
 | `helpers.ts`, `testbrick.ts`, `edges.ts` | Contours crantés (`plateOutline`, `windowsFor`), `rect`, `circle` : servent aux scripts qui génèrent un modèle et aux planches d'essai |
-| `crenelTest.ts`, `goujonTest.ts` | Planches d'essai (crantage, goujons) ; le crantage = petits bouts, une paire par sorte de crans (16 mm, 6 mm des coins) du bloc « Test » |
+| `crenelTest.ts`, `goujonTest.ts` | Planches d'essai (crantage, goujons) ; le crantage = petits bouts, les petits crans de 6 mm des coins en deux couples (encoches à +0,1 et +0,2 mm) du bloc « Test » |
 | `validate.ts` | Traits résiduels d'un contour (`panelIssues`), nom gravé mal posé (`markIssues`) : utilisé par `check` |
 | `solid.ts` | Pièce pleine d'un seul tenant (`solid` d'une planche `cut: false`, cuve imprimée en 3D) : grille de cellules, longueurs codées, faces extérieures |
 | `viewer3d.ts` | Scène three.js : extrusion des planches, couleurs par catégorie, tranche plus foncée, éclaté, sélection, mesure, coupe par un plan (x, y ou z), planches cachées, noms masquables (`setMarks`, les textes et dessins du modèle restent et ne sont montrés que sur la face avant). Reste hors du store |

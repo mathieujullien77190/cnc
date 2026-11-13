@@ -243,12 +243,12 @@ try {
   const ct = crenelTestSheet(3, 300, 300).sheet
   const cmax = Math.max(...ct.items.map((i) => i.x + i.w))
   const cmin = Math.min(...ct.items.map((i) => i.y))
-  check(ct.items.length === 4 && conflicts(ct).size === 0 && ct.rejected.length === 0, 'essai de crantage : 4 petits bouts (2 paires), sans conflit')
+  check(ct.items.length === 4 && conflicts(ct).size === 0 && ct.rejected.length === 0, 'essai de crantage : 4 petits bouts (2 couples languettes / encoches de coin), sans conflit')
   const { goujonTestSheet } = await server.ssrLoadModule('/src/models/goujonTest.ts')
   const gt = goujonTestSheet(3, 300, 300).sheet
   const gw = gt.items.filter((i) => i.part.id.startsWith('GJ')).map((i) => i.w).sort((a, b) => a - b)
   check(gt.items.length === 6 && conflicts(gt).size === 0 && gt.rejected.length === 0 && gw.join() === '3,3.1,3.2,3.3,3.4' && gt.items.some((i) => i.part.id.startsWith('GT') && i.holes.length === 1), 'essai de goujons : 1 mini planche trouée + 5 goujons de 3 à 3,4 mm, sans conflit')
-  check(cmax < 90 && cmin > 300 - 100, `essai de crantage : regroupé contre l'origine (x max ${cmax.toFixed(0)} mm, y haut ${cmin.toFixed(0)} mm sur 300)`)
+  check(cmax < 150 && cmin > 300 - 40, `essai de crantage : regroupé contre l'origine (x max ${cmax.toFixed(0)} mm, y haut ${cmin.toFixed(0)} mm sur 300)`)
 
   // planche d'essai puissance × vitesse
   const { buildTestCard, spread } = await server.ssrLoadModule('/src/laser/grbl/gcode.ts')

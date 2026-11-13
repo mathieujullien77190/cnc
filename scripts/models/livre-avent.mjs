@@ -36,7 +36,9 @@ const BOXX = CELLX - 2 * PLAY // 51,6 : boîte hors tout
 const BOXZ = CELLZ - 2 * PLAY // 59,6
 const LIDWX = PITX - 2 * PLAY // 57,6 : couvercle (déborde de 3 mm de la boîte, repose sur le quadrillage doublé)
 const LIDWZ = PITZ - 2 * PLAY // 65,6
-const CT = 2 // épaisseur des coins marron (plaque de face et ailes)
+const CT = 3 // épaisseur des coins marron (plaque de face et ailes) : crans de 3 mm
+const TAB_PLUS = 0.2 // toutes les languettes des coins : 0,2 mm plus larges que la dent nominale (6,42 pour 6,22) ; pas de serrage automatique sur les coins (snugDepths []), les cotes sont posées ici
+const NOTCH_MINUS = 0.2 // toutes les encoches des coins : 0,2 mm plus étroites que la dent nominale (6,02 pour 6,22), donc toutes les mêmes
 const CORNER_B = 16 // largeur d'un bras
 const CORNER_R = 16 // rayon du creux arrondi dans l'angle
 // couleurs des boîtes (la vue 3D colore par catégorie) : les boîtes 1 et 24 en rouge (comme la couverture), les 22 autres en beige
@@ -183,13 +185,14 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
         return Array.from({ length: Math.floor(n / 2) }, (_, i) => ({ u0: r2((2 * i + 1) * sg), u1: r2((2 * i + 2) * sg), d }))
       }
       const spans = small(CT)
+      const spansT = spans.map(({ u0, u1, d }) => ({ u0: u0 - TAB_PLUS / 2, u1: u1 + TAB_PLUS / 2, d })) // languettes
       const spansX = spans
       const notchesZ = spans.flatMap(({ u0, u1 }) => [[u0, -OUT], [u0, -OUT + CT], [u1, -OUT + CT], [u1, -OUT]])
       const notchesX = outerX ? [...spansX].reverse().flatMap(({ u0, u1 }) => [[-ex, u1], [-ex + CT, u1], [-ex + CT, u0], [-ex, u0]]) : []
       // petits crans entre la plaque de face (à ras du bord) et les ailes : la plaque a des languettes de 3 mm qui sortent de son bord et entrent dans des encoches du bas des ailes
       // (les ailes descendent de 3 mm, jusqu'à l'épaisseur de la plaque, et touchent son chant) ; elles restent dans l'épaisseur de l'aile, rien ne dépasse
-      const tabsZ = spans.flatMap(({ u0, u1 }) => [[u0, 0], [u0, -CT], [u1, -CT], [u1, 0]])
-      const tabsXe = outerX ? [...spansX].reverse().flatMap(({ u0, u1 }) => [[0, u1], [-CT, u1], [-CT, u0], [0, u0]]) : []
+      const tabsZ = spansT.flatMap(({ u0, u1 }) => [[u0, 0], [u0, -CT], [u1, -CT], [u1, 0]])
+      const tabsXe = outerX ? [...spansT].reverse().flatMap(({ u0, u1 }) => [[0, u1], [-CT, u1], [-CT, u0], [0, u0]]) : []
       // les angles de la plaque qui ne touchent aucune autre pièce de coin et ne sont pas au bord crénelé (bouts des deux bras, côté intérieur) sont arrondis (rayon 5)
       const RT = 5
       const arcAt = (cu, cv, a0, a1) => Array.from({ length: 7 }, (_, k) => [r2(cu + RT * Math.cos(((a0 + ((a1 - a0) * k) / 6) * Math.PI) / 180)), r2(cv + RT * Math.sin(((a0 + ((a1 - a0) * k) / 6) * Math.PI) / 180))])
@@ -208,21 +211,21 @@ const half = (bx, colOff, { free = false, big = null } = {}) => {
       const wo = world(L)
       const mnx = Math.min(...wo.map((q) => q[0])), mxx = Math.max(...wo.map((q) => q[0])), mnz = Math.min(...wo.map((q) => q[1])), mxz = Math.max(...wo.map((q) => q[1]))
       const loc = (pts) => pts.map(([x, z]) => [r2(x - mnx), r2(z - mnz)])
-      panels.push({ id: 'CO', category: 'Coin', thickness: CT, outer: loc(wo), holes: [loc(world(star))], position: [(mnx + mxx) / 2, -CT / 2, (mnz + mxz) / 2], rotation: [-90, 0, 0] })
+      panels.push({ id: 'CO', category: 'Coin', thickness: CT, snugDepths: [], outer: loc(wo), holes: [loc(world(star))], position: [(mnx + mxx) / 2, -CT / 2, (mnz + mxz) / 2], rotation: [-90, 0, 0] })
       // les deux ailes d'un même coin se touchent et s'emboîtent : l'aile de bout (z) a 2 languettes de 3 mm qui traversent 2 encoches de l'aile du bord libre (x),
       // dont le bord déborde de 3 mm pour couvrir l'angle
       const IL = small(CT).map(({ u0, u1 }) => ({ v1: u0, v2: u1 })) // languettes d'emboîtement : le même petit crénelage uniforme
       const wing = (xs, along, rot, pos, ws, kind, mate = true) => {
         // xs : origine le long du côté ; along : sens du côté vers l'intérieur ; ws : crans du bord bas (dans la plaque de face)
-        const bottom = ws.flatMap(({ u0, u1 }) => [[u0, 0], [u0, CT], [u1, CT], [u1, 0]]) // encoches du bas : les languettes de la plaque de face y entrent
-        const desc = [...IL].reverse()
+        const bottom = ws.flatMap(({ u0, u1 }) => [[u0 + NOTCH_MINUS / 2, 0], [u0 + NOTCH_MINUS / 2, CT], [u1 - NOTCH_MINUS / 2, CT], [u1 - NOTCH_MINUS / 2, 0]]) // encoches du bas : les languettes de la plaque de face y entrent
+        const desc = [...IL].reverse().map(({ v1, v2 }) => (kind === 'z' ? { v1: v1 - TAB_PLUS / 2, v2: v2 + TAB_PLUS / 2 } : { v1: v1 + NOTCH_MINUS / 2, v2: v2 - NOTCH_MINUS / 2 })) // aile de bout : languettes ; aile du bord libre : encoches
         const pts = kind === 'z'
           ? [[0, 0], ...bottom, ...(mate ? L0w : L0).slice(1), ...(mate ? desc.flatMap(({ v1, v2 }) => [[0, v2], [-CT, v2], [-CT, v1], [0, v1]]) : [])] // pas d'aile voisine côté charnière : bord droit
           : [[-OUT, 0], ...bottom, [CORNER_A, 0], ...L0w.slice(2, -1), [-OUT, CORNER_A], ...desc.flatMap(({ v1, v2 }) => [[-OUT, v2], [0, v2], [0, v1], [-OUT, v1]])]
         const wo2 = pts.map(([u, v]) => [xs + along * u, v - CT]) // l'aile descend de 3 mm : son pied est à la hauteur de la plaque de face (y de -3 à 0)
         const mn = Math.min(...wo2.map((q) => q[0])), mx = Math.max(...wo2.map((q) => q[0])), mxy = Math.max(...wo2.map((q) => q[1])), mny = Math.min(...wo2.map((q) => q[1]))
         const loc2 = (pp) => pp.map(([a2, y]) => [r2(a2 - mn), r2(mxy - y)])
-        return { id: 'CW', category: 'Coin', thickness: CT, outer: loc2(wo2), rotation: rot, position: pos((mn + mx) / 2, (mny + mxy) / 2) }
+        return { id: 'CW', category: 'Coin', thickness: CT, snugDepths: [], outer: loc2(wo2), rotation: rot, position: pos((mn + mx) / 2, (mny + mxy) / 2) }
       }
       panels.push(wing(xc, sx, [0, 0, 0], (c, y) => [c, y, zc + sz * (-OUT / 2)], spans, 'z', outerX))
       if (outerX) panels.push(wing(zc, sz, [0, -90, 0], (c, y) => [xc - sx * (OUT / 2), y, c], spansX, 'x'))
