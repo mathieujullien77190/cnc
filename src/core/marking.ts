@@ -211,6 +211,20 @@ export const digitRects = (text: string, x: number, y: number, h: number, passes
   return out
 }
 
+/** Lignes centrales des traits d'un texte (polylignes, mm, mêmes cases que `digitRects` : coin haut-gauche en (x, y), hauteur h, y vers le bas) et largeur d'un trait. Servent à tracer un contour par passe sans repasser sur les petits segments. Pas de `script` (écriture pleine). */
+export const digitStrokes = (text: string, x: number, y: number, h: number, font?: MarkFont): { strokes: Pt[][]; width: number } => {
+  const k = h / GLYPH_H
+  const w = textW([...text].length)
+  const at = ([px, py]: Pt): Pt => [x + Math.min(Math.max(px, 0), w) * k, y + h - Math.min(Math.max(py, 0), GLYPH_H) * k]
+  const strokes: Pt[][] = []
+  ;[...text.toUpperCase()].forEach((ch, i) => {
+    const x0 = i * ADVANCE + STROKE / 2
+    const y0 = STROKE / 2
+    for (const stroke of (font === 'round' ? ROUND_FONT[ch] : undefined) ?? FONT[ch] ?? []) strokes.push(stroke.map(([sx, sy]) => at([x0 + sx * UNIT, y0 + sy * UNIT])))
+  })
+  return { strokes, width: STROKE * k }
+}
+
 /** Largeur réelle du texte (proportionnelle pour `script`) et hauteur h de la boîte. */
 export const markSize = (text: string, h: number, font?: MarkFont) => ({ w: font === 'script' ? (text ? scriptLayout(text).w * (h / SCRIPT_CAP) + SCRIPT_STROKE : 0) : textW([...text].length) * (h / GLYPH_H), h })
 

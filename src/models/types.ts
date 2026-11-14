@@ -41,7 +41,9 @@ export interface Panel {
   /** Textes gravés en plus du nom (« BOIS »…) : coin haut-gauche (x, y) dans le repère de la planche, hauteur de lettre h (mm). Ils doivent tenir sur du bois plein. */
   labels?: PanelLabel[]
   /** Traits gravés (lignes d'un tableau, dessins…) : `[x0, y0, x1, y1]` dans le repère de la planche, tracés en rectangle fin (`RULE_W`) ; une 5e valeur donne la largeur de ce trait (mm). */
-  rules?: ([number, number, number, number] | [number, number, number, number, number])[]
+  rules?: ([number, number, number, number] | [number, number, number, number, number] | [number, number, number, number, number, number])[]
+  /** Ronds gravés : `[cx, cy, r]`, `[cx, cy, r, pas]` ou `[cx, cy, r, pas, rMin]` ou `[cx, cy, r, pas, rMin, a0, a1, du]` (un arc de a0 à a1, en degrés ; 0 et 360 : le tour entier ; `du` : rayon en plus dans le sens u, pour un ovale) dans le repère de la planche (mm). Le rond de rayon r est gravé en cercles emboîtés, chacun plus petit de `pas` mm de rayon (0,25 par défaut), jusqu'au centre ou jusqu'à `rMin` (un anneau : le trait d'un 0 ou d'un 8). */
+  circles?: number[][]
   /** Profondeurs de cran à serrer, en multiples de l'épaisseur (défaut [1]) : [1, 3] si une encoche reçoit trois plaques empilées. */
   snugDepths?: number[]
 }

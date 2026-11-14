@@ -2,8 +2,8 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { categoryHex } from '../core/colors'
-import { digitRects, markPiece } from '../core/marking'
-import { ruleRect } from './toCutParts'
+import { digitRects, filledWidths, markPiece } from '../core/marking'
+import { circleLines, circleRings, ruleRect } from './toCutParts'
 import { contourEdges } from './edges'
 import { solidQuads } from './solid'
 import type { Panel } from './types'
@@ -62,6 +62,9 @@ const solidObject = (p: Panel, color: number): THREE.Group => {
   return g
 }
 
+/** Matériau unique des textes et numéros gravés (partagé : jamais libéré planche par planche). */
+const markMat = new THREE.MeshBasicMaterial({ color: 0x2b1a0c, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
+
 /** Planche → maillage extrudé, centré sur sa boîte englobante. Repère : voir `Panel`. */
 const panelObject = (p: Panel, color: number): THREE.Group => {
   if (p.solid) return solidObject(p, color)
@@ -97,10 +100,37 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
   const w = Math.max(...xs) - Math.min(...xs)
   const h = Math.max(...ys) - Math.min(...ys)
   // les textes gravés en plus du nom (labels) sont aussi des obstacles pour le nom
-  const words = [...(p.labels ?? []).map((l) => digitRects(l.text, l.x, l.y, l.h, 2, l.font)), ...(p.rules ?? []).map((r) => [ruleRect(r)])]
-  const rects = markPiece({ x: Math.min(...xs), y: Math.min(...ys), w, h, outer: p.outer, holes: [...(p.holes ?? []), ...words.flat()] }, p.id)
+  // les traits à 6 valeurs ont un pas entre contours : on les montre comme la gravure, un contour par passe (lignes), pas un gros trait plein
+  const words = [...(p.labels ?? []).map((l) => digitRects(l.text, l.x, l.y, l.h, 2, l.font)), ...(p.rules ?? []).filter((r) => r.length < 6).map((r) => [ruleRect(r)])]
+  const contourRules = (p.rules ?? []).filter((r) => r.length === 6)
+  if (contourRules.length || p.circles?.length) {
+    const seg: number[] = []
+    for (const r of contourRules)
+      if (r[4]! <= 0.2) seg.push(r[0] - cx, -(r[1] - cy), 0, r[2] - cx, -(r[3] - cy), 0) // une ligne fine : un seul trait (pas un contour de bande, qui paraîtrait doublé)
+      else
+        for (const wd of filledWidths(r[4]!, r[5])) {
+          const q = ruleRect([r[0], r[1], r[2], r[3], wd])
+          for (let i = 0; i < 4; i++) {
+            const [a0, b0] = [q[i], q[(i + 1) % 4]]
+            seg.push(a0[0] - cx, -(a0[1] - cy), 0, b0[0] - cx, -(b0[1] - cy), 0)
+          }
+        }
+    // les ronds gravés : un cercle par passe, en lignes
+    for (const c of p.circles ?? [])
+      for (const { pts, closed } of circleLines(c))
+        for (let i = 0; i < (closed ? pts.length : pts.length - 1); i++) {
+          const [a0, b0] = [pts[i], pts[(i + 1) % pts.length]]
+          seg.push(a0[0] - cx, -(a0[1] - cy), 0, b0[0] - cx, -(b0[1] - cy), 0)
+        }
+    const lineGeo = new THREE.BufferGeometry()
+    lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3))
+    const contours = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ color: 0x2b1a0c }))
+    contours.position.z = p.thickness / 2 + 0.02
+    g.add(contours)
+  }
+  const obstacles = [...words.flat(), ...contourRules.map((r) => ruleRect(r)), ...(p.circles ?? []).map((c) => circleRings(c)[0])]
+  const rects = markPiece({ x: Math.min(...xs), y: Math.min(...ys), w, h, outer: p.outer, holes: [...(p.holes ?? []), ...obstacles] }, p.id)
   if (rects.length || words.length) {
-    const markMat = new THREE.MeshBasicMaterial({ color: 0x2b1a0c, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
     const build = (list: [number, number][][], z: number, mark = false) => {
       const parts = list.map((r) => new THREE.ShapeGeometry(path(new THREE.Shape(), r)))
       const mesh = new THREE.Mesh(mergeGeometries(parts), markMat)
@@ -165,11 +195,17 @@ export class Viewer3D {
   private controls: OrbitControls
   private root = new THREE.Group()
   private objects: { group: THREE.Group; origin: THREE.Vector3; materials: THREE.MeshStandardMaterial[]; hex: number; shown: boolean }[] = []
+  private panels: Panel[] = []
   private colored = true
   private marks = true
   private selected = -1
   private explode = 0
   private raf = 0
+  /** Rendu à la demande : une image n'est dessinée que si la scène a changé (sinon la vue 3D ne coûte rien au repos, ni onglet masqué). */
+  private dirty = true
+  private invalidate = () => {
+    this.dirty = true
+  }
   private ro: ResizeObserver
   private down: [number, number] | null = null
   private hidden = new Set<number>()
@@ -193,7 +229,7 @@ export class Viewer3D {
   onHidden: (count: number) => void = () => {}
 
   constructor(private host: HTMLElement) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
+    this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.localClippingEnabled = true // la coupe ne touche que les planches (pas la grille, ni la règle)
     host.appendChild(this.renderer.domElement)
@@ -214,6 +250,7 @@ export class Viewer3D {
     this.camera.position.set(350, 300, 450)
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
+    this.controls.addEventListener('change', this.invalidate)
     // clic molette glissé = tourner autour du modèle (comme le clic gauche) ; la molette seule zoome, clic droit déplace
     this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN }
     this.renderer.domElement.addEventListener('mousedown', (e) => e.button === 1 && e.preventDefault()) // pas de défilement automatique
@@ -239,7 +276,10 @@ export class Viewer3D {
     this.resize()
     const loop = () => {
       this.raf = requestAnimationFrame(loop)
-      this.controls.update()
+      if (this.host.offsetParent === null) return // onglet masqué : rien à dessiner
+      if (this.controls.update()) this.dirty = true
+      if (!this.dirty) return
+      this.dirty = false
       this.headlight.position.copy(this.camera.position)
       this.headlight.target.position.copy(this.controls.target)
       if (this.tag) {
@@ -257,6 +297,7 @@ export class Viewer3D {
     this.renderer.setSize(w, h)
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
+    this.invalidate()
   }
 
   /** Indice de la planche visible sous le curseur, -1 sinon. */
@@ -291,6 +332,7 @@ export class Viewer3D {
       this.tag.material.dispose()
       this.tag = null
     }
+    this.invalidate()
     this.onMeasure(null)
   }
 
@@ -325,6 +367,7 @@ export class Viewer3D {
     const p = this.snap(e)
     this.hover.visible = !!p
     if (p) this.hover.geometry.setFromPoints([p])
+    this.invalidate()
   }
 
   private measureClick(e: PointerEvent) {
@@ -362,6 +405,7 @@ export class Viewer3D {
     this.tag.position.copy(a).add(b).multiplyScalar(0.5)
     this.tag.renderOrder = 21
     this.scene.add(this.tag)
+    this.invalidate()
     this.onMeasure(m)
   }
 
@@ -397,6 +441,7 @@ export class Viewer3D {
       }
     })
     for (const o of this.objects) o.materials[0].side = axis ? THREE.DoubleSide : THREE.FrontSide
+    this.invalidate()
   }
 
   /** Cache une planche (vue seulement : la découpe ne change pas). */
@@ -438,6 +483,7 @@ export class Viewer3D {
 
   private applyMarks() {
     for (const o of this.objects) for (const c of o.group.children) if (c.userData.mark) c.visible = this.marks
+    this.invalidate()
   }
 
   private applyColors() {
@@ -446,43 +492,65 @@ export class Viewer3D {
       o.materials[0].color.setHex(hex)
       o.materials[1].color.setHex(hex).multiplyScalar(EDGE_SHADE)
     }
+    this.invalidate()
   }
 
   private applyHidden() {
     this.objects.forEach((o, i) => (o.group.visible = !this.hidden.has(i) && o.shown))
+    this.invalidate()
     this.onHidden(this.hidden.size)
   }
 
   select(i: number) {
     this.selected = i
     this.objects.forEach((o, k) => o.materials.forEach((m) => m.emissive.setHex(k === i ? 0x2a6f4b : 0x000000)))
+    this.invalidate()
   }
 
   setPanels(panels: Panel[], keepView = true, reset = !keepView) {
-    for (const o of this.objects) this.disposeGroup(o.group)
-    this.root.clear()
-    this.corners = panels.map(cornersOf)
-    this.clearMeasure()
-    this.objects = panels.map((p) => {
+    // une planche dont la forme n'a pas changé (même contour, trous, textes : mêmes objets) garde son maillage, seuls sa position et sa rotation sont remis à jour (curseur de charnière : aucune reconstruction)
+    const old = this.objects
+    const oldPanels = this.panels
+    const reused = new Set<number>()
+    const sameShape = (a: Panel | undefined, b: Panel) =>
+      !!a && a.id === b.id && a.outer === b.outer && a.holes === b.holes && a.labels === b.labels && a.rules === b.rules && a.circles === b.circles && a.solid === b.solid && a.tube === b.tube && a.thickness === b.thickness && a.category === b.category
+    const next = panels.map((p, i) => {
+      const prev = old[i]
+      if (prev && sameShape(oldPanels[i], p)) {
+        reused.add(i)
+        prev.group.position.set(...p.position)
+        if (!p.solid && !p.tube) {
+          const [rx, ry, rz] = (p.rotation ?? [0, 0, 0]).map((d) => THREE.MathUtils.degToRad(d))
+          prev.group.rotation.set(rx, ry, rz, 'XYZ')
+        }
+        return { ...prev, origin: prev.group.position.clone(), shown: p.visible !== false }
+      }
       const group = panelObject(p, categoryHex(p.category ?? ''))
-      this.root.add(group)
       return { group, origin: group.position.clone(), materials: (group.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial[], hex: categoryHex(p.category ?? ''), shown: p.visible !== false }
     })
+    old.forEach((o, i) => reused.has(i) || this.disposeGroup(o.group))
+    this.root.clear()
+    for (const o of next) this.root.add(o.group)
+    this.objects = next
+    this.corners = panels.map((p, i) => (reused.has(i) ? this.corners[i] : cornersOf(p)))
+    this.panels = panels
+    this.clearMeasure()
     this.applyColors()
     this.applyMarks()
-    this.selected = -1
+    this.select(-1)
     this.hidden = new Set([...this.hidden].filter((i) => i < panels.length && !reset))
     this.applyHidden()
     this.applyExplode()
     this.applySection()
     if (!keepView) this.fit()
+    this.invalidate()
   }
 
   private disposeGroup(g: THREE.Group) {
     g.traverse((o) => {
       const m = o as THREE.Mesh
       m.geometry?.dispose()
-      for (const mat of [m.material].flat()) (mat as THREE.Material | undefined)?.dispose()
+      for (const mat of [m.material].flat()) if (mat !== markMat) (mat as THREE.Material | undefined)?.dispose()
     })
   }
 
@@ -497,6 +565,7 @@ export class Viewer3D {
     for (const o of this.objects) box.expandByPoint(o.origin)
     const c = box.getCenter(new THREE.Vector3())
     for (const o of this.objects) o.group.position.copy(o.origin).sub(c).multiplyScalar(1 + this.explode).add(c)
+    this.invalidate()
   }
 
   /** Cadre le modèle entier. */

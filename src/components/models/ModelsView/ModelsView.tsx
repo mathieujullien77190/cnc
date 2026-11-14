@@ -4,7 +4,7 @@ import { saveText } from '@/laser'
 import { MODELS, modelById } from '@/models/registry'
 import { modelToJson } from '@/models/json'
 import { panelsToCutParts } from '@/models/toCutParts'
-import { cleanParams, defaultParams } from '@/models/types'
+import { cleanParams, defaultParams, type Panel } from '@/models/types'
 import { Viewer3D } from '@/models/viewer3d'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { modelsActions, type SectionState } from '@/store/models'
@@ -16,7 +16,7 @@ import ModelList from './ModelList'
 import ModelSettings from './ModelSettings'
 import SectionTool from './SectionTool'
 import ViewToolbar from './ViewToolbar'
-import { build, groupName, groupOf } from './helpers'
+import { build, groupName, groupOf, sameShapes } from './helpers'
 import { SYNC_DELAY } from './constants'
 import type { MenuState } from './types'
 import { useCnc3dApi } from './useCnc3dApi'
@@ -48,7 +48,16 @@ export const ModelsView = () => {
   const modelId = model?.id ?? ''
   const params = useMemo(() => (model ? cleanParams(model, savedParams[model.id] ?? defaultParams(model)) : {}), [model, savedParams])
   const { result, error } = useMemo(() => (model ? build(model, params) : { result: null, error: '' }), [model, params])
-  const cut = useMemo(() => (result && model ? panelsToCutParts(result.panels, model.id) : null), [result, model])
+  // le fichier de découpe ne dépend que des formes : tant qu'elles ne changent pas (curseur de charnière), même objet, donc rien n'est renvoyé à la découpe
+  const lastCut = useRef<{ panels: Panel[]; id: string; cut: ReturnType<typeof panelsToCutParts> } | null>(null)
+  const cut = useMemo(() => {
+    if (!result || !model) return null
+    const prev = lastCut.current
+    if (prev && prev.id === model.id && sameShapes(prev.panels, result.panels)) return prev.cut
+    const next = panelsToCutParts(result.panels, model.id)
+    lastCut.current = { panels: result.panels, id: model.id, cut: next }
+    return next
+  }, [result, model])
 
   // la vue 3D vit le temps de l'onglet
   useEffect(() => {

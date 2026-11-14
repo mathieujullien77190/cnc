@@ -63,7 +63,8 @@ const panelOf = (raw: unknown, i: number): Panel => {
   if (p.cut !== undefined && typeof p.cut !== 'boolean') return fail(`${at} (${p.id}) : "cut" vaut true ou false`)
   if (p.rotate !== undefined && p.rotate !== 'any90' && p.rotate !== 'none') return fail(`${at} (${p.id}) : "rotate" vaut "any90" ou "none"`)
   if (p.labels !== undefined && !(Array.isArray(p.labels) && p.labels.every((l) => l && typeof (l as LabelLike).text === 'string' && isNum((l as LabelLike).x) && isNum((l as LabelLike).y) && isNum((l as LabelLike).h)))) return fail(`${at} (${p.id}) : "labels" doit être une liste de { text, x, y, h }`)
-  if (p.rules !== undefined && !(Array.isArray(p.rules) && p.rules.every((r) => Array.isArray(r) && (r.length === 4 || r.length === 5) && r.every(isNum)))) return fail(`${at} (${p.id}) : "rules" doit être une liste de [x0, y0, x1, y1] (ou [x0, y0, x1, y1, largeur])`)
+  if (p.rules !== undefined && !(Array.isArray(p.rules) && p.rules.every((r) => Array.isArray(r) && (r.length >= 4 && r.length <= 6) && r.every(isNum)))) return fail(`${at} (${p.id}) : "rules" doit être une liste de [x0, y0, x1, y1] (ou [x0, y0, x1, y1, largeur, pas entre deux contours])`)
+  if (p.circles !== undefined && !(Array.isArray(p.circles) && p.circles.every((c) => Array.isArray(c) && (c.length >= 3 && c.length <= 8 && c.length !== 6) && c.every(isNum) && (c as number[])[2] > 0))) return fail(`${at} (${p.id}) : "circles" doit être une liste de [cx, cy, r], [cx, cy, r, pas], [cx, cy, r, pas, rMin] ou [cx, cy, r, pas, rMin, a0, a1, du] (r > 0, en mm ; angles en degrés ; du = rayon en plus dans le sens u : un ovale)`)
   if (p.snugDepths !== undefined && !(Array.isArray(p.snugDepths) && p.snugDepths.every(isNum))) return fail(`${at} (${p.id}) : "snugDepths" doit être une liste de nombres`)
   const out: Panel = { id: p.id, thickness: p.thickness, outer: p.outer, position: p.position }
   if (typeof p.category === 'string') out.category = p.category
@@ -77,6 +78,7 @@ const panelOf = (raw: unknown, i: number): Panel => {
   if (typeof p.material === 'string') out.material = p.material
   if (p.labels !== undefined) out.labels = p.labels as Panel['labels']
   if (p.rules !== undefined) out.rules = p.rules as Panel['rules']
+  if (p.circles !== undefined) out.circles = p.circles as Panel['circles']
   if (p.snugDepths !== undefined) out.snugDepths = p.snugDepths as number[]
   return out
 }
@@ -111,7 +113,7 @@ export const modelFromJson = (raw: unknown, fallbackId: string): ModelDef => {
   const id = typeof f.id === 'string' && f.id ? f.id : fallbackId
   if (!/^[a-z0-9-]+$/.test(id)) return fail(`fichier de modèle : "id" doit être en kebab-case ("${id}")`)
   if (typeof f.name !== 'string' || !f.name.trim()) return fail('fichier de modèle : "name" manquant')
-  if (!Array.isArray(f.panels) || !f.panels.length) return fail('fichier de modèle : "panels" doit contenir au moins une planche')
+  if (!Array.isArray(f.panels)) return fail('fichier de modèle : "panels" doit être une liste de planches (vide permis)')
   const panels = f.panels.map(panelOf)
   if (f.actions !== undefined && !Array.isArray(f.actions)) return fail('fichier de modèle : "actions" doit être une liste')
   const actions = (f.actions ?? []).map((a, i) => actionOf(a, i, panels))
