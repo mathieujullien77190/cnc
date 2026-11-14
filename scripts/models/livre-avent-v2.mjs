@@ -103,6 +103,32 @@ const cornerLines = (poly, only = null) => { // only : les indices des coins à 
   })
 }
 // le milieu des numéros 1 à 16 est sur la ligne des deux coins larges de la pièce (le sommet n° 1 de son contour : lidIn[1] et lidEIn[1])
+// un trait au milieu de chaque angle d'une pièce, le long de la bissectrice, à BISECT_D mm du sommet (distance aux deux côtés), de BISECT_L mm de long, tracé comme les chiffres (2 lignes parallèles fines) ; seulement s'il tient dans du bois plein (à BISECT_MARGIN mm au moins du bord et des vides)
+const BISECT_D = 2.5
+const BISECT_L = 5
+const BISECT_MARGIN = 1.2
+const bisectorLines = (poly, holes = []) => {
+  const sc = NUM_H / NUM_REF_H
+  const step = Math.round(NUM_STEP_REF * sc * 1000) / 1000
+  const lw = NUM_LINE_W_REF * sc
+  const unit = (a, b) => { const d = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / d, (b[1] - a[1]) / d] }
+  const distSeg = (q, a, b) => { const d = [b[0] - a[0], b[1] - a[1]]; const t = Math.max(0, Math.min(1, ((q[0] - a[0]) * d[0] + (q[1] - a[1]) * d[1]) / (d[0] ** 2 + d[1] ** 2))); return Math.hypot(q[0] - a[0] - t * d[0], q[1] - a[1] - t * d[1]) }
+  const inPoly = (q, P) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) if (P[i][1] > q[1] !== P[j][1] > q[1] && q[0] < ((P[j][0] - P[i][0]) * (q[1] - P[i][1])) / (P[j][1] - P[i][1]) + P[i][0]) c = !c; return c }
+  const edgeDist = (q, P) => Math.min(...P.map((a, i) => distSeg(q, a, P[(i + 1) % P.length])))
+  const onWood = (q) => inPoly(q, poly) && edgeDist(q, poly) >= BISECT_MARGIN && holes.every((h) => !inPoly(q, h) && edgeDist(q, h) >= BISECT_MARGIN)
+  return poly.flatMap((q, i) => {
+    const e1 = unit(q, poly[(i + poly.length - 1) % poly.length]), e2 = unit(q, poly[(i + 1) % poly.length])
+    const bis = unit([0, 0], [e1[0] + e2[0], e1[1] + e2[1]])
+    const half = Math.acos(Math.max(-1, Math.min(1, e1[0] * e2[0] + e1[1] * e2[1]))) / 2 // demi-angle au sommet
+    const start = [q[0] + (bis[0] * BISECT_D) / Math.sin(half), q[1] + (bis[1] * BISECT_D) / Math.sin(half)]
+    const end = [start[0] + bis[0] * BISECT_L, start[1] + bis[1] * BISECT_L]
+    if (!Array.from({ length: 11 }, (_, k) => [start[0] + ((end[0] - start[0]) * k) / 10, start[1] + ((end[1] - start[1]) * k) / 10]).every(onWood)) return []
+    return [step / 2, -step / 2].map((d) => {
+      const line = [start, end].map(([x, y]) => [x - bis[1] * d, y + bis[0] * d])
+      return [line[0][0], line[0][1], line[1][0], line[1][1], lw, 1].map(r2)
+    })
+  })
+}
 const innerOf = (outline, w = FRAME_INSET) => insetPoly(outline, w).map(([u, v]) => [r2(u), r2(v)]) // le bord intérieur du cadre = le contour de la pièce du milieu
 // les couvercles LO du dessus : leurs 2 côtés collés à l'étoile (arêtes 0 et 3 du losange) reculent de LID_GAP mm là où ils touchent les couvercles E du même niveau, pour ne pas les forcer
 const LID_GAP = 0.2
@@ -480,7 +506,7 @@ for (let k = 0; k < N; k++) {
   eTrap.push(panels.length)
   panels.push({ ...onAxis(piece, STAR_STACK + 1), id: 'LN', category: 'Numéroté', holes: [pieceIn] })
   eTrap.push(panels.length)
-  panels.push({ ...onAxis(pieceIn, STAR_STACK + 1), holes: [triHole], ...engrave(String(2 * N + k + 1), 33, starV, E04_NUM_H) })
+  panels.push({ ...onAxis(pieceIn, STAR_STACK + 1), holes: [triHole], ...engrave(String(2 * N + k + 1), 33, starV, E04_NUM_H, bisectorLines(pieceIn, [triHole])) })
   // un couvercle sur E-05 et E-04, avec dessous la pièce qui s'emboîte dans son vide (PLUG_GAP de jeu, évidée avec PLUG_FRAME de bordure), même principe que les autres
   const lidEIn = innerOf(lidE)
   e06.push(panels.length)
