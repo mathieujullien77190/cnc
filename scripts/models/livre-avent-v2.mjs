@@ -16,7 +16,10 @@ const t = 3 // épaisseur de l'étoile pleine
 const N = 8 // branches
 const R = 140 * SCALE // rayon des pointes (140 mm à l'échelle 1)
 const HOLLOW = 0.4 // rayon des creux, en part du rayon des pointes (plus petit = creux plus près du centre, branches plus fines)
-const STAR_FRAME = 4 // bordure des pièces évidées posées sur chaque pièce de l'étoile
+const LN02_OUT_PLUS = 0.1 // le cadre LN-02 est plus large de 0,1 mm sur ses 2 côtés vers l'extérieur (ceux qui vont vers la pointe)
+const LN02_SHRINK = 0.1 // le contour extérieur des cadres LN-02 (pièces 17 à 24) est réduit de 0,1 mm
+const BORDER = 3 // LA bordure de tout le modèle : le bois autour de chaque vide, des pièces évidées, des pièces d'emboîtement et la largeur des cadres LN (3 mm partout)
+const STAR_FRAME = BORDER // bordure des pièces évidées posées sur chaque pièce de l'étoile
 const STAR_STACK = 12 // nombre de ces pièces évidées empilées
 const r2 = (v) => Math.round(v * 1000) / 1000 + 0 // 1 µm : l'arrondi ne laisse plus de chevauchement entre pièces voisines (à 0,01 il faisait ~0,01 mm)
 
@@ -52,16 +55,18 @@ const panels = []
 
 // dans chaque creux, à l'extérieur : une pièce à 4 côtés calée contre les deux côtés du creux (sommet dans le creux H).
 // Les 2 côtés collés à l'étoile (longueur a) font la moitié des 2 côtés dans le vide (2a), et le bout touche la droite qui joindrait les deux pointes voisines, sur l'axe du creux.
-const LO_FRAME = 2 // bordure des pièces évidées posées sur chaque petite pièce
+const LO_FRAME = BORDER // bordure des pièces évidées posées sur chaque petite pièce
 const LO_STACK = 13 // nombre de ces pièces évidées empilées
 const h = R * HOLLOW // rayon du creux
 const tx = R * Math.cos(Math.PI / N) - h, tz = R * Math.sin(Math.PI / N) // pointe voisine relativement au creux (u = vers l'extérieur) ; tx = distance du creux à la corde entre deux pointes
 const cosf = tx / Math.hypot(tx, tz), sinf = tz / Math.hypot(tx, tz) // direction d'un côté du creux
-// |bout - point collé|² = (tx - a·cosf)² + (a·sinf)² = (2a)²  →  3a² + 2·tx·cosf·a - tx² = 0
-const a = (tx * (-cosf + Math.sqrt(cosf * cosf + 3))) / 3
+// |bout - point collé|² = (pu - a·cosf)² + (a·sinf)² = (2a)²  →  3a² + 2·pu·cosf·a - pu² = 0
+const LO_BEYOND = 20 // les pièces LO dépassent de 2 cm de l'étoile : leur bout est à R + 20 mm du centre (avant, sur la corde entre deux pointes, à 129 mm)
+const pu = R + LO_BEYOND - h // le bout, sur l'axe du creux, à pu du creux
+// les 2 côtés collés à l'étoile (les petits côtés, longueur a) font la moitié des 2 côtés dans le vide (2a) : plus le bout est loin, plus ils sont grands
+const a = (pu * (-cosf + Math.sqrt(cosf * cosf + 3))) / 3
 const GLUE = a // longueur d'un côté collé à l'étoile
 const eu = a * cosf, ev = a * sinf // les deux points collés à l'étoile, relativement à H
-const pu = tx // le bout, sur la corde
 const rhombus = [[0, ev], [eu, 0], [pu, ev], [eu, 2 * ev]].map(([u, v]) => [r2(u), r2(v)]) // contour local : creux à gauche, bout à droite
 const MID = h + pu / 2 // le centre de la pièce, du creux vers l'extérieur
 const loHole = insetPoly(rhombus, LO_FRAME).map(([u, v]) => [r2(u), r2(v)]) // le vide des pièces évidées
@@ -71,7 +76,7 @@ const mid = (poly) => (Math.max(...poly.map((q) => q[0])) + Math.min(...poly.map
 const loLids = [] // cercle 1 : un couvercle LO = LO-01 du dessus + LO-03 dessous (8 couvercles, 16 pièces)
 const e06 = [] // cercle 2 : le couvercle E-06 (losange, recouvre E-04 et E-05) + E-07 dessous
 const eTrap = [] // cercle 3 : le couvercle E-04 (triangle centre–coin–coin) + E-03 dessous
-const PLUG_FRAME = 5 // bordure des pièces d'emboîtement, évidées au lieu d'être pleines
+const PLUG_FRAME = BORDER // bordure des pièces d'emboîtement, évidées au lieu d'être pleines
 const hollowPlug = (poly) => insetPoly(poly, PLUG_FRAME).map(([u, v]) => [r2(u), r2(v)])
 const PLUG_GAP = 0.2 // jeu entre la LO-03 et le vide, de chaque côté (0 = pile à la taille du vide)
 const plug = PLUG_GAP ? insetPoly(loHole, PLUG_GAP).map(([u, v]) => [r2(u), r2(v)]) : loHole
@@ -81,7 +86,7 @@ const LO_NUM_H = NUM_H // couvercles LO (1 à 8)
 const E04_NUM_H = NUM_H // pièces E-04 (17 à 24)
 const E_NUM_H = NUM_H // couvercles E-05 (9 à 16)
 // chaque losange (couvercle numéroté) est en 2 pièces : le contour, un cadre de FRAME_INSET mm de large (groupe LN), et la pièce du milieu qui porte le numéro
-const FRAME_INSET = 2 // largeur du cadre
+const FRAME_INSET = BORDER // largeur du cadre
 // décor gravé : une ligne coudée à chaque coin de la pièce du milieu (4 par losange), à CORNER_D mm du bord, de CORNER_L mm de long de chaque côté (jamais plus de 40 % d'un côté : elles ne se rejoignent pas).
 // Chaque ligne est tracée comme les chiffres : 2 lignes parallèles fines (de part et d'autre de l'axe, au même écart que les numéros), le coin en onglet
 const CORNER_D = 2.5
@@ -107,7 +112,7 @@ const cornerLines = (poly, only = null) => { // only : les indices des coins à 
 const BISECT_D = 2.5
 const BISECT_L = 5
 const BISECT_MARGIN = 1.2
-const bisectorLines = (poly, holes = []) => {
+const bisectorLines = (poly, holes = [], only = null) => { // only : les indices des coins à dessiner (tous par défaut)
   const sc = NUM_H / NUM_REF_H
   const step = Math.round(NUM_STEP_REF * sc * 1000) / 1000
   const lw = NUM_LINE_W_REF * sc
@@ -117,6 +122,7 @@ const bisectorLines = (poly, holes = []) => {
   const edgeDist = (q, P) => Math.min(...P.map((a, i) => distSeg(q, a, P[(i + 1) % P.length])))
   const onWood = (q) => inPoly(q, poly) && edgeDist(q, poly) >= BISECT_MARGIN && holes.every((h) => !inPoly(q, h) && edgeDist(q, h) >= BISECT_MARGIN)
   return poly.flatMap((q, i) => {
+    if (only && !only.includes(i)) return []
     const e1 = unit(q, poly[(i + poly.length - 1) % poly.length]), e2 = unit(q, poly[(i + 1) % poly.length])
     const bis = unit([0, 0], [e1[0] + e2[0], e1[1] + e2[1]])
     const half = Math.acos(Math.max(-1, Math.min(1, e1[0] * e2[0] + e1[1] * e2[1]))) / 2 // demi-angle au sommet
@@ -465,9 +471,8 @@ const hole = insetPoly(piece, STAR_FRAME) // [creux côté centre, côté, point
 const at = (p, q, u) => [u, p[1] + ((q[1] - p[1]) * (u - p[0])) / (q[0] - p[0])] // point du segment p–q à l'abscisse u
 const cut = hole[1][0] / 2 // abscisse de la nervure
 const rib = STAR_FRAME / 2
-const u0 = cut - rib // distance du centre à la coupe
-const topPiece = [at(piece[0], piece[1], u0), piece[1], piece[2], piece[3], at(piece[0], piece[3], u0)].map(([u, v]) => [r2(u), r2(v)])
-const bigHole = [at(hole[0], hole[1], cut + rib), hole[1], hole[2], hole[3], at(hole[0], hole[3], cut + rib)] // le vide d'une seule pièce, du côté de la paroi centrale à la pointe
+const topPiece = piece // les branches de l'étoile vont jusqu'au centre (plus d'octogone au milieu) : la pièce entière, du sommet au centre jusqu'à la pointe
+const bigHole = hole // le vide d'une seule pièce : le contour reculé de STAR_FRAME mm, du centre de l'étoile (son sommet à STAR_FRAME / sin 22,5° du centre) jusqu'à la pointe
 // ce vide est coupé en deux par une nervure de STAR_FRAME mm au niveau de son coin (SPLIT) : un compartiment vers la pointe (un triangle), l'autre vers le centre (un trapèze)
 const SPLIT = hole[1][0] // au niveau du coin du vide (là où il est le plus large)
 const clipU = (poly, x, keepAbove) => {
@@ -481,13 +486,15 @@ const clipU = (poly, x, keepAbove) => {
   return out
 }
 const topHoles = [clipU(bigHole, SPLIT - rib, false), clipU(bigHole, SPLIT + rib, true)].map((poly) => poly.map(([u, v]) => [r2(u), r2(v)])) // [vers le centre, vers la pointe]
-const topMid = (u0 + R) / 2 // le centre de la pièce coupée, du centre de l'étoile vers la pointe
+const topMid = R / 2 // le centre de la pièce, du centre de l'étoile vers la pointe
 
 const trapPlug = insetPoly(topHoles[0], PLUG_GAP).map(([u, v]) => [r2(u), r2(v)]) // le trapèze rentré du jeu
 // les couvercles E du dessus : leurs 2 côtés qui partent du centre (arêtes 0 et 3 de `piece`) reculent de LID_E_SIDE mm là où ils touchent le couvercle voisin (0,2 mm de jeu entre deux voisins)
 const LID_E_SIDE = 0.1
 const lidE = insetPoly(piece, [LID_E_SIDE, 0, 0, LID_E_SIDE]).map(([u, v]) => [r2(u), r2(v)])
-const triPlug = insetPoly(topHoles[1], PLUG_GAP).map(([u, v]) => [r2(u), r2(v)]) // la pièce qui s'emboîte dans le vide de E-05 (même vide que celui des E-02)
+const pieceInAll = innerOf(piece) // le trou du cadre LN des pièces 17 à 24 (le losange rentré de BORDER)
+// la pièce qui s'emboîte dans la pointe (E-06) remplit tout le trou du cadre au-delà du triangle du milieu : du côté des coins larges du losange jusqu'à la pointe (PLUG_GAP de jeu partout) ; elle comble donc la bande entre le triangle et le vide
+const triPlug = insetPoly([pieceInAll[1], pieceInAll[2], pieceInAll[3]], PLUG_GAP).map(([u, v]) => [r2(u), r2(v)])
 const triHole = topHoles[1] // le vide de E-05 = le vide triangulaire des E-02 en dessous (la cavité continue, la paroi n'y dépasse pas) ; côté coin la bordure est plus fine que STAR_FRAME
 
 for (let k = 0; k < N; k++) {
@@ -501,12 +508,15 @@ for (let k = 0; k < N; k++) {
   const onAxis = (outer, level) => ({ id: 'E', category: 'Etoile', thickness: t, outer, position: [r2(Math.cos(a) * mid(outer)), t / 2 + level * t, r2(Math.sin(a) * mid(outer))], rotation: [-90, 0, r2(-deg)] })
   eTrap.push(panels.length)
   panels.push({ ...onAxis(trapPlug, STAR_STACK), holes: [hollowPlug(trapPlug)] }) // E-03 : monte avec E-04
-  // les pièces 17 à 24 sont en 2 pièces comme les couvercles : le cadre qui fait tout le tour du losange (groupe LN) et la pièce du milieu, avec le vide triangulaire et le numéro
+  // les pièces 17 à 24 sont en 2 pièces : le cadre qui fait tout le tour du losange (groupe LN, BORDER de large) et la pièce du milieu, qui porte le numéro.
+  // Le vide triangulaire est aussi à BORDER du contour : le bord du cadre tombe sur le bord du vide, qui reste donc ouvert dans le cadre (c'est lui, la paroi de BORDER) ; la pièce du milieu est le triangle du centre jusqu'aux coins larges du losange
   const pieceIn = innerOf(piece)
+  const wedge = [pieceIn[0], pieceIn[1], pieceIn[3]] // un triangle : le sommet au centre et les deux coins larges du losange (il arrive pile à l'angle ; entre ses coins et le vide, le trou du cadre reste vide)
   eTrap.push(panels.length)
-  panels.push({ ...onAxis(piece, STAR_STACK + 1), id: 'LN', category: 'Numéroté', holes: [pieceIn] })
+  const ringOut = insetPoly(piece, [LN02_SHRINK, LN02_SHRINK - LN02_OUT_PLUS, LN02_SHRINK - LN02_OUT_PLUS, LN02_SHRINK]).map(([u, v]) => [r2(u), r2(v)]) // LN-02 : les 2 côtés près du centre (arêtes 0 et 3 du losange) reculent de LN02_SHRINK ; les 2 côtés vers l'extérieur (arêtes 1 et 2, vers la pointe) sont plus larges de LN02_OUT_PLUS (le cadre y est plus large, le trou ne bouge pas)
+  panels.push({ ...onAxis(ringOut, STAR_STACK + 1), id: 'LN', category: 'Numéroté', holes: [pieceIn] })
   eTrap.push(panels.length)
-  panels.push({ ...onAxis(pieceIn, STAR_STACK + 1), holes: [triHole], ...engrave(String(2 * N + k + 1), 33, starV, E04_NUM_H, bisectorLines(pieceIn, [triHole])) })
+  panels.push({ ...onAxis(wedge, STAR_STACK + 1), ...engrave(String(2 * N + k + 1), 33, starV, E04_NUM_H, bisectorLines(wedge)) }) // un trait au milieu de chacun des 3 angles du triangle
   // un couvercle sur E-05 et E-04, avec dessous la pièce qui s'emboîte dans son vide (PLUG_GAP de jeu, évidée avec PLUG_FRAME de bordure), même principe que les autres
   const lidEIn = innerOf(lidE)
   e06.push(panels.length)
@@ -516,19 +526,6 @@ for (let k = 0; k < N; k++) {
   e06.push(panels.length)
   panels.push({ ...onAxis(triPlug, STAR_STACK + 1), holes: [hollowPlug(triPlug)] })
 }
-
-// au centre : un octogone qui s'emboîte exactement dans le vide laissé par les 8 pièces (côtés à u0 du centre, face à chaque pièce), monté comme les autres (une pièce pleine puis OCT_STACK évidées, bordure OCT_FRAME), la dernière couche ayant le contour plein de l'octogone et un trou octogonal au milieu (FINGER_HOLE) pour y passer l'index
-const OCT_FRAME = 4
-const OCT_STACK = 13
-const octR = u0 / Math.cos(Math.PI / N) // rayon des sommets : les côtés sont à u0, perpendiculaires aux axes des pièces
-const octPts = Array.from({ length: N }, (_, k) => [octR * Math.cos(Math.PI / N + (2 * Math.PI * k) / N), octR * Math.sin(Math.PI / N + (2 * Math.PI * k) / N)])
-const octOf = (poly) => poly.map(([x, z]) => [r2(octR + x), r2(octR + z)])
-const octOuter = octOf(octPts)
-const octHole = octOf(insetPoly(octPts, OCT_FRAME))
-const octLevel = (l, extra) => ({ id: 'O', category: 'Octogone', thickness: t, ...extra, position: [0, t / 2 + l * t, 0], rotation: [-90, 0, 0] })
-panels.push(octLevel(0, { outer: octOuter })) // le fond
-for (let l = 1; l < OCT_STACK; l++) panels.push(octLevel(l, { outer: octOuter, holes: [octHole] })) // les couches évidées
-// plus de couvercle ni de pièce qui s'emboîte sur l'octogone : il s'arrête à la dernière couche évidée
 
 const model = {
   format: 'cnc-model',
@@ -546,5 +543,5 @@ const model = {
   ],
 }
 writeFileSync(arg('sortie') ?? 'models/livre-avent-v2.model.json', JSON.stringify(model))
-console.log(`${panels.length} planches ; échelle ${SCALE} : rayon ${r2(R)} mm, octogone central de ${r2(2 * u0)} mm d'un côté plat à l'autre`)
+console.log(`${panels.length} planches ; échelle ${SCALE} : rayon ${r2(R)} mm`)
 await server.close()
