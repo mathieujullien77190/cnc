@@ -9,10 +9,11 @@ Un chiffre gravé n'est **pas** un texte plein (`labels`) : c'est un dessin fait
 
 ## La règle de base (la même pour tous les chiffres)
 
-- **6 lignes** dans l'épaisseur de chaque trait, **à 0,3 mm d'écart** : à ±0,15, ±0,45 et ±0,75 mm de l'axe. Le trait fait donc **1,5 mm** quelle que soit la taille du chiffre (`NUM_LINES`, `NUM_STEP`, `NUM_HALF`). Même nombre de lignes et même écart partout, jamais un nombre de lignes qui change avec la hauteur.
+- **6 lignes** dans l'épaisseur de chaque trait. L'écart entre deux lignes et la largeur du trait **suivent la hauteur du chiffre** : 0,3 mm d'écart et 1,5 mm de trait pour un chiffre de 13 mm (`NUM_REF_H`), dans la même proportion pour un autre (`sc = h / NUM_REF_H`). Toujours 6 lignes, jamais un nombre qui change. L'écart est arrondi au µm avant tout calcul, sinon le dernier cercle sort.
 - Chaque ligne est un trait fin de 0,12 mm (`NUM_LINE_W`) : une règle `[x0, y0, x1, y1, 0.12, 1]` (6ᵉ valeur = pas entre contours : grand, donc une seule passe). La vue 3D dessine un trait de 0,12 mm ou moins en **une seule ligne** (pas deux bords).
 - Le chiffre est tourné de **90° dans le sens trigonométrique** autour de son centre : un point `(x, y)` du glyphe devient `(cu + y, cv − x)` dans la pièce (`turn`) ; un angle de glyphe devient `angle − 90°`.
-- Tailles utilisées : `LO_NUM_H` = 13 (numéros 1 à 8, couvercles `LO`), `E_NUM_H` = 12 (9 à 16, couvercles `E`), `E04_NUM_H` = 8 (17 à 24, pièces `E-04`). Le numéro est centré sur la pièce.
+- **Tous les numéros ont la même hauteur** : `NUM_H` = 10 mm (numéros 1 à 8 sur les couvercles `LN`, 9 à 16 sur les couvercles `E`, 17 à 24 sur les pièces `E-04`), donc aussi le même écart entre lignes. Leur **encre réelle** est recentrée sur le centre de la pièce (`engrave` mesure les traits et les cercles finis, puis décale) : un 1 ou un 7 est aussi centré qu'un 8.
+- Les 8 couvercles numérotés de 1 à 8 sont dans leur propre groupe `LN` (couleur « Numéroté »).
 
 ## Comment chaque partie d'un chiffre est tracée
 
@@ -52,3 +53,7 @@ Le défaut classique : deux traits se croisent et leurs lignes se traversent. R�
 - L'ordre des traits dans la police compte : « celui qui vient après » domine. Pour inverser, changer l'ordre ou la règle, pas l'écart.
 - Ne pas remettre des `labels` : ils ne se tournent pas et se remplissent en gros trait.
 - Le format `circles` (arcs, ovales, `rMin`) et les règles à 6 valeurs sont décrits dans `docs/MODELES.md` ; leur code est dans `src/models/` (`toCutParts.ts` : `circleRings` pour la découpe, `circleLines` pour la vue 3D ; `viewer3d.ts`).
+
+## Les losanges numérotés : cadre et pièce du milieu (livre-avent-v2)
+
+Chaque losange qui porte un numéro (couvercles `LO` 1 à 8, couvercles `E` 9 à 16, pièces 17 à 24) est en **2 pièces** : un **cadre** de `FRAME_INSET` (2 mm) qui fait tout le tour, dans le groupe `LN` (couleur « Numéroté »), et la **pièce du milieu**, qui garde son groupe et porte le numéro (`innerOf`). Le cadre a un trou exactement de la forme de la pièce du milieu, sans jeu. Les numéros 1 à 16 sont sur la ligne des coins larges de leur pièce ; les lignes de coin (`cornerLines`) sont 2 lignes parallèles fines, comme les chiffres, qui ne se rejoignent pas.
