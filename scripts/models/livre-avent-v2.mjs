@@ -138,6 +138,7 @@ const bisectorLines = (poly, holes = [], only = null) => { // only : les indices
 const innerOf = (outline, w = FRAME_INSET) => insetPoly(outline, w).map(([u, v]) => [r2(u), r2(v)]) // le bord intérieur du cadre = le contour de la pièce du milieu
 // les couvercles LO du dessus : leurs 2 côtés collés à l'étoile (arêtes 0 et 3 du losange) reculent de LID_GAP mm là où ils touchent les couvercles E du même niveau, pour ne pas les forcer
 const LID_GAP = 0.2
+const KERF_GROW = 0.2 // le laser enlève un peu de bois : la pièce du milieu (numérotée, 1 à 24) est agrandie de ce mm tout autour, elle déborde donc sur le trou du cadre LN
 const lidLO = insetPoly(rhombus, [LID_GAP, 0, 0, LID_GAP]).map(([u, v]) => [r2(u), r2(v)])
 // numéro gravé, centré en (cu, cv) du repère de la pièce et tourné de 90° dans le sens trigonométrique (un texte `labels` ne se tourne pas : on trace les chiffres en traits `rules`, à partir des mêmes glyphes que le nom des pièces).
 // Repère de la pièce : u à droite, v vers le bas ; vu de face, une rotation trigo envoie un point (dx, dy) sur (dy, -dx).
@@ -458,7 +459,7 @@ for (let k = 0; k < N; k++) {
   loLids.push(panels.length)
   panels.push(lo(MID + (mid(lidLO) - mid(rhombus)), LO_STACK + 1, { id: 'LN', category: 'Numéroté', outer: lidLO, holes: [lidIn] })) // le contour du couvercle : un cadre, groupe LN
   loLids.push(panels.length)
-  panels.push(lo(MID + (mid(lidIn) - mid(rhombus)), LO_STACK + 1, { outer: lidIn, ...engrave(String(k + 1), lidIn[1][0], ev, LO_NUM_H, cornerLines(lidIn)) })) // la pièce du milieu, qui porte le numéro (1 à 8)
+  panels.push(lo(MID + (mid(lidIn) - mid(rhombus)), LO_STACK + 1, { outer: insetPoly(lidIn, -KERF_GROW).map(([u, v]) => [r2(u), r2(v)]), ...engrave(String(k + 1), lidIn[1][0], ev, LO_NUM_H, cornerLines(lidIn)) })) // la pièce du milieu, qui porte le numéro (1 à 8)
 }
 
 // l'étoile de 28 cm (même forme qu'avant : pointes à R, creux à R × HOLLOW) en N pièces identiques : chacune va du centre O à une pointe T en passant par les deux creux voisins H1 / H2
@@ -516,13 +517,13 @@ for (let k = 0; k < N; k++) {
   const ringOut = insetPoly(piece, [LN02_SHRINK, LN02_SHRINK - LN02_OUT_PLUS, LN02_SHRINK - LN02_OUT_PLUS, LN02_SHRINK]).map(([u, v]) => [r2(u), r2(v)]) // LN-02 : les 2 côtés près du centre (arêtes 0 et 3 du losange) reculent de LN02_SHRINK ; les 2 côtés vers l'extérieur (arêtes 1 et 2, vers la pointe) sont plus larges de LN02_OUT_PLUS (le cadre y est plus large, le trou ne bouge pas)
   panels.push({ ...onAxis(ringOut, STAR_STACK + 1), id: 'LN', category: 'Numéroté', holes: [pieceIn] })
   eTrap.push(panels.length)
-  panels.push({ ...onAxis(wedge, STAR_STACK + 1), ...engrave(String(2 * N + k + 1), 33, starV, E04_NUM_H, bisectorLines(wedge)) }) // un trait au milieu de chacun des 3 angles du triangle
+  panels.push({ ...onAxis(wedge, STAR_STACK + 1), outer: insetPoly(wedge, -KERF_GROW).map(([u, v]) => [r2(u), r2(v)]), ...engrave(String(2 * N + k + 1), 33, starV, E04_NUM_H, bisectorLines(wedge)) }) // un trait au milieu de chacun des 3 angles du triangle
   // un couvercle sur E-05 et E-04, avec dessous la pièce qui s'emboîte dans son vide (PLUG_GAP de jeu, évidée avec PLUG_FRAME de bordure), même principe que les autres
   const lidEIn = innerOf(lidE)
   e06.push(panels.length)
   panels.push({ ...onAxis(lidE, STAR_STACK + 2), id: 'LN', category: 'Numéroté', holes: [lidEIn] }) // le contour du couvercle E : un cadre, groupe LN
   e06.push(panels.length)
-  panels.push({ ...onAxis(lidEIn, STAR_STACK + 2), ...engrave(String(N + k + 1), lidEIn[1][0], starV, E_NUM_H, cornerLines(lidEIn)) }) // la pièce du milieu, qui porte le numéro (9 à 16)
+  panels.push({ ...onAxis(lidEIn, STAR_STACK + 2), outer: insetPoly(lidEIn, -KERF_GROW).map(([u, v]) => [r2(u), r2(v)]), ...engrave(String(N + k + 1), lidEIn[1][0], starV, E_NUM_H, cornerLines(lidEIn)) }) // la pièce du milieu, qui porte le numéro (9 à 16)
   e06.push(panels.length)
   panels.push({ ...onAxis(triPlug, STAR_STACK + 1), holes: [hollowPlug(triPlug)] })
 }
