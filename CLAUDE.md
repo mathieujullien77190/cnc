@@ -29,7 +29,7 @@ Chaque dossier a son `CLAUDE.md` avec le détail. En bref :
 | `src/state/` | Hooks de liaison : `useProject`, `useLaserSession`, `useDeepSearch` (worker) |
 | `src/components/` | Interface React par domaine (`app`, `sheets`, `parts`, `settings`, `models`, `laser`) ; briques dans `ui/` |
 | `docs/`, `scripts/`, `export/`, `examples/` | Doc de référence, contrôles, module d'export three.js, exemple |
-| `.claude/skills/` | `creer-modele`, `ajouter-action`, `cranter-plaques`, `goujon`, `gravure-noms-dessins`, `store-redux`, `react-structure` |
+| `.claude/skills/` | `creer-modele`, `ajouter-action`, `cranter-plaques`, `goujon`, `gravure-noms-dessins`, `chiffres-contours`, `store-redux`, `react-structure` |
 
 Imports : `@/...` (alias de `src/`) entre dossiers, `./...` dans un composant. Un composant = un dossier (`index.ts`, `X.tsx`, `types.ts`), briques importées depuis `@/components/ui`.
 
