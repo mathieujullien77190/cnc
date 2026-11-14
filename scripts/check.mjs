@@ -266,7 +266,7 @@ try {
   // vue 3D : arêtes depuis les contours, jamais EdgesGeometry (faux traits noirs entre fenêtres alignées)
   const { readFileSync: e3_rf } = await import('node:fs')
   check(!/EdgesGeometry/.test(e3_rf(new URL('../src/models/viewer3d.ts', import.meta.url), 'utf8').replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '')), 'vue 3D : pas de EdgesGeometry')
-  check(/EDGE_SHADE = 0\.[0-9]+/.test(e3_rf(new URL('../src/models/viewer3d.ts', import.meta.url), 'utf8')) && /\[faceMat, sideMat\]/.test(e3_rf(new URL('../src/models/viewer3d.ts', import.meta.url), 'utf8')), 'vue 3D : tranche des planches plus foncée que les faces')
+  check(/EDGE_COLOR = 0x[0-9a-f]+/.test(e3_rf(new URL('../src/models/viewer3d.ts', import.meta.url), 'utf8')) && /\[faceMat, sideMat\]/.test(e3_rf(new URL('../src/models/viewer3d.ts', import.meta.url), 'utf8')), 'vue 3D : tranche des planches en marron très foncé (EDGE_COLOR)')
   const { contourEdges } = await server.ssrLoadModule('/src/models/edges.ts')
   const e3_sq = (x, y) => [[x, y], [x + 3, y], [x + 3, y + 3], [x, y + 3]]
   const e3_eg = contourEdges({ id: 'X', thickness: 3, outer: [[0, 0], [100, 0], [100, 50], [0, 50]], holes: [e3_sq(10, 10), e3_sq(40, 10), e3_sq(70, 10)], position: [0, 0, 0] }, 50, 25)

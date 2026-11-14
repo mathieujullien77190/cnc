@@ -85,7 +85,7 @@ const panelObject = (p: Panel, color: number): THREE.Group => {
   // faces (avant / arrière) à la couleur de la famille, tranche (le tour de la planche) légèrement plus foncée : ExtrudeGeometry range les faces en groupe 0, la tranche en groupe 1
   const faceMat = new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })
   const sideMat = faceMat.clone()
-  sideMat.color.multiplyScalar(EDGE_SHADE)
+  sideMat.color.setHex(EDGE_COLOR)
   // la paroi d'un trou sort de ExtrudeGeometry tournée vers le bois : sans double face elle est cachée et on voit à travers
   sideMat.side = THREE.DoubleSide
   const mesh = new THREE.Mesh(geo, [faceMat, sideMat])
@@ -182,8 +182,8 @@ export interface Measure {
 
 const SNAP_PX = 16
 
-/** Part de la couleur de la face gardée pour la tranche (0,8 = 20 % plus foncée). */
-export const EDGE_SHADE = 0.8
+/** Couleur de la tranche (le bord de 3 mm) de toutes les planches, de tous les modèles : un marron très foncé, comme un bord brûlé par la laser, quelle que soit la couleur de la face. */
+export const EDGE_COLOR = 0x3f2713
 /** Couleur unique quand les couleurs par famille sont désactivées : contreplaqué clair, uni. */
 export const PLAIN_WOOD = 0xd4b07a
 
@@ -490,7 +490,7 @@ export class Viewer3D {
     for (const o of this.objects) {
       const hex = this.colored ? o.hex : PLAIN_WOOD
       o.materials[0].color.setHex(hex)
-      o.materials[1].color.setHex(hex).multiplyScalar(EDGE_SHADE)
+      o.materials[1].color.setHex(EDGE_COLOR)
     }
     this.invalidate()
   }

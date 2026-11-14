@@ -54,7 +54,7 @@ Référence : `docs/MODELES.md`. Exemples : `models/embouts.model.json`, `models
 
 ## Rendu 3D (automatique)
 
-- Couleur par `category` (`src/core/colors.ts`), tranche plus foncée que les faces (`EDGE_SHADE`), arêtes noires, nom gravé sur les deux faces. Rien à coder dans le modèle.
+- Couleur par `category` (`src/core/colors.ts`), tranche en marron très foncé (`EDGE_COLOR`, la même pour toutes les planches), arêtes noires, nom gravé sur les deux faces. Rien à coder dans le modèle.
 
 ## Pièges
 

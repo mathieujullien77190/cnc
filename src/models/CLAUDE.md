@@ -14,7 +14,7 @@ Le moteur des modèles 3D. Les modèles eux-mêmes sont des fichiers `models/<id
 | `crenelTest.ts`, `goujonTest.ts` | Planches d'essai (crantage, goujons) ; le crantage = petits bouts, les petits crans de 6 mm des coins en deux couples (encoches à +0,1 et +0,2 mm) du bloc « Test » |
 | `validate.ts` | Traits résiduels d'un contour (`panelIssues`), nom gravé mal posé (`markIssues`) : utilisé par `check` |
 | `solid.ts` | Pièce pleine d'un seul tenant (`solid` d'une planche `cut: false`, cuve imprimée en 3D) : grille de cellules, longueurs codées, faces extérieures |
-| `viewer3d.ts` | Scène three.js : extrusion des planches, couleurs par catégorie, tranche plus foncée, éclaté, sélection, mesure, coupe par un plan (x, y ou z), planches cachées, noms masquables (`setMarks`, les textes et dessins du modèle restent et ne sont montrés que sur la face avant). Reste hors du store |
+| `viewer3d.ts` | Scène three.js : extrusion des planches, couleurs par catégorie, tranche en marron très foncé (`EDGE_COLOR`, la même pour toutes les planches), éclaté, sélection, mesure, coupe par un plan (x, y ou z), planches cachées, noms masquables (`setMarks`, les textes et dessins du modèle restent et ne sont montrés que sur la face avant). Reste hors du store |
 
 Règles :
 - Un modèle ne contient pas de code : un réglage qui change la découpe est un autre fichier ; une action ne déplace que des planches.
