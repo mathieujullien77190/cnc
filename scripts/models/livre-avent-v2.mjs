@@ -76,23 +76,44 @@ const hollowPlug = (poly) => insetPoly(poly, PLUG_FRAME).map(([u, v]) => [r2(u),
 const PLUG_GAP = 0.2 // jeu entre la LO-03 et le vide, de chaque côté (0 = pile à la taille du vide)
 const plug = PLUG_GAP ? insetPoly(loHole, PLUG_GAP).map(([u, v]) => [r2(u), r2(v)]) : loHole
 const plugMID = MID + (mid(plug) - mid(rhombus))
-const LO_NUM_H = 13 // hauteur du numéro gravé sur les couvercles LO (1 à 8), au centre ; le nom de la pièce se loge dans la place qui reste, en plus petit
-const E04_NUM_H = 8 // et sur la pièce E-04 (17 à 24), plus petits : ils tiennent entre le centre et le vide
-const E_NUM_H = 12 // et sur les couvercles E-05 (9 à 16)
-// décor gravé (traits `rules`) : un liseré qui suit le contour de la pièce, rentré de FRAME_INSET mm
-const DECO_W = 0.6 // largeur des traits du décor
-const FRAME_INSET = 3 // le liseré est à 3 mm du bord
-const loop = (poly) => poly.map((p, i) => { const q = poly[(i + 1) % poly.length]; return [r2(p[0]), r2(p[1]), r2(q[0]), r2(q[1]), DECO_W] })
-const decor = (outline) => loop(insetPoly(outline, FRAME_INSET))
+const NUM_H = 10 // hauteur de TOUS les numéros gravés (1 à 24), la même partout : donc aussi le même écart entre les lignes
+const LO_NUM_H = NUM_H // couvercles LO (1 à 8)
+const E04_NUM_H = NUM_H // pièces E-04 (17 à 24)
+const E_NUM_H = NUM_H // couvercles E-05 (9 à 16)
+// chaque losange (couvercle numéroté) est en 2 pièces : le contour, un cadre de FRAME_INSET mm de large (groupe LN), et la pièce du milieu qui porte le numéro
+const FRAME_INSET = 2 // largeur du cadre
+// décor gravé : une ligne coudée à chaque coin de la pièce du milieu (4 par losange), à CORNER_D mm du bord, de CORNER_L mm de long de chaque côté (jamais plus de 40 % d'un côté : elles ne se rejoignent pas).
+// Chaque ligne est tracée comme les chiffres : 2 lignes parallèles fines (de part et d'autre de l'axe, au même écart que les numéros), le coin en onglet
+const CORNER_D = 2.5
+const CORNER_L = 8
+const CORNER_LINES = 2 // lignes parallèles par ligne de coin
+const cornerLines = (poly, only = null) => { // only : les indices des coins à dessiner (tous par défaut)
+  const sc = NUM_H / NUM_REF_H // même écart et même épaisseur de ligne que les numéros
+  const step = Math.round(NUM_STEP_REF * sc * 1000) / 1000
+  const lw = NUM_LINE_W_REF * sc
+  const J = insetPoly(poly, CORNER_D)
+  const toward = (a, b) => { const d = Math.hypot(b[0] - a[0], b[1] - a[1]); const t = Math.min(CORNER_L, d * 0.4) / d; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t] }
+  return J.flatMap((q, i) => {
+    if (only && !only.includes(i)) return []
+    const path = [toward(q, J[(i + J.length - 1) % J.length]), q, toward(q, J[(i + 1) % J.length])]
+    return Array.from({ length: CORNER_LINES }, (_, k) => (k - (CORNER_LINES - 1) / 2) * step).flatMap((d) => {
+      const line = offsetOpen(path, d, 0)
+      return line.slice(0, -1).map((a, k) => [a[0], a[1], line[k + 1][0], line[k + 1][1], lw, 1].map(r2))
+    })
+  })
+}
+// le milieu des numéros 1 à 16 est sur la ligne des deux coins larges de la pièce (le sommet n° 1 de son contour : lidIn[1] et lidEIn[1])
+const innerOf = (outline, w = FRAME_INSET) => insetPoly(outline, w).map(([u, v]) => [r2(u), r2(v)]) // le bord intérieur du cadre = le contour de la pièce du milieu
 // les couvercles LO du dessus : leurs 2 côtés collés à l'étoile (arêtes 0 et 3 du losange) reculent de LID_GAP mm là où ils touchent les couvercles E du même niveau, pour ne pas les forcer
 const LID_GAP = 0.2
 const lidLO = insetPoly(rhombus, [LID_GAP, 0, 0, LID_GAP]).map(([u, v]) => [r2(u), r2(v)])
 // numéro gravé, centré en (cu, cv) du repère de la pièce et tourné de 90° dans le sens trigonométrique (un texte `labels` ne se tourne pas : on trace les chiffres en traits `rules`, à partir des mêmes glyphes que le nom des pièces).
 // Repère de la pièce : u à droite, v vers le bas ; vu de face, une rotation trigo envoie un point (dx, dy) sur (dy, -dx).
-const NUM_STEP = 0.3 // écart entre deux lignes d'un chiffre
+const NUM_REF_H = 13 // hauteur de référence : un chiffre de 13 mm a ses lignes à 0,3 mm d'écart ; plus petit, l'écart et la largeur du trait diminuent dans la même proportion (toujours 6 lignes)
+const NUM_STEP_REF = 0.3 // écart entre deux lignes d'un chiffre de la hauteur de référence
 const NUM_LINES = 6 // nombre de lignes dans l'épaisseur d'un trait, le même pour tous les chiffres (donc la même largeur de trait, quelle que soit la taille du chiffre)
-const NUM_HALF = ((NUM_LINES - 1) * NUM_STEP) / 2 // demi-largeur du trait : 0,75 mm (les lignes sont à ±0,15, ±0,45, ±0,75 de l'axe)
-const NUM_LINE_W = 0.12 // largeur de chaque ligne de contour (une seule passe : le pas est plus grand)
+const NUM_HALF_REF = ((NUM_LINES - 1) * NUM_STEP_REF) / 2 // demi-largeur du trait : 0,75 mm (les lignes sont à ±0,15, ±0,45, ±0,75 de l'axe)
+const NUM_LINE_W_REF = 0.12 // largeur de chaque ligne de contour (une seule passe : le pas est plus grand)
 // décalage d'une polyligne ouverte de s mm sur sa gauche, sommets en onglet (intersection des deux côtés décalés) ; les bouts sont rallongés de `ext`
 const offsetOpen = (pts, s, ext) => {
   const P = pts.map((q) => [...q])
@@ -215,7 +236,7 @@ const equalizeArc = (runs, discs) => {
   arcs[0].arc = { ...arcs[0].arc, c: nc, r: ring.rc }
 }
 const FLAG_GROW = 1.3 // le petit bout en haut du 1 est 1,3 fois plus long
-const ARC_GAP = 0.1 // un arc s'arrête à 0,1 mm d'un trait droit (sans le toucher)
+const ARC_GAP_REF = 0.1 // un arc s'arrête à 0,1 mm d'un trait droit (sans le toucher)
 const ARC_EXT = (100 * Math.PI) / 180 // un arc dont un bout touche un trait droit d'un autre trait est prolongé d'autant à ce bout (la bande l'arrête ensuite)
 const segDist = (q, A, B) => { const [dx, dy] = [B[0] - A[0], B[1] - A[1]]; const t = Math.max(0, Math.min(1, ((q[0] - A[0]) * dx + (q[1] - A[1]) * dy) / (dx * dx + dy * dy))); return Math.hypot(q[0] - A[0] - t * dx, q[1] - A[1] - t * dy) }
 const EXT_END = 0.06 // un trait droit qui finit sur un arc d'un autre trait (le 5) descend de EXT_END × hauteur du chiffre de plus : l'arc arrive dessus
@@ -238,10 +259,18 @@ const glyphStrokes = (text, h) => {
   })
 }
 const numberShapes = (text, cu, cv, h) => {
+  const sc = h / NUM_REF_H // les lignes suivent la taille du chiffre : écart, demi-largeur du trait, épaisseur d'une ligne et jeu des arcs
+  const NUM_STEP = Math.round(NUM_STEP_REF * sc * 1000) / 1000 // arrondi au µm : l'écart écrit dans le fichier est exactement celui du calcul, donc toujours NUM_LINES lignes
+  const NUM_HALF = ((NUM_LINES - 1) * NUM_STEP) / 2
+  const NUM_LINE_W = NUM_LINE_W_REF * sc, ARC_GAP = ARC_GAP_REF * sc
   const raw = glyphStrokes(text, h)
   // le petit bout en haut du 1 (le trait de 3 points dont la tige est verticale) est un peu plus grand : FLAG_GROW × sa longueur
   const strokes = raw.map((st) => (st.length === 3 && Math.abs(st[1][0] - st[2][0]) < 1e-6 && Math.abs(st[0][0] - st[1][0]) > 1e-6 ? [[st[1][0] + (st[0][0] - st[1][0]) * FLAG_GROW, st[1][1] + (st[0][1] - st[1][1]) * FLAG_GROW], st[1], st[2]] : st))
-  const turn = ([x, y]) => [cu + y, cv - x] // 90° dans le sens trigonométrique
+  // on centre l'encre réelle du numéro (l'étendue de ses traits, plus la demi-largeur du trait), pas la boîte du texte et ses marges : un 1 ou un 7 est bien au centre comme un 8
+  const allPts = strokes.flat()
+  const inkX = (Math.max(...allPts.map((q) => q[0])) + Math.min(...allPts.map((q) => q[0]))) / 2
+  const inkY = (Math.max(...allPts.map((q) => q[1])) + Math.min(...allPts.map((q) => q[1]))) / 2
+  const turn = ([x, y]) => [cu + (y - inkY), cv - (x - inkX)] // 90° dans le sens trigonométrique, autour du centre de l'encre
   const deg = (rad) => (rad * 180) / Math.PI - 90 // angle dans le repère de la pièce (rotation de 90° trigo : angle - 90°)
   const rules = [], circles = []
   const edges = (poly) => poly.forEach((q, i) => { const n = poly[(i + 1) % poly.length]; rules.push([...turn(q), ...turn(n), NUM_LINE_W, 1].map(r2)) })
@@ -268,10 +297,10 @@ const numberShapes = (text, cu, cv, h) => {
       const c = [(Math.max(...xs) + Math.min(...xs)) / 2, (Math.max(...ys) + Math.min(...ys)) / 2]
       const rx = (Math.max(...xs) - Math.min(...xs)) / 2, ry = (Math.max(...ys) - Math.min(...ys)) / 2
       if (Math.max(...f.ring.map((q) => Math.abs(Math.hypot((q[0] - c[0]) / rx, (q[1] - c[1]) / ry) - 1))) < 0.08) { // un ovale (le 0) : dans le repère de la pièce (tournée de 90°), le rayon du glyphe en y devient le rayon en u
-        circles.push([...turn(c), rx + NUM_HALF, NUM_STEP, Math.max(rx - NUM_HALF - 0.001, 0.1), 0, 360, ry - rx].map(r2))
+        circles.push([...turn(c), rx + NUM_HALF, NUM_STEP, Math.max(rx - NUM_HALF - 0.004, 0.1), 0, 360, ry - rx].map(r2))
         return
       }
-      for (let d = NUM_HALF; d >= 0.06; d -= NUM_STEP) { edges(insetPoly(f.ring, -d)); edges(insetPoly(f.ring, d)) }
+      for (let d = NUM_HALF; d >= 0.06 * sc; d -= NUM_STEP) { edges(insetPoly(f.ring, -d)); edges(insetPoly(f.ring, d)) }
       return
     }
     const runs = splitRuns(st)
@@ -329,7 +358,7 @@ const numberShapes = (text, cu, cv, h) => {
     }
     const okAll = Array.from({ length: N + 1 }, (_, k) => RADII.every((dr) => free(cv_.r + dr, k)))
     if (okAll.every(Boolean) && !extended) { // rien ne le touche : le rond ou l'arc entier, tous ses cercles d'un coup
-      circles.push(cv_.full ? [...turn(cv_.c), cv_.r + NUM_HALF, NUM_STEP, Math.max(cv_.r - NUM_HALF - 0.001, 0.1)].map(r2) : [...turn(cv_.c), cv_.r + NUM_HALF, NUM_STEP, Math.max(cv_.r - NUM_HALF - 0.001, 0.1), deg(ang(0)), deg(ang(N))].map(r2))
+      circles.push(cv_.full ? [...turn(cv_.c), cv_.r + NUM_HALF, NUM_STEP, Math.max(cv_.r - NUM_HALF - 0.004, 0.1)].map(r2) : [...turn(cv_.c), cv_.r + NUM_HALF, NUM_STEP, Math.max(cv_.r - NUM_HALF - 0.004, 0.1), deg(ang(0)), deg(ang(N))].map(r2))
       return
     }
     const midK = Math.round(N / 2) // le milieu de l'arc : le morceau qui le contient est le bon (le prolongement ne doit pas ressortir de l'autre côté du trait)
@@ -350,7 +379,7 @@ const numberShapes = (text, cu, cv, h) => {
         const extN = Math.round((N * ARC_EXT) / Math.abs(sweepc))
         const kStart = ext0 && r.k0 === 0 ? extN : r.k0
         const kEnd = ext1 && r.k1 >= N ? N - extN : r.k1
-        circles.push([...turn(cv_.c), rho, NUM_STEP, rho - 0.001, deg(a0c + (sweepc * (first + kStart)) / N), deg(a0c + (sweepc * (first + kEnd)) / N)].map(r2))
+        circles.push([...turn(cv_.c), rho, NUM_STEP, rho - 0.004, deg(a0c + (sweepc * (first + kStart)) / N), deg(a0c + (sweepc * (first + kEnd)) / N)].map(r2))
       }
     }
   })
@@ -359,7 +388,30 @@ const numberShapes = (text, cu, cv, h) => {
 // les gravures d'une pièce : le numéro (traits + ronds) et des traits en plus (le liseré) ; `circles` n'est présent que s'il y en a
 const engrave = (text, cu, cv, h, extra = []) => {
   const { rules, circles } = numberShapes(text, cu, cv, h)
-  return { rules: [...rules, ...extra], ...(circles.length ? { circles } : {}) }
+  // l'encre finale (traits, cercles et arcs) est recentrée sur (cu, cv) : les chiffres sont alignés quelle que soit leur forme
+  const xs = [], ys = []
+  for (const r of rules) { xs.push(r[0], r[2]); ys.push(r[1], r[3]) }
+  for (const [cx, cy, r, , rMin, a0, a1, du = 0] of circles) {
+    const full = a0 === undefined || Math.abs(a1 - a0) >= 359.99
+    const steps = full ? 72 : Math.max(2, Math.ceil(Math.abs(a1 - a0) / 2))
+    for (let k = 0; k <= steps; k++) for (const rad of [r, rMin ?? r]) {
+      const a = ((full ? (360 * k) / steps : a0 + ((a1 - a0) * k) / steps) * Math.PI) / 180
+      xs.push(cx + (rad + du) * Math.cos(a))
+      ys.push(cy + rad * Math.sin(a))
+    }
+  }
+  // dans le sens de la largeur de la pièce (v), un chiffre qui contient un 4 est centré sur le centre de masse de ses lignes : la barre du 4 dépasse de sa tige, la boîte seule le décalait de ~0,9 mm
+  let centerV = (Math.min(...ys) + Math.max(...ys)) / 2
+  if (text.includes('4') && rules.length) {
+    const len = (r) => Math.hypot(r[2] - r[0], r[3] - r[1])
+    const total = rules.reduce((a, r) => a + len(r), 0)
+    centerV = rules.reduce((a, r) => a + (len(r) * (r[1] + r[3])) / 2, 0) / total
+  }
+  const dx = cu - (Math.min(...xs) + Math.max(...xs)) / 2, dy = cv - centerV
+  const sh = (v, d) => r2(v + d)
+  const moved = rules.map(([x0, y0, x1, y1, ...rest]) => [sh(x0, dx), sh(y0, dy), sh(x1, dx), sh(y1, dy), ...rest])
+  const movedCircles = circles.map(([cx, cy, ...rest]) => [sh(cx, dx), sh(cy, dy), ...rest])
+  return { rules: [...moved, ...extra], ...(movedCircles.length ? { circles: movedCircles } : {}) }
 }
 for (let k = 0; k < N; k++) {
   const deg = (360 / N) * k + 180 / N
@@ -370,8 +422,11 @@ for (let k = 0; k < N; k++) {
   for (let l = 1; l <= LO_STACK; l++) panels.push(lo(MID, l, { outer: rhombus, holes: [loHole] }))
   loLids.push(panels.length)
   panels.push(lo(plugMID, LO_STACK, { outer: plug, holes: [hollowPlug(plug)] })) // la pièce LO-03, dans le vide de la dernière couche évidée
+  const lidIn = innerOf(lidLO)
   loLids.push(panels.length)
-  panels.push(lo(MID + (mid(lidLO) - mid(rhombus)), LO_STACK + 1, { outer: lidLO, ...engrave(String(k + 1), pu / 2, ev, LO_NUM_H, decor(lidLO)) })) // le couvercle : LO-01 pleine au-dessus de la pile, numéroté 1 à 8
+  panels.push(lo(MID + (mid(lidLO) - mid(rhombus)), LO_STACK + 1, { id: 'LN', category: 'Numéroté', outer: lidLO, holes: [lidIn] })) // le contour du couvercle : un cadre, groupe LN
+  loLids.push(panels.length)
+  panels.push(lo(MID + (mid(lidIn) - mid(rhombus)), LO_STACK + 1, { outer: lidIn, ...engrave(String(k + 1), lidIn[1][0], ev, LO_NUM_H, cornerLines(lidIn)) })) // la pièce du milieu, qui porte le numéro (1 à 8)
 }
 
 // l'étoile de 28 cm (même forme qu'avant : pointes à R, creux à R × HOLLOW) en N pièces identiques : chacune va du centre O à une pointe T en passant par les deux creux voisins H1 / H2
@@ -420,11 +475,18 @@ for (let k = 0; k < N; k++) {
   const onAxis = (outer, level) => ({ id: 'E', category: 'Etoile', thickness: t, outer, position: [r2(Math.cos(a) * mid(outer)), t / 2 + level * t, r2(Math.sin(a) * mid(outer))], rotation: [-90, 0, r2(-deg)] })
   eTrap.push(panels.length)
   panels.push({ ...onAxis(trapPlug, STAR_STACK), holes: [hollowPlug(trapPlug)] }) // E-03 : monte avec E-04
+  // les pièces 17 à 24 sont en 2 pièces comme les couvercles : le cadre qui fait tout le tour du losange (groupe LN) et la pièce du milieu, avec le vide triangulaire et le numéro
+  const pieceIn = innerOf(piece)
   eTrap.push(panels.length)
-  panels.push({ ...onAxis(piece, STAR_STACK + 1), holes: [triHole], ...engrave(String(2 * N + k + 1), 33, starV, E04_NUM_H) }) // E-04 et E-05 en une seule pièce : le losange entier (centre, coins, pointe) avec le vide du triangle ; numéroté 17 à 24 entre le centre et le vide, dans la suite des LO (1 à 8) et des couvercles E (9 à 16)
+  panels.push({ ...onAxis(piece, STAR_STACK + 1), id: 'LN', category: 'Numéroté', holes: [pieceIn] })
+  eTrap.push(panels.length)
+  panels.push({ ...onAxis(pieceIn, STAR_STACK + 1), holes: [triHole], ...engrave(String(2 * N + k + 1), 33, starV, E04_NUM_H) })
   // un couvercle sur E-05 et E-04, avec dessous la pièce qui s'emboîte dans son vide (PLUG_GAP de jeu, évidée avec PLUG_FRAME de bordure), même principe que les autres
+  const lidEIn = innerOf(lidE)
   e06.push(panels.length)
-  panels.push({ ...onAxis(lidE, STAR_STACK + 2), ...engrave(String(N + k + 1), R / 2, starV, E_NUM_H, decor(lidE)) }) // numéroté 9 à 16 (tracé en traits, tourné de 90° trigo), dans la suite des LO // E-06 : la pièce entière (un losange) : elle recouvre E-04 et E-05, donc elle monte plus haut que E-04
+  panels.push({ ...onAxis(lidE, STAR_STACK + 2), id: 'LN', category: 'Numéroté', holes: [lidEIn] }) // le contour du couvercle E : un cadre, groupe LN
+  e06.push(panels.length)
+  panels.push({ ...onAxis(lidEIn, STAR_STACK + 2), ...engrave(String(N + k + 1), lidEIn[1][0], starV, E_NUM_H, cornerLines(lidEIn)) }) // la pièce du milieu, qui porte le numéro (9 à 16)
   e06.push(panels.length)
   panels.push({ ...onAxis(triPlug, STAR_STACK + 1), holes: [hollowPlug(triPlug)] })
 }
@@ -448,7 +510,7 @@ const model = {
   id: 'livre-avent-v2',
   name: 'Livre de l’Avent v2',
   description: 'Étoile à 8 branches de 28 cm en 8 pièces identiques, chacune avec 10 pièces évidées (bordure 4 mm, vide coupé en deux compartiments, un trapèze et un triangle, par une nervure au niveau du coin) empilées dessus, chaque compartiment avec son couvercle et sa pièce qui s’emboîte, un couvercle sur le trapèze et une couche sur le triangle, toutes sans leur bout côté centre (un octogone vide au milieu) ; un octogone au centre qui s’emboîte dans le vide, monté de même (pleine + évidées, bordure 4 mm), dont la dernière couche est un couvercle plein avec dessous une pièce qui s’emboîte ; autour, huit petites pièces calées dans ses creux, chacune jusqu’à la droite entre deux pointes, avec 10 pièces évidées (bordure 2 mm) empilées dessus.',
-  colors: { Etoile: '#d9b98c', Losange: '#8a5a2b', Octogone: '#ffffff' }, // E : marron clair, LO : marron plus foncé, O : blanc
+  colors: { Etoile: '#d9b98c', Losange: '#d9b98c', Octogone: '#d9b98c', Numéroté: '#8f6130' }, // E, LO et O : marron clair, LN (couvercles numérotés 1 à 8) : marron nettement plus foncé, O : le même marron clair
   panels,
   actions: [
     // quatre boutons : chacun cache un groupe de pièces (allumé : caché ; éteint : visible). La découpe ne change pas.
