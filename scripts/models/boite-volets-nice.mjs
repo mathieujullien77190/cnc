@@ -430,15 +430,36 @@ const PITCH = FOND + COPY_GAP
   panels.push({ id: 'F', category: 'Fond', thickness: t, outer: rect(0, 0, IX, BACK_MORE), position: [r2(cxB), t / 2, r2(zc - IZ / 2 + BACK_MORE / 2)], rotation: [-90, 0, 0] })
   // un cadre de 5 mm de large (fenêtre de 55 × 29 mm) posé sur une plaque pleine de même contour (65 × 39 mm), elle-même posée sur la planche de la bande arrière, au milieu
   const ez = r2(zc - IZ / 2 + BACK_MORE / 2)
-  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 65, 39), position: [r2(cxB), r2(t + t / 2), ez], rotation: [-90, 0, 0] })
+  // des fentes de 2 mm de large, une tous les 4 mm (2 mm de bois entre deux), qui courent sur la largeur (39 mm en z), à 4 mm des bords
+  const slats = []
+  for (let x = 4; x + 2 <= 65 - 4; x += 4) slats.push(rect(x, 4, 2, 39 - 8))
+  slats.pop() // la première et la dernière fente sont supprimées
+  slats.shift()
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 65, 39), holes: slats, position: [r2(cxB), r2(2 * t + t / 2), ez], rotation: [-90, 0, 0] })
   // un bout du côté gauche est enlevé : la bande de gauche est coupée sur 14 mm au milieu, la fenêtre s'ouvre sur le bord (contour d'un seul tenant)
   const CUT0 = 12.5
   const CUT1 = 26.5
   const frameO = [[0, 0], [65, 0], [65, 39], [0, 39], [0, CUT1], [5, CUT1], [5, 34], [60, 34], [60, 5], [5, 5], [5, CUT0], [0, CUT0]]
-  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(2 * t + t / 2), ez], rotation: [-90, 0, 0] })
-  // un deuxième cadre identique par-dessus le premier (même numéro)
   panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(3 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  // un deuxième cadre identique par-dessus le premier (même numéro)
   panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(4 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(5 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  // une planche de 7 × 39 mm (0,7 cm de long, aussi large que E-01 : 39 mm en z) sous E-01, de chaque côté (elles la surélèvent), à fleur de son bord droit
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(cxB + 65 / 2 - 7 / 2), r2(t + t / 2), ez], rotation: [-90, 0, 0] })
+  // et la même de l'autre côté, à fleur du bord gauche
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(cxB - 65 / 2 + 7 / 2), r2(t + t / 2), ez], rotation: [-90, 0, 0] })
+  // et les 2 mêmes planches restent aussi sur le dernier cadre E-02, une de chaque côté
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(cxB + 65 / 2 - 7 / 2), r2(6 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(cxB - 65 / 2 + 7 / 2), r2(6 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  // un autre composant (famille H), à côté du E, dans la bande arrière : même pile (une plaque pleine et 3 cadres), fenêtre de 64 × 26 mm (6,4 × 2,6 cm), bande de 5 mm autour
+  const HW = 64
+  const HD = 26
+  const hx = r2(cxB + 65 / 2 + 10 + (HW + 10) / 2)
+  const hFrame = [[0, 0], [HW + 10, 0], [HW + 10, HD + 10], [0, HD + 10]]
+  panels.push({ id: 'H', category: 'Support relais', thickness: t, outer: hFrame, position: [hx, r2(t + t / 2), ez], rotation: [-90, 0, 0] })
+  // les cadres H-02 n'ont plus de côté gauche : la fenêtre s'ouvre sur le bord (contour d'un seul tenant)
+  const hOpen = [[0, 0], [HW + 10, 0], [HW + 10, HD + 10], [0, HD + 10], [0, HD + 5], [HW + 5, HD + 5], [HW + 5, 5], [0, 5]]
+  for (let k = 2; k <= 4; k++) panels.push({ id: 'H', category: 'Support relais', thickness: t, outer: hOpen, position: [hx, r2(k * t + t / 2), ez], rotation: [-90, 0, 0] })
   console.log('boîte', IX, 'x', IZ, ', haut de l élément le plus haut', r2(top), ', parois', HB)
 }
 
