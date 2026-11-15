@@ -6069,6 +6069,105 @@
    ]
   },
   {
+   "id": "R",
+   "category": "Bouchon fente",
+   "thickness": 3,
+   "outer": [
+    [
+     0,
+     0
+    ],
+    [
+     32.076,
+     0
+    ],
+    [
+     32.076,
+     8.6
+    ],
+    [
+     0,
+     8.6
+    ]
+   ],
+   "position": [
+    -87.685,
+    16.5,
+    4
+   ],
+   "rotation": [
+    -90,
+    0,
+    0
+   ]
+  },
+  {
+   "id": "R",
+   "category": "Bouchon fente",
+   "thickness": 3,
+   "outer": [
+    [
+     0,
+     0
+    ],
+    [
+     32.076,
+     0
+    ],
+    [
+     32.076,
+     8.6
+    ],
+    [
+     0,
+     8.6
+    ]
+   ],
+   "position": [
+    -87.685,
+    16.5,
+    17
+   ],
+   "rotation": [
+    -90,
+    0,
+    0
+   ]
+  },
+  {
+   "id": "R",
+   "category": "Bouchon fente",
+   "thickness": 3,
+   "outer": [
+    [
+     0,
+     0
+    ],
+    [
+     32.076,
+     0
+    ],
+    [
+     32.076,
+     8.6
+    ],
+    [
+     0,
+     8.6
+    ]
+   ],
+   "position": [
+    -87.685,
+    16.5,
+    29
+   ],
+   "rotation": [
+    -90,
+    0,
+    0
+   ]
+  },
+  {
    "id": "S",
    "category": "Planche moteur",
    "thickness": 3,

@@ -246,6 +246,15 @@ const crossRules = () => {
 }
 panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LID, LID), holes: lidHoles, rules: crossRules(), position: [rx0, LID_TOP - t / 2, REMOTE_Z], rotation: [-90, 0, 0] })
 
+// les 3 fentes de la plaque (au-dessus des touches) sont remplies par des rectangles de bois, à PLUG_EDGE mm du bord de chaque fente (0,2 mm de vide tout autour)
+const PLUG_EDGE = 0.2
+for (const sv of servos) {
+  const [[u0, v0], [u1], [, v1]] = slotOf(sv)
+  const w = u1 - u0 - 2 * PLUG_EDGE
+  const h = v1 - v0 - 2 * PLUG_EDGE
+  panels.push({ id: 'R', category: 'Bouchon fente', thickness: t, outer: rect(0, 0, r2(w), r2(h)), position: [r2(rx0 - LID / 2 + (u0 + u1) / 2), r2(LID_TOP - t / 2), r2(REMOTE_Z - LID / 2 + (v0 + v1) / 2)], rotation: [-90, 0, 0] })
+}
+
 // 3 planches debout autour du cul du moteur du milieu (une derrière, une de chaque côté) et une planche à plat par-dessus, posées sur la plaque, de la hauteur du corps du moteur (12 mm) ;
 // les côtés vont du cul jusqu'aux ailettes. Le vide entre les côtés est celui du corps du moteur plus 0,3 mm (ajustement trouvé avec les U d'essai).
 // Elles s'emboîtent par de mini crans (comme les autres planches, crans impairs, profondeur = épaisseur) : le bout des côtés dans des encoches du fond, le haut des trois dans des encoches de la planche du dessus.
