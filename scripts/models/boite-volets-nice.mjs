@@ -381,6 +381,67 @@ const actions = [
   },
 ]
 
+// 3 ensembles identiques côte à côte (selon x, COPY_GAP mm entre les fonds, collés) : on duplique tout l'ensemble ; les pièces identiques gardent le même numéro (quantité 3)
+const COPIES = 3
+const COPY_GAP = 0
+const PITCH = FOND + COPY_GAP
+{
+  const base = panels.slice()
+  const baseSteps = actions[0].steps.slice()
+  for (let k = 1; k < COPIES; k++) {
+    for (const p of base) panels.push({ ...p, position: [r2(p.position[0] + k * PITCH), p.position[1], p.position[2]] })
+    for (const st of baseSteps) actions[0].steps.push({ ...st, panels: st.panels.map((i) => i + k * base.length), pivot: [r2(st.pivot[0] + k * PITCH), st.pivot[1], st.pivot[2]] })
+  }
+}
+
+// la grande boîte : un fond et 4 parois crantées, ouverte en haut, qui entoure pile les 3 ensembles (intérieur = leur emprise) et monte 1 cm au-dessus de l'élément le plus haut
+{
+  const EXTRA = 10
+  const IX = COPIES * FOND + (COPIES - 1) * COPY_GAP // intérieur en x
+  const BACK_MORE = 40 // la boîte est plus profonde de 4 cm vers l'arrière (z petits)
+  const IZ = FOND + BACK_MORE // intérieur en z
+  const zc = REMOTE_Z - BACK_MORE / 2 // milieu de l'intérieur en z
+  const cxB = rx0 + ((COPIES - 1) * PITCH) / 2 // milieu de l'intérieur en x
+  let top = 0
+  for (const p of panels) {
+    const vs = p.outer.map((q) => q[1])
+    const flat = p.rotation && p.rotation[0] === -90
+    top = Math.max(top, p.position[1] + (flat ? p.thickness / 2 : (Math.max(...vs) - Math.min(...vs)) / 2))
+  }
+  const HB = r2(top + EXTRA) // hauteur intérieure : du dessus du fond au haut des parois
+  const LONGX = IX + 2 * t
+  const box = (o) => {
+    const us = o.map((q) => q[0])
+    const vs = o.map((q) => q[1])
+    return { cu: (Math.min(...us) + Math.max(...us)) / 2, cv: (Math.min(...vs) + Math.max(...vs)) / 2 }
+  }
+  // le fond (à plat, sous les ensembles) : encoches sur les 4 côtés pour les languettes du bas des parois
+  const floorO = plateOutline(LONGX, IZ + 2 * t, { top: { d: -t }, bottom: { d: -t }, left: { d: -t, a: t, b: t + IZ }, right: { d: -t, a: t, b: t + IZ } })
+  panels.push({ id: 'G', category: 'Grande boîte', thickness: t, outer: floorO, position: [r2(cxB), -t / 2, zc], rotation: [-90, 0, 0] })
+  // devant et derrière (plan XY) : couvrent les coins, encoches pour les languettes des côtés
+  const longO = plateOutline(LONGX, HB, { bottom: { d: t }, left: { d: -t }, right: { d: -t } })
+  const lb = box(longO)
+  for (const sz of [-1, 1]) panels.push({ id: 'G', category: 'Grande boîte', thickness: t, outer: longO, position: [r2(cxB - LONGX / 2 + lb.cu), r2(HB - lb.cv), r2(zc + sz * (IZ / 2 + t / 2))] })
+  // les côtés (plan YZ) : languettes en bas et aux deux bouts
+  const sideO = plateOutline(IZ, HB, { bottom: { d: t }, left: { d: t }, right: { d: t } })
+  const sb = box(sideO)
+  for (const sx of [-1, 1]) panels.push({ id: 'G', category: 'Grande boîte', thickness: t, outer: sideO, position: [r2(cxB + sx * (IX / 2 + t / 2)), r2(HB - sb.cv), r2(zc - IZ / 2 + sb.cu)], rotation: [0, -90, 0] })
+  // une planche à plat sur le fond, dans la bande de 4 cm ajoutée derrière, sur toute la longueur de la boîte
+  panels.push({ id: 'F', category: 'Fond', thickness: t, outer: rect(0, 0, IX, BACK_MORE), position: [r2(cxB), t / 2, r2(zc - IZ / 2 + BACK_MORE / 2)], rotation: [-90, 0, 0] })
+  // un cadre de 5 mm de large (fenêtre de 55 × 29 mm) posé sur une plaque pleine de même contour (65 × 39 mm), elle-même posée sur la planche de la bande arrière, au milieu
+  const ez = r2(zc - IZ / 2 + BACK_MORE / 2)
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 65, 39), position: [r2(cxB), r2(t + t / 2), ez], rotation: [-90, 0, 0] })
+  // un bout du côté gauche est enlevé : la bande de gauche est coupée sur 10 mm au milieu, la fenêtre s'ouvre sur le bord (contour d'un seul tenant)
+  const CUT0 = 14.5
+  const CUT1 = 24.5
+  const frameO = [[0, 0], [65, 0], [65, 39], [0, 39], [0, CUT1], [5, CUT1], [5, 34], [60, 34], [60, 5], [5, 5], [5, CUT0], [0, CUT0]]
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(2 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  // un deuxième cadre identique par-dessus le premier (même numéro)
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(3 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(4 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  console.log('boîte', IX, 'x', IZ, ', haut de l élément le plus haut', r2(top), ', parois', HB)
+}
+
 const model = {
   format: 'cnc-model',
   version: 1,
