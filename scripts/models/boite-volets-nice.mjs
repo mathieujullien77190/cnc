@@ -257,6 +257,20 @@ const U_ARM = SERVO_DEPTH - BODY_TOP + t / 2 // longueur des bras à partir du c
   put([[bx0 - U_W, zOut], [bx1 + U_W, zOut], [bx1 + U_W, zOut + s.dir * SQ], [bx0 - U_W, zOut + s.dir * SQ]], 4)
 }
 
+// 5 U d'essai, à part (à plat, à côté de la boîte) : le vide du U est plus large que le corps du moteur de 0,1 mm, puis 0,2, 0,3, 0,4 et 0,5 mm, pour trouver le bon ajustement
+for (let k = 1; k <= 5; k++) {
+  const w = SERVO_L + k * 0.1 + 2 * U_W
+  const len = U_ARM + U_W
+  panels.push({
+    id: 'UE',
+    category: 'Essai U',
+    thickness: t,
+    outer: [[0, 0], [w, 0], [w, len], [w - U_W, len], [w - U_W, U_W], [U_W, U_W], [U_W, len], [0, len]].map(([u, v]) => [r2(u), r2(v)]),
+    position: [r2(10 + (k - 1) * 35 + w / 2), t / 2, r2(len / 2)],
+    rotation: [-90, 0, 0],
+  })
+}
+
 // pièces montrées mais non découpées : servos, axes, télécommandes, touches
 const cyl = (r) => circle(0, 0, r, 24)
 for (const s of servos) {
