@@ -281,7 +281,7 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
   for (const sx of [-1, 1]) {
     const short = sx === axisSide
     const len = short ? L - SHORT : L
-    const sideO = plateOutline(len, H, { top: { d: t }, ...(short ? {} : { bottom: { d: t } }), ...(short ? {} : d > 0 ? { left: { d: t } } : { right: { d: t } }) })
+    const sideO = plateOutline(len, H, { top: { d: t }, bottom: { d: t }, ...(short ? {} : d > 0 ? { left: { d: t } } : { right: { d: t } }) })
     if (short) {
       // une bande de BAND_W mm sur toute la hauteur, collée à la planche du cul (S-01), reliée à la planche raccourcie par un bout du haut (BIT_H de haut)
       if (d > 0) {
@@ -325,15 +325,24 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
   panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(topO), position: [r2(cx - W / 2 + tb.cu), r2(LID_TOP + LIFT + H + t / 2), r2(zv0 + tb.cv)], rotation: [-90, 0, 0] })
   // la plaque du dessous (à plat, sur le couvercle) : mêmes encoches que celle du dessus, sauf du côté de l'axe où la planche raccourcie n'a pas de bout du bas
   const zoneBot = (sx) => (sx === axisSide ? null : zoneFor(sx))
-  const EXT = 10 // la plaque dépasse de 1 cm derrière et de chaque côté (pas devant, vers le moteur) : les encoches deviennent des fenêtres
-  const zb = (sx) => zoneBot(sx)
-  const botHoles = [
-    ...windowsFor(W, t, EXT, true, 0, W, EXT), // derrière (la planche du cul)
-    ...[-1, 1].filter((sx) => zb(sx)).flatMap((sx) => windowsFor(LP, t, sx < 0 ? EXT : EXT + W - t, false, zb(sx).a, zb(sx).b, EXT)),
-  ]
-  const botO = plateOutline(W + 2 * EXT, LP + EXT, { bottom: { d: -t, a: blockU0 + EXT, b: blockU0 + EXT + BW } })
+  const STOP_W = 5 // la cale contre le bout de l'ailette, côté axe : 5 mm de large (x), sur toute la longueur de S-06
+  const EXT = EARS_L / 2 + STOP_W - W / 2 // la plaque dépasse du côté de l'axe (S-02) seulement, jusqu'au bout de la cale ; derrière elle est à fleur de S-01, et du côté long (S-03) à fleur de S-03
+  const offL = axisSide === -1 ? EXT : 0 // le dépassement est à gauche (x petits) ou à droite
+  const longSx = -axisSide
+  const botO = plateOutline(W + EXT, LP, {
+    top: { d: -t, a: offL, b: offL + W },
+    bottom: { d: -t, a: blockU0 + offL, b: blockU0 + offL + BW },
+    ...(longSx === -1 ? { left: { d: -t, ...zoneFor(-1) } } : { right: { d: -t, ...zoneFor(1) } }),
+  })
+  // S-02 (côté axe) entre dans des fenêtres de la plaque : sa languette du bas est dans le repère de la plaque à (SHORT + t) du bord arrière
+  const botHoles = windowsFor(L - SHORT, t, axisSide === -1 ? offL : W - t, false, 0, L - SHORT, SHORT + t)
   const bt = box(botO)
-  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(botO), holes: botHoles.map(r2o), position: [r2(cx - W / 2 - EXT + bt.cu), r2(LID_TOP + t / 2), r2(zv0 - EXT + bt.cv)], rotation: [-90, 0, 0] })
+  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(botO), holes: botHoles.map(r2o), position: [r2(cx - W / 2 - offL + bt.cu), r2(LID_TOP + t / 2), r2(zv0 + bt.cv)], rotation: [-90, 0, 0] })
+  // la cale : une pièce à plat sur S-06, contre le bout de l'ailette du côté de l'axe (même profondeur que l'ailette)
+  const EAR_D = 2.5
+  const tipX = cx + axisSide * (EARS_L / 2)
+  const earZ = s.zp + d * (t / 2 + EARS_SHIFT + EAR_D / 2)
+  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: rect(0, 0, STOP_W, LP), position: [r2(tipX + axisSide * (STOP_W / 2)), r2(LID_TOP + t + t / 2), r2(zv0 + LP / 2)], rotation: [-90, 0, 0] })
 }
 
 // pièces montrées mais non découpées : servos, axes, télécommandes, touches
