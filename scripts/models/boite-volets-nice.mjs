@@ -425,7 +425,9 @@ const PITCH = FOND + COPY_GAP
   // les côtés (plan YZ) : languettes en bas et aux deux bouts
   const sideO = plateOutline(IZ, HB, { bottom: { d: t }, left: { d: t }, right: { d: t } })
   const sb = box(sideO)
-  for (const sx of [-1, 1]) panels.push({ id: 'G', category: 'Grande boîte', thickness: t, outer: sideO, position: [r2(cxB + sx * (IX / 2 + t / 2)), r2(HB - sb.cv), r2(zc - IZ / 2 + sb.cu)], rotation: [0, -90, 0] })
+  // un trou de 20 × 20 mm vers l'arrière (z petits) de la planche de gauche seulement, à 10 mm du bout, au milieu de la hauteur
+  const sideHole = rect(10, r2((HB - 20) / 2), 20, 20)
+  for (const sx of [-1, 1]) panels.push({ id: 'G', category: 'Grande boîte', thickness: t, outer: sideO, holes: sx === -1 ? [sideHole] : [], position: [r2(cxB + sx * (IX / 2 + t / 2)), r2(HB - sb.cv), r2(zc - IZ / 2 + sb.cu)], rotation: [0, -90, 0] })
   // une planche à plat sur le fond, dans la bande de 4 cm ajoutée derrière, sur toute la longueur de la boîte
   panels.push({ id: 'F', category: 'Fond', thickness: t, outer: rect(0, 0, IX, BACK_MORE), position: [r2(cxB), t / 2, r2(zc - IZ / 2 + BACK_MORE / 2)], rotation: [-90, 0, 0] })
   // un cadre de 5 mm de large (fenêtre de 55 × 29 mm) posé sur une plaque pleine de même contour (65 × 39 mm), elle-même posée sur la planche de la bande arrière, au milieu
