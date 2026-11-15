@@ -431,9 +431,9 @@ const PITCH = FOND + COPY_GAP
   // un cadre de 5 mm de large (fenêtre de 55 × 29 mm) posé sur une plaque pleine de même contour (65 × 39 mm), elle-même posée sur la planche de la bande arrière, au milieu
   const ez = r2(zc - IZ / 2 + BACK_MORE / 2)
   panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 65, 39), position: [r2(cxB), r2(t + t / 2), ez], rotation: [-90, 0, 0] })
-  // un bout du côté gauche est enlevé : la bande de gauche est coupée sur 10 mm au milieu, la fenêtre s'ouvre sur le bord (contour d'un seul tenant)
-  const CUT0 = 14.5
-  const CUT1 = 24.5
+  // un bout du côté gauche est enlevé : la bande de gauche est coupée sur 14 mm au milieu, la fenêtre s'ouvre sur le bord (contour d'un seul tenant)
+  const CUT0 = 12.5
+  const CUT1 = 26.5
   const frameO = [[0, 0], [65, 0], [65, 39], [0, 39], [0, CUT1], [5, CUT1], [5, 34], [60, 34], [60, 5], [5, 5], [5, CUT0], [0, CUT0]]
   panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(2 * t + t / 2), ez], rotation: [-90, 0, 0] })
   // un deuxième cadre identique par-dessus le premier (même numéro)
