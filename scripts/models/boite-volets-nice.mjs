@@ -132,6 +132,7 @@ const FOND = R + 40 // le fond est un carré plus grand que la télécommande : 
 const rx0 = REMOTE_X[0]
 const LONG = R + 2 * t // devant et derrière
 const half = FOND / 2
+const LID = LONG + 10 // la plaque du dessus : 1 cm plus grande que la télécommande avec ses bords
 const wy = t + BORD_H / 2
 const windowsAt = (h) => [
   ...windowsFor(LONG, t, h + R / 2, true, 0, LONG, h - R / 2 - t), // devant
@@ -158,18 +159,20 @@ for (const sx of [-1, 1]) panels.push(standing(R, (cu, y) => ({ position: [r2(rx
 
 // palonniers (l'accessoire pousse la touche) : les servos ne sont tenus par rien dans le modèle (ni plaque, ni bloc, ni planche, ni couvercle)
 const hornIndex = []
-for (const s of servos) {
+const KEPT = servos.filter((q) => q.j === 1) // un seul moteur gardé : celui du milieu (les fentes de la plaque restent pour les trois)
+for (const s of KEPT) {
   const h = horn(s)
   hornIndex.push({ index: panels.length, s })
   panels.push({ id: 'MOT', category: 'Palonnier', thickness: HORN_T, outer: h.outer, holes: [h.hole], cut: false, position: h.position })
 }
 
-// la plaque posée sur les bords (à la taille de la télécommande avec ses bords : 86 × 86 ; des encoches sur son pourtour reçoivent les languettes du haut des bords) ; les servos sont posés dessus, le palonnier passe dessous par une fente
+// la plaque posée sur les bords (96 × 96, 1 cm de plus que la télécommande avec ses bords ; des fenêtres reçoivent les languettes du haut des bords) ; les servos sont posés dessus, le palonnier passe dessous par une fente
 // (un rectangle de l'épaisseur du palonnier, qui couvre le trajet du palonnier de sa position jusqu'à l'angle de repos)
 const SLOT_MORE_L = 20
+const SLOT_B03_LEFT = 5 // la fente de B-03 est réduite de 5 mm sur la gauche
 const SLOT_BAR = 3 // bois mini entre deux fentes (mm)
 const SLOT_W = Math.min(BTN_Z[1] - BTN_Z[0], BTN_Z[2] - BTN_Z[1]) - SLOT_BAR // largeur des fentes (9 mm : les touches sont à 12 et 13 mm l'une de l'autre)
-const slotOf = (s) => {
+const slotRange = (s) => {
   const h = hornOutline().map(([a, b]) => {
     const len = Math.hypot(s.rx - s.xs, BTN_FACE - PIVOT_Y)
     const dx = (s.rx - s.xs) / len
@@ -195,85 +198,114 @@ const slotOf = (s) => {
     }
   }
   // la fente est bien plus large que le palonnier : 20 mm de plus en longueur (x) et SLOT_W en largeur (z), avec SLOT_BAR de bois au moins entre deux fentes
-  return rect(r2(x0 - SLOT_MORE_L / 2 - (rx0 - LONG / 2)), r2(s.zb - SLOT_W / 2 - (REMOTE_Z - LONG / 2)), r2(x1 - x0 + SLOT_MORE_L), SLOT_W)
+  const cut = s.j === 2 ? SLOT_B03_LEFT : 0 // la fente au-dessus de B-03 (la touche du bas) est raccourcie à gauche
+  return [x0 - SLOT_MORE_L / 2 + cut, x1 + SLOT_MORE_L / 2] // [début, fin] en x (monde)
 }
-const lidAt = panels.length
-panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: plateOutline(LONG, LONG, { top: { d: -t }, bottom: { d: -t }, left: { d: -t, a: t, b: LONG - t }, right: { d: -t, a: t, b: LONG - t } }), holes: servos.map(slotOf), position: [rx0, LID_TOP - t / 2, REMOTE_Z], rotation: [-90, 0, 0] })
-
-// un support en U (3 mm de large) posé sur la plaque autour du cul du moteur du milieu, par-dessus 3 L (le bras de gauche manque : les fils du servo sortent de ce côté), puis une plaque carrée sur le dessus du moteur ; d'autres couches s'empileront ensuite. Le U entoure le corps sans jeu, ouvert vers l'axe du servo.
-const ENGR_BOIS = 1.2 // bois mini entre un trait gravé et une fente
-const U_W = 3 // largeur des bras du U
-const U_ARM = SERVO_DEPTH - BODY_TOP + t / 2 // longueur des bras à partir du cul : ils vont jusqu'aux ailettes (les oreilles du servo, qui commencent à t / 2 de la plaque de l'axe)
-{
-  const s = servos[1]
-  const cx = s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END) // milieu du corps en x
-  const rear = s.zp - s.dir * (SERVO_DEPTH - BODY_TOP) // le cul : le bout du corps, à l'opposé du palonnier
-  const bx0 = cx - SERVO_L / 2
-  const bx1 = cx + SERVO_L / 2
-  const zOut = rear - s.dir * U_W // derrière le fond du U
-  const zEnd = rear + s.dir * U_ARM // le bout des bras
-  // contour en x, z (monde), dans l'ordre : fond du U, bras droit, bras gauche
-  const world = [[bx0 - U_W, zOut], [bx1 + U_W, zOut], [bx1 + U_W, zEnd], [bx1, zEnd], [bx1, rear], [bx0, rear], [bx0, zEnd], [bx0 - U_W, zEnd]]
-  const put = (world, level) => {
-    const xmin = Math.min(...world.map((q) => q[0]))
-    const zmin = Math.min(...world.map((q) => q[1]))
-    const xmax = Math.max(...world.map((q) => q[0]))
-    const zmax = Math.max(...world.map((q) => q[1]))
-    panels.push({ id: 'U', category: 'Support moteur', thickness: t, outer: world.map(([x, z]) => [r2(x - xmin), r2(z - zmin)]), position: [r2((xmin + xmax) / 2), r2(LID_TOP + (level + 0.5) * t), r2((zmin + zmax) / 2)], rotation: [-90, 0, 0] })
-  }
-  put(world, 0) // le U sur la plaque
-  // son emplacement est gravé sur la plaque (C-01) : le contour du U, en traits
-  // (les parties qui tombent dans une fente, ou à moins de ENGR_BOIS d'elle, ne sont pas gravées : un dessin reste sur du bois plein)
-  const o = [rx0 - LONG / 2, REMOTE_Z - LONG / 2]
-  const holes = panels[lidAt].holes.map((h) => {
+// les 3 fentes sont alignées sur celle de B-03 (même début et même fin en x) ; elles couvrent bien le trajet de chaque palonnier
+const SLOT_RIGHT_PLUS = 5 // les fentes sont plus longues de 5 mm sur la droite
+const alignedRange = [slotRange(servos[2])[0], slotRange(servos[2])[1] + SLOT_RIGHT_PLUS]
+const slotOf = (s) => {
+  const [a, b] = slotRange(s) // la fente propre à ce palonnier, avec ses marges
+  const hornA = a + SLOT_MORE_L / 2 - (s.j === 2 ? SLOT_B03_LEFT : 0)
+  const hornB = b - SLOT_MORE_L / 2
+  if (hornA < alignedRange[0] || hornB > alignedRange[1]) throw new Error(`la fente alignée ne couvre pas le palonnier ${s.j}`)
+  const [x0, x1] = alignedRange
+  return rect(r2(x0 - (rx0 - LID / 2)), r2(s.zb - SLOT_W / 2 - (REMOTE_Z - LID / 2)), r2(x1 - x0), SLOT_W)
+}
+const lidHoles = [...windowsAt(LID / 2), ...servos.map(slotOf)]
+// la plaque est couverte de mini croix, une à chaque intersection d'un quadrillage de GRID mm (la première à GRID_FIRST mm du bord) : un bras de CROSS mm de chaque côté du point.
+// Partout sur le bois ; une croix qui touche un trou est coupée au bord du trou (on ne grave jamais dans un trou).
+const GRID = 1
+const GRID_FIRST = 0.5
+const CROSS = 0.15
+const CROSS_W = 0.12 // trait fin de 0,12 mm, une seule passe (pas de 1), comme les traits des numéros (NUM_LINE_W de livre-avent-v2)
+const crossRules = () => {
+  const boxes = lidHoles.map((h) => {
     const us = h.map((q) => q[0])
     const vs = h.map((q) => q[1])
-    return [Math.min(...us) - ENGR_BOIS, Math.min(...vs) - ENGR_BOIS, Math.max(...us) + ENGR_BOIS, Math.max(...vs) + ENGR_BOIS]
+    return [Math.min(...us) - CROSS_W / 2 - 0.01, Math.min(...vs) - CROSS_W / 2 - 0.01, Math.max(...us) + CROSS_W / 2 + 0.01, Math.max(...vs) + CROSS_W / 2 + 0.01] // le trait a une largeur : il s'arrête avant le bord du trou
   })
-  const rules = []
-  world.forEach(([x, z], i) => {
-    const [x2, z2] = world[(i + 1) % world.length]
-    const a = [x - o[0], z - o[1]]
-    const b = [x2 - o[0], z2 - o[1]]
-    // les bouts du segment qui sont hors de toutes les fentes (le long d'un segment horizontal ou vertical)
-    let spans = [[0, 1]]
-    for (const [u0, v0, u1, v1] of holes) {
-      const lo = (a[0] === b[0] ? (a[0] > u0 && a[0] < u1 ? [Math.min(a[1], b[1]), Math.max(a[1], b[1]), v0, v1, a[1] < b[1]] : null) : a[1] > v0 && a[1] < v1 ? [Math.min(a[0], b[0]), Math.max(a[0], b[0]), u0, u1, a[0] < b[0]] : null)
-      if (!lo) continue
-      const len = lo[1] - lo[0]
-      const c0 = Math.max(0, (lo[2] - lo[0]) / len)
-      const c1 = Math.min(1, (lo[3] - lo[0]) / len)
-      if (c1 <= c0) continue
-      const [t0, t1] = lo[4] ? [c0, c1] : [1 - c1, 1 - c0]
-      spans = spans.flatMap(([s0, s1]) => (t1 <= s0 || t0 >= s1 ? [[s0, s1]] : [[s0, Math.min(s1, t0)], [Math.max(s0, t1), s1]].filter(([p, q]) => q > p)))
+  const out = []
+  /** Le bout de segment [lo, hi] sur la ligne `fixed`, sans les parties dans un trou ; `vertical` : la ligne est u = fixed. */
+  const piece = (fixed, lo, hi, vertical) => {
+    let spans = [[lo, hi]]
+    for (const [u0, v0, u1, v1] of boxes) {
+      const [a, b, c, d] = vertical ? [u0, u1, v0, v1] : [v0, v1, u0, u1]
+      if (!(fixed > a && fixed < b)) continue
+      spans = spans.flatMap(([s0, s1]) => (d <= s0 || c >= s1 ? [[s0, s1]] : [[s0, Math.min(s1, c)], [Math.max(s0, d), s1]].filter(([p, q]) => q - p > 0.02)))
     }
-    for (const [s0, s1] of spans) rules.push([r2(a[0] + (b[0] - a[0]) * s0), r2(a[1] + (b[1] - a[1]) * s0), r2(a[0] + (b[0] - a[0]) * s1), r2(a[1] + (b[1] - a[1]) * s1)])
-  })
-  panels[lidAt].rules = rules
-  // par-dessus : un L, sans le bras de gauche (côté bx0, où sortent les fils du servo)
-  for (const level of [1, 2, 3]) put([[bx0, zOut], [bx1 + U_W, zOut], [bx1 + U_W, zEnd], [bx1, zEnd], [bx1, rear], [bx0, rear]], level)
-  // tout en haut : une plaque carrée (la largeur du U) qui recouvre le dessus du moteur, posée sur les L
-  const SQ = bx1 - bx0 + 2 * U_W
-  put([[bx0 - U_W, zOut], [bx1 + U_W, zOut], [bx1 + U_W, zOut + s.dir * SQ], [bx0 - U_W, zOut + s.dir * SQ]], 4)
+    for (const [s0, s1] of spans) out.push(vertical ? [r2(fixed), r2(s0), r2(fixed), r2(s1), CROSS_W, 1] : [r2(s0), r2(fixed), r2(s1), r2(fixed), CROSS_W, 1])
+  }
+  for (let a = GRID_FIRST; a <= LID - GRID_FIRST + 1e-9; a += GRID)
+    for (let b = GRID_FIRST; b <= LID - GRID_FIRST + 1e-9; b += GRID) {
+      piece(b, a - CROSS, a + CROSS, false)
+      piece(a, b - CROSS, b + CROSS, true)
+    }
+  return out
 }
+panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LID, LID), holes: lidHoles, rules: crossRules(), position: [rx0, LID_TOP - t / 2, REMOTE_Z], rotation: [-90, 0, 0] })
 
-// 5 U d'essai, à part (à plat, à côté de la boîte) : le vide du U est plus large que le corps du moteur de 0,1 mm, puis 0,2, 0,3, 0,4 et 0,5 mm, pour trouver le bon ajustement
-for (let k = 1; k <= 5; k++) {
-  const w = SERVO_L + k * 0.1 + 2 * U_W
-  const len = U_ARM + U_W
-  panels.push({
-    id: 'UE',
-    category: 'Essai U',
-    thickness: t,
-    outer: [[0, 0], [w, 0], [w, len], [w - U_W, len], [w - U_W, U_W], [U_W, U_W], [U_W, len], [0, len]].map(([u, v]) => [r2(u), r2(v)]),
-    position: [r2(10 + (k - 1) * 35 + w / 2), t / 2, r2(len / 2)],
-    rotation: [-90, 0, 0],
-  })
+// 3 planches debout autour du cul du moteur du milieu (une derrière, une de chaque côté) et une planche à plat par-dessus, posées sur la plaque, de la hauteur du corps du moteur (12 mm) ;
+// les côtés vont du cul jusqu'aux ailettes. Le vide entre les côtés est celui du corps du moteur plus 0,3 mm (ajustement trouvé avec les U d'essai).
+// Elles s'emboîtent par de mini crans (comme les autres planches, crans impairs, profondeur = épaisseur) : le bout des côtés dans des encoches du fond, le haut des trois dans des encoches de la planche du dessus.
+{
+  const SIDE_PLAY = 0.3
+  const s = servos[1]
+  const d = s.dir
+  const cx = s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END) // milieu du corps en x
+  const rear = s.zp - d * (SERVO_DEPTH - BODY_TOP) // le cul : le bout du corps, à l'opposé du palonnier
+  const inner = SERVO_L + SIDE_PLAY
+  const H = 12
+  const W = inner + 2 * t // largeur de la planche du cul et de celle du dessus
+  const L = SERVO_DEPTH - BODY_TOP + t / 2 // longueur des côtés : jusqu'à la face arrière des ailettes
+  const box = (o) => {
+    const us = o.map((q) => q[0])
+    const vs = o.map((q) => q[1])
+    return { cu: (Math.min(...us) + Math.max(...us)) / 2, cv: (Math.min(...vs) + Math.max(...vs)) / 2 }
+  }
+  const r2o = (o) => o.map(([a, b]) => [r2(a), r2(b)])
+  // le côté de l'axe du servo (le bout du corps le plus près de l'axe) a sa planche raccourcie de SHORT mm du côté de la planche du cul : pas de crans à ce bout
+  const axisSide = -s.sx // -1 : côté des x petits (gauche), 1 : côté des x grands
+  const SHORT = 6
+  const BIT_H = 3 // hauteur du bout qui touche S-01
+  // derrière (plan XY) : languettes en haut, encoches sur les bords debout (là où entrent les côtés ; pas du côté de l'axe)
+  const backO = plateOutline(W, H, { top: { d: t }, ...(axisSide === -1 ? {} : { left: { d: -t } }), ...(axisSide === 1 ? {} : { right: { d: -t } }) })
+  const b = box(backO)
+  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(backO), position: [r2(cx - W / 2 + b.cu), r2(LID_TOP + H - b.cv), r2(rear - d * (t / 2))] })
+  // côtés (plan YZ, u vers z) : languette en haut et languette au bout du cul (bord gauche si le cul est du côté des z petits, droit sinon), sauf du côté de l'axe : raccourci, sans languette au bout
+  for (const sx of [-1, 1]) {
+    const short = sx === axisSide
+    const len = short ? L - SHORT : L
+    const sideO = plateOutline(len, H, { top: { d: t }, ...(short ? {} : d > 0 ? { left: { d: t } } : { right: { d: t } }) })
+    if (short) {
+      // en haut, un bout de SHORT mm (BIT_H de haut) qui va toucher la planche du cul (S-01) : la planche raccourcie y retrouve son contact
+      if (d > 0) {
+        sideO.pop() // le dernier point est le coin haut gauche, déjà le premier
+        sideO.push([0, BIT_H], [-SHORT, BIT_H], [-SHORT, 0])
+      } else {
+        const at = sideO.findIndex((q, k) => q[0] === len && q[1] === 0 && sideO[k - 1] && sideO[k - 1][0] === len && sideO[k - 1][1] === 0)
+        sideO.splice(at + 1, 0, [len + SHORT, 0], [len + SHORT, BIT_H], [len, BIT_H])
+      }
+    }
+    const sb = box(sideO)
+    const zu0 = d > 0 ? rear + (short ? SHORT : 0) : rear - L // z du bord u = 0 du corps
+    panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(sideO), position: [r2(cx + sx * (inner / 2 + t / 2)), r2(LID_TOP + H - sb.cv), r2(zu0 + sb.cu)], rotation: [0, -90, 0] })
+  }
+  // dessus (à plat) : encoches sur le bord du cul et sur les deux bords, là où entrent les languettes du haut
+  const LP = SERVO_DEPTH + t // la planche du dessus va du dos de la planche du cul jusqu'au bout du moteur (MOT-02, le corps)
+  const zoneFor = (sx) => {
+    const cut = sx === axisSide ? SHORT : 0
+    return d > 0 ? { a: t + cut, b: t + L } : { a: SERVO_DEPTH - L, b: SERVO_DEPTH - cut }
+  }
+  const topO = plateOutline(W, LP, { ...(d > 0 ? { top: { d: -t } } : { bottom: { d: -t } }), left: { d: -t, ...zoneFor(-1) }, right: { d: -t, ...zoneFor(1) } })
+  const tb = box(topO)
+  const zv0 = d > 0 ? rear - t : rear - SERVO_DEPTH // z du bord v = 0
+  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(topO), position: [r2(cx - W / 2 + tb.cu), r2(LID_TOP + H + t / 2), r2(zv0 + tb.cv)], rotation: [-90, 0, 0] })
 }
 
 // pièces montrées mais non découpées : servos, axes, télécommandes, touches
 const cyl = (r) => circle(0, 0, r, 24)
-for (const s of servos) {
+for (const s of KEPT) {
   const z = (a, b) => [r2(s.zp + s.dir * ((a + b) / 2)), Math.abs(b - a)] // [centre en z, épaisseur] d'un étage de la pile (de a à b depuis le centre de la plaque)
   const body = z(-(SERVO_DEPTH - BODY_TOP), BODY_TOP) // du fond du corps jusqu'à son haut
   panels.push({ id: 'MOT', category: 'Moteurs', thickness: body[1], outer: rect(0, 0, SERVO_L, SERVO_W), cut: false, position: [r2(s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END)), PIVOT_Y, body[0]] })
@@ -288,8 +320,10 @@ for (const s of servos) {
 }
 for (const rx of [REMOTE_X[0]]) {
   panels.push({ id: 'T', category: 'Télécommande', thickness: RH, outer: rect(0, 0, R, R), cut: false, position: [rx, t + RH / 2, REMOTE_Z], rotation: [-90, 0, 0] })
-  for (const dz of BTN_Z) {
-    panels.push({ id: 'B', category: 'Touche', thickness: BTN_RAISE, outer: rect(0, 0, BTN_W, BTN_H), cut: false, position: [rx, BTN_TOP + BTN_RAISE / 2, REMOTE_Z + dz], rotation: [-90, 0, 0] })
+  for (const [i, dz] of BTN_Z.entries()) {
+    // chaque touche a son numéro (B-01, B-02, B-03) sans rien graver : la numérotation donne un numéro par contour distinct, donc l'épaisseur de la touche diffère de 0,01 mm de l'une à l'autre
+    const bt = r2(BTN_RAISE + i * 0.01)
+    panels.push({ id: 'B', category: 'Touche', thickness: bt, outer: rect(0, 0, BTN_W, BTN_H), cut: false, position: [rx, r2(BTN_TOP + bt / 2), REMOTE_Z + dz], rotation: [-90, 0, 0] })
   }
 }
 
@@ -312,12 +346,12 @@ const model = {
   name: 'Boîte volets Nice',
   description:
     'Une télécommande murale Nice (8 × 8 cm) sur un fond carré, avec ses 3 touches, des bords encastrés et une plaque dessus ; trois servos (un par touche) posés sur la plaque, montrés sans support, dont le palonnier (l’accessoire du servo) appuie au milieu de la touche.',
-  // les moteurs ont les couleurs du MF90 du schéma du site (corps brun fumé, embase sombre, axe clair, corne noire), dans leur propre groupe (famille MOT) : clic droit sur l'un d'eux pour les cacher tous
+  // les moteurs sont blancs (corps, embase, axe, palonnier), dans leur propre groupe (famille MOT) : clic droit sur l'un d'eux pour les cacher tous
   colors: {
-    Moteurs: '#4b4640',
-    Embase: '#2a2d31',
-    Palonnier: '#1b1b1b',
-    'Axe et vis': '#cfd3d8',
+    Moteurs: '#f5f5f5',
+    Embase: '#f5f5f5',
+    Palonnier: '#f5f5f5',
+    'Axe et vis': '#f5f5f5',
   },
   panels,
   actions,
