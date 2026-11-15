@@ -24,7 +24,8 @@ const r2 = (n) => Math.round(n * 1000) / 1000
 
 // ---- les télécommandes ----
 const R = 80 // côté (mm), carré
-const RH = 10 // épaisseur
+const REMOTE_TRIM = 2 // le bloc violet (la télécommande) est réduit de 2 mm de chaque côté : 76 × 76 mm ; les bords et la plaque gardent les 80 mm
+const RH = 7 // épaisseur de la télécommande (10 mm avant, 3 mm de moins)
 const GAP = 8 // écart entre deux télécommandes
 const SIDE = 8 // marge entre la télécommande et le mur (côtés)
 const FRONT = 6 // marge devant (la cale a 6,4 mm de bois autour des poches)
@@ -64,7 +65,7 @@ const BTN_FACE = BTN_TOP + BTN_RAISE // 13,5
 const REACH = 18.1 // de l'axe au milieu de la touche : le bout de la corne (16,1 + 2 = 18,1 mm devant l'axe) la touche sans être coupé ni la traverser
 // Servo couché : l'axe est le plus bas possible au-dessus de la touche (le corps, large de 12,1 mm, dépasse de 6,05 mm sous l'axe, plus 1,5 mm de jeu), donc la corne attaque presque à plat : plus de force utile sur la touche.
 const REST_DEG = 8 // le servo relève le palonnier de 8 degrés au repos
-const BORD_H = 12 // hauteur des bords autour de la télécommande
+const BORD_H = 9 // hauteur des bords autour de la télécommande (12 mm avant, 3 mm de moins)
 const LID_TOP = t + BORD_H + t // dessus de la plaque posée sur les bords : les servos sont posés dessus
 const H_AXIS = LID_TOP + SERVO_W / 2 - BTN_FACE // l'axe est à la moitié du corps (couché) au-dessus de la plaque
 const D = Math.sqrt(REACH ** 2 - H_AXIS ** 2) // 16,5 : distance horizontale de l'axe du servo au milieu de la touche
@@ -131,15 +132,16 @@ const FOND = R + 40 // le fond est un carré plus grand que la télécommande : 
 // bords autour de la télécommande (la plaque violette) : 4 bandes de BORD_H de haut, contre ses côtés (pas de jeu) ; devant et derrière couvrent les coins.
 // Chaque bande a des languettes en bas qui entrent dans des fenêtres du fond et en haut dans la plaque posée dessus (encastrées : elles affleurent).
 const rx0 = REMOTE_X[0]
-const LONG = R + 2 * t // devant et derrière
+const RW = R - 2 * REMOTE_TRIM // l'intérieur des bords : 76 mm (ils sont rapprochés de 2 mm de chaque côté)
+const LONG = RW + 2 * t // devant et derrière
 const half = FOND / 2
-const LID = LONG + 10 // la plaque du dessus : 1 cm plus grande que la télécommande avec ses bords
+const LID = LONG + 30 // la plaque du dessus : 1 cm de plus de chaque côté (puis encore 1 cm) que les bords
 const wy = t + BORD_H / 2
 const windowsAt = (h) => [
-  ...windowsFor(LONG, t, h + R / 2, true, 0, LONG, h - R / 2 - t), // devant
-  ...windowsFor(LONG, t, h - R / 2 - t, true, 0, LONG, h - R / 2 - t), // derrière
-  ...windowsFor(R, t, h - R / 2 - t, false, 0, R, h - R / 2), // côté gauche
-  ...windowsFor(R, t, h + R / 2, false, 0, R, h - R / 2), // côté droit
+  ...windowsFor(LONG, t, h + RW / 2, true, 0, LONG, h - RW / 2 - t), // devant
+  ...windowsFor(LONG, t, h - RW / 2 - t, true, 0, LONG, h - RW / 2 - t), // derrière
+  ...windowsFor(RW, t, h - RW / 2 - t, false, 0, RW, h - RW / 2), // côté gauche
+  ...windowsFor(RW, t, h + RW / 2, false, 0, RW, h - RW / 2), // côté droit
 ] // fenêtres pour les languettes des bords dans une plaque carrée dont la moitié du côté est h, centrée sur la télécommande
 const fondHoles = windowsAt(half)
 
@@ -155,8 +157,8 @@ const standing = (len, place) => {
   const cv = (Math.min(...vs) + Math.max(...vs)) / 2
   return { id: 'W', category: 'Bord', thickness: t, outer, ...place(cu, t + BORD_H - cv) }
 }
-for (const sz of [-1, 1]) panels.push(standing(LONG, (cu, y) => ({ position: [r2(rx0 - LONG / 2 + cu), r2(y), r2(REMOTE_Z + sz * (R / 2 + t / 2))] })))
-for (const sx of [-1, 1]) panels.push(standing(R, (cu, y) => ({ position: [r2(rx0 + sx * (R / 2 + t / 2)), r2(y), r2(REMOTE_Z - R / 2 + cu)], rotation: [0, -90, 0] })))
+for (const sz of [-1, 1]) panels.push(standing(LONG, (cu, y) => ({ position: [r2(rx0 - LONG / 2 + cu), r2(y), r2(REMOTE_Z + sz * (RW / 2 + t / 2))] })))
+for (const sx of [-1, 1]) panels.push(standing(RW, (cu, y) => ({ position: [r2(rx0 + sx * (RW / 2 + t / 2)), r2(y), r2(REMOTE_Z - RW / 2 + cu)], rotation: [0, -90, 0] })))
 
 // palonniers (l'accessoire pousse la touche) : les servos ne sont tenus par rien dans le modèle (ni plaque, ni bloc, ni planche, ni couvercle)
 const hornIndex = []
@@ -246,15 +248,6 @@ const crossRules = () => {
 }
 panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LID, LID), holes: lidHoles, rules: crossRules(), position: [rx0, LID_TOP - t / 2, REMOTE_Z], rotation: [-90, 0, 0] })
 
-// les 3 fentes de la plaque (au-dessus des touches) sont remplies par des rectangles de bois, à PLUG_EDGE mm du bord de chaque fente (0,2 mm de vide tout autour)
-const PLUG_EDGE = 0.2
-for (const sv of servos) {
-  const [[u0, v0], [u1], [, v1]] = slotOf(sv)
-  const w = u1 - u0 - 2 * PLUG_EDGE
-  const h = v1 - v0 - 2 * PLUG_EDGE
-  panels.push({ id: 'R', category: 'Bouchon fente', thickness: t, outer: rect(0, 0, r2(w), r2(h)), position: [r2(rx0 - LID / 2 + (u0 + u1) / 2), r2(LID_TOP - t / 2), r2(REMOTE_Z - LID / 2 + (v0 + v1) / 2)], rotation: [-90, 0, 0] })
-}
-
 // 3 planches debout autour du cul du moteur du milieu (une derrière, une de chaque côté) et une planche à plat par-dessus, posées sur la plaque, de la hauteur du corps du moteur (12 mm) ;
 // les côtés vont du cul jusqu'aux ailettes. Le vide entre les côtés est celui du corps du moteur plus 0,3 mm (ajustement trouvé avec les U d'essai).
 // Elles s'emboîtent par de mini crans (comme les autres planches, crans impairs, profondeur = épaisseur) : le bout des côtés dans des encoches du fond, le haut des trois dans des encoches de la planche du dessus.
@@ -339,7 +332,7 @@ for (const s of KEPT) {
   panels.push({ id: 'MOT', category: 'Axe et vis', thickness: screw[1], outer: cyl(SCREW_R), cut: false, position: [r2(s.xs), PIVOT_Y, screw[0]] })
 }
 for (const rx of [REMOTE_X[0]]) {
-  panels.push({ id: 'T', category: 'Télécommande', thickness: RH, outer: rect(0, 0, R, R), cut: false, position: [rx, t + RH / 2, REMOTE_Z], rotation: [-90, 0, 0] })
+  panels.push({ id: 'T', category: 'Télécommande', thickness: RH, outer: rect(0, 0, R - 2 * REMOTE_TRIM, R - 2 * REMOTE_TRIM), cut: false, position: [rx, t + RH / 2, REMOTE_Z], rotation: [-90, 0, 0] })
   for (const [i, dz] of BTN_Z.entries()) {
     // chaque touche a son numéro (B-01, B-02, B-03) sans rien graver : la numérotation donne un numéro par contour distinct, donc l'épaisseur de la touche diffère de 0,01 mm de l'une à l'autre
     const bt = r2(BTN_RAISE + i * 0.01)
