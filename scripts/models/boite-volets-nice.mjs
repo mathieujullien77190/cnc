@@ -17,7 +17,7 @@ import { writeFileSync } from 'node:fs'
 import { createServer } from 'vite'
 
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' })
-const { rect, circle, plateOutline, windowsFor } = await server.ssrLoadModule('/src/models/helpers.ts')
+const { rect, circle, plateOutline, windowsFor, fingerSpans } = await server.ssrLoadModule('/src/models/helpers.ts')
 
 const t = 3
 const r2 = (n) => Math.round(n * 1000) / 1000
@@ -166,7 +166,7 @@ const KEPT = servos.filter((q) => q.j === 1) // un seul moteur gardé : celui du
 for (const s of KEPT) {
   const h = horn(s)
   hornIndex.push({ index: panels.length, s })
-  panels.push({ id: 'MOT', category: 'Palonnier', thickness: HORN_T, outer: h.outer, holes: [h.hole], cut: false, position: h.position })
+  panels.push({ id: 'MOT', category: 'Palonnier', thickness: HORN_T, outer: h.outer, holes: [h.hole], cut: false, position: [h.position[0], r2(h.position[1] + t), h.position[2]] })
 }
 
 // la plaque posée sur les bords (96 × 96, 1 cm de plus que la télécommande avec ses bords ; des fenêtres reçoivent les languettes du haut des bords) ; les servos sont posés dessus, le palonnier passe dessous par une fente
@@ -253,6 +253,7 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
 // Elles s'emboîtent par de mini crans (comme les autres planches, crans impairs, profondeur = épaisseur) : le bout des côtés dans des encoches du fond, le haut des trois dans des encoches de la planche du dessus.
 {
   const SIDE_PLAY = 0.3
+  const LIFT = t // une plaque à plat de t sous les planches debout : le bloc et le moteur sont montés d'autant
   const s = servos[1]
   const d = s.dir
   const cx = s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END) // milieu du corps en x
@@ -260,7 +261,7 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
   const inner = SERVO_L + SIDE_PLAY
   const H = 12.3 // hauteur des 3 planches debout : 0,3 mm de plus que le corps du moteur (12 mm), pour que la planche du dessus ne le touche pas
   const W = inner + 2 * t // largeur de la planche du cul et de celle du dessus
-  const L = SERVO_DEPTH - BODY_TOP + t / 2 + EARS_SHIFT // longueur des côtés : jusqu'à la face arrière des ailettes (décalées de EARS_SHIFT)
+  const L = SERVO_DEPTH - BODY_TOP + t / 2 + EARS_SHIFT + 0.1 // longueur des côtés : jusqu'à la face arrière des ailettes (décalées de EARS_SHIFT)
   const box = (o) => {
     const us = o.map((q) => q[0])
     const vs = o.map((q) => q[1])
@@ -273,14 +274,14 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
   const BIT_H = 3 // hauteur du bout du haut qui relie la bande à la planche
   const BAND_W = 3 // largeur de la bande collée à S-01, sur toute la hauteur
   // derrière (plan XY) : languettes en haut, encoches sur les bords debout (là où entrent les côtés ; pas du côté de l'axe)
-  const backO = plateOutline(W, H, { top: { d: t }, ...(axisSide === -1 ? {} : { left: { d: -t } }), ...(axisSide === 1 ? {} : { right: { d: -t } }) })
+  const backO = plateOutline(W, H, { top: { d: t }, bottom: { d: t }, ...(axisSide === -1 ? {} : { left: { d: -t } }), ...(axisSide === 1 ? {} : { right: { d: -t } }) })
   const b = box(backO)
-  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(backO), position: [r2(cx - W / 2 + b.cu), r2(LID_TOP + H - b.cv), r2(rear - d * (t / 2))] })
+  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(backO), position: [r2(cx - W / 2 + b.cu), r2(LID_TOP + LIFT + H - b.cv), r2(rear - d * (t / 2))] })
   // côtés (plan YZ, u vers z) : languette en haut et languette au bout du cul (bord gauche si le cul est du côté des z petits, droit sinon), sauf du côté de l'axe : raccourci, sans languette au bout
   for (const sx of [-1, 1]) {
     const short = sx === axisSide
     const len = short ? L - SHORT : L
-    const sideO = plateOutline(len, H, { top: { d: t }, ...(short ? {} : d > 0 ? { left: { d: t } } : { right: { d: t } }) })
+    const sideO = plateOutline(len, H, { top: { d: t }, ...(short ? {} : { bottom: { d: t } }), ...(short ? {} : d > 0 ? { left: { d: t } } : { right: { d: t } }) })
     if (short) {
       // une bande de BAND_W mm sur toute la hauteur, collée à la planche du cul (S-01), reliée à la planche raccourcie par un bout du haut (BIT_H de haut)
       if (d > 0) {
@@ -293,7 +294,7 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
     }
     const sb = box(sideO)
     const zu0 = d > 0 ? rear + (short ? SHORT : 0) : rear - L // z du bord u = 0 du corps
-    panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(sideO), position: [r2(cx + sx * (inner / 2 + t / 2)), r2(LID_TOP + H - sb.cv), r2(zu0 + sb.cu)], rotation: [0, -90, 0] })
+    panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(sideO), position: [r2(cx + sx * (inner / 2 + t / 2)), r2(LID_TOP + LIFT + H - sb.cv), r2(zu0 + sb.cu)], rotation: [0, -90, 0] })
   }
   // dessus (à plat) : encoches sur le bord du cul et sur les deux bords, là où entrent les languettes du haut
   if (d < 0) throw new Error("le bloc devant le moteur n'est prévu que pour un moteur dont le cul est vers les z petits")
@@ -301,9 +302,17 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
   // côté axe : 1 mm de moins que l'embase ; côté opposé : jusqu'au coin de la planche du dessus (le bord dehors de la planche de ce côté)
   const bx = [s.xs + s.sx * (BOSS_R + 1), cx + s.sx * (W / 2)].sort((a, b2) => a - b2)
   const BW = bx[1] - bx[0]
-  const blockO = plateOutline(BW, H, { top: { d: t } })
+  // côté moteur : le bloc est rogné jusqu'au bord du trou du crantage (la languette du haut et du bas finit au bout du bloc) ; les encoches des plaques à plat gardent leur place
+  const tabSpan = fingerSpans(BW, 0, BW)[0] // la languette du bloc entier, dans le repère du bloc entier
+  const motorLow = s.sx > 0 // le côté moteur (l'embase) est celui des x petits
+  const cutAt = motorLow ? tabSpan.u0 : BW - tabSpan.u1
+  const BW2 = BW - cutAt
+  const tw = tabSpan.u1 - tabSpan.u0
+  const tabO = (w) => [[0, -t], [tw, -t], [tw, 0], [w, 0], [w, H], [tw, H], [tw, H + t], [0, H + t]]
+  const blockO = motorLow ? tabO(BW2) : tabO(BW2).map(([u, v]) => [BW2 - u, v]).reverse()
   const bb = box(blockO)
-  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(blockO), position: [r2(bx[0] + bb.cu), r2(LID_TOP + H - bb.cv), r2(rear + SERVO_DEPTH + t / 2)] })
+  const bx0 = motorLow ? bx[0] + cutAt : bx[0]
+  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(blockO), position: [r2(bx0 + bb.cu), r2(LID_TOP + LIFT + H - bb.cv), r2(rear + SERVO_DEPTH + t / 2)] })
   const LP = SERVO_DEPTH + 2 * t // la planche du dessus va du dos de la planche du cul jusqu'au devant du bloc (t après le bout du corps, MOT-02)
   const blockU0 = bx[0] - (cx - W / 2) // où le bloc commence sur la planche du dessus (u)
   const zoneFor = (sx) => {
@@ -313,7 +322,18 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
   const topO = plateOutline(W, LP, { top: { d: -t }, bottom: { d: -t, a: blockU0, b: blockU0 + BW }, left: { d: -t, ...zoneFor(-1) }, right: { d: -t, ...zoneFor(1) } })
   const tb = box(topO)
   const zv0 = d > 0 ? rear - t : rear - SERVO_DEPTH // z du bord v = 0
-  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(topO), position: [r2(cx - W / 2 + tb.cu), r2(LID_TOP + H + t / 2), r2(zv0 + tb.cv)], rotation: [-90, 0, 0] })
+  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(topO), position: [r2(cx - W / 2 + tb.cu), r2(LID_TOP + LIFT + H + t / 2), r2(zv0 + tb.cv)], rotation: [-90, 0, 0] })
+  // la plaque du dessous (à plat, sur le couvercle) : mêmes encoches que celle du dessus, sauf du côté de l'axe où la planche raccourcie n'a pas de bout du bas
+  const zoneBot = (sx) => (sx === axisSide ? null : zoneFor(sx))
+  const EXT = 10 // la plaque dépasse de 1 cm derrière et de chaque côté (pas devant, vers le moteur) : les encoches deviennent des fenêtres
+  const zb = (sx) => zoneBot(sx)
+  const botHoles = [
+    ...windowsFor(W, t, EXT, true, 0, W, EXT), // derrière (la planche du cul)
+    ...[-1, 1].filter((sx) => zb(sx)).flatMap((sx) => windowsFor(LP, t, sx < 0 ? EXT : EXT + W - t, false, zb(sx).a, zb(sx).b, EXT)),
+  ]
+  const botO = plateOutline(W + 2 * EXT, LP + EXT, { bottom: { d: -t, a: blockU0 + EXT, b: blockU0 + EXT + BW } })
+  const bt = box(botO)
+  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(botO), holes: botHoles.map(r2o), position: [r2(cx - W / 2 - EXT + bt.cu), r2(LID_TOP + t / 2), r2(zv0 - EXT + bt.cv)], rotation: [-90, 0, 0] })
 }
 
 // pièces montrées mais non découpées : servos, axes, télécommandes, touches
@@ -321,15 +341,15 @@ const cyl = (r) => circle(0, 0, r, 24)
 for (const s of KEPT) {
   const z = (a, b) => [r2(s.zp + s.dir * ((a + b) / 2)), Math.abs(b - a)] // [centre en z, épaisseur] d'un étage de la pile (de a à b depuis le centre de la plaque)
   const body = z(-(SERVO_DEPTH - BODY_TOP), BODY_TOP) // du fond du corps jusqu'à son haut
-  panels.push({ id: 'MOT', category: 'Moteurs', thickness: body[1], outer: rect(0, 0, SERVO_L, SERVO_W), cut: false, position: [r2(s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END)), PIVOT_Y, body[0]] })
+  panels.push({ id: 'MOT', category: 'Moteurs', thickness: body[1], outer: rect(0, 0, SERVO_L, SERVO_W), cut: false, position: [r2(s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END)), PIVOT_Y + t, body[0]] })
   const ears = z(t / 2 + EARS_SHIFT, t / 2 + 2.5 + EARS_SHIFT)
-  panels.push({ id: 'MOT', category: 'Moteurs', thickness: ears[1], outer: rect(0, 0, EARS_L, SERVO_W), cut: false, position: [r2(s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END)), PIVOT_Y, ears[0]] })
+  panels.push({ id: 'MOT', category: 'Moteurs', thickness: ears[1], outer: rect(0, 0, EARS_L, SERVO_W), cut: false, position: [r2(s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END)), PIVOT_Y + t, ears[0]] })
   const boss = z(BODY_TOP, HORN_Z0)
-  panels.push({ id: 'MOT', category: 'Embase', thickness: boss[1], outer: cyl(BOSS_R), cut: false, position: [r2(s.xs), PIVOT_Y, boss[0]] })
+  panels.push({ id: 'MOT', category: 'Embase', thickness: boss[1], outer: cyl(BOSS_R), cut: false, position: [r2(s.xs), PIVOT_Y + t, boss[0]] })
   const shaft = z(BODY_TOP, LEVER_Z0) // l'axe cannelé traverse l'embase et le palonnier
-  panels.push({ id: 'MOT', category: 'Axe et vis', thickness: shaft[1], outer: cyl(SHAFT_R), cut: false, position: [r2(s.xs), PIVOT_Y, shaft[0]] })
+  panels.push({ id: 'MOT', category: 'Axe et vis', thickness: shaft[1], outer: cyl(SHAFT_R), cut: false, position: [r2(s.xs), PIVOT_Y + t, shaft[0]] })
   const screw = z(LEVER_Z0, LEVER_Z0 + SCREW_L) // la vis centrale, sur le palonnier
-  panels.push({ id: 'MOT', category: 'Axe et vis', thickness: screw[1], outer: cyl(SCREW_R), cut: false, position: [r2(s.xs), PIVOT_Y, screw[0]] })
+  panels.push({ id: 'MOT', category: 'Axe et vis', thickness: screw[1], outer: cyl(SCREW_R), cut: false, position: [r2(s.xs), PIVOT_Y + t, screw[0]] })
 }
 for (const rx of [REMOTE_X[0]]) {
   panels.push({ id: 'T', category: 'Télécommande', thickness: RH, outer: rect(0, 0, R - 2 * REMOTE_TRIM, R - 2 * REMOTE_TRIM), cut: false, position: [rx, t + RH / 2, REMOTE_Z], rotation: [-90, 0, 0] })
@@ -348,7 +368,7 @@ const actions = [
     label: 'Palonnier au repos (servo tourné)',
     default: 0,
     type: 'swing',
-    steps: hornIndex.map(({ index, s }) => ({ panels: [index], by: [0, 0, s.sx < 0 ? REST_DEG : -REST_DEG], pivot: [r2(s.xs), PIVOT_Y, r2(s.zb)] })),
+    steps: hornIndex.map(({ index, s }) => ({ panels: [index], by: [0, 0, s.sx < 0 ? REST_DEG : -REST_DEG], pivot: [r2(s.xs), r2(PIVOT_Y + t), r2(s.zb)] })),
   },
 ]
 
