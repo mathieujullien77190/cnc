@@ -40,6 +40,7 @@ const SERVO_L = 22.4 // corps du servo, sens de la longueur (carte Miuzei MS60 :
 const SERVO_DEPTH = 22.8 // longueur du corps le long de l'axe (carte MS60 : 22,8 mm du dessous au dessus du corps)
 const SERVO_FRONT = 6 // les oreilles (18 mm du dessous) reposent sur la plaque : le corps dépasse de 6 mm devant sa face
 const EARS_L = 32.2 // longueur avec les oreilles (pas sur la carte MS60 ; annonce MF90 : 32,2 mm, entraxe des trous 27,6 mm, trous de 2 mm)
+const EARS_SHIFT = 1 // les ailettes (les oreilles du servo) sont décalées de 1 mm vers l'avant (vers le palonnier), pour laisser 1 mm de plus aux planches de côté
 const PIVOT_FROM_END = 5.9 // l'axe de sortie est à 5,9 mm du bout du corps, celui qui est tourné vers la touche
 const BOSS_R = 4.5 // embase ronde autour de l'axe (9 mm de diamètre)
 const BOSS_L = 4 // l'embase monte à 28 mm du dessous (fiche) : 4 mm au-dessus du corps
@@ -255,9 +256,9 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
   const cx = s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END) // milieu du corps en x
   const rear = s.zp - d * (SERVO_DEPTH - BODY_TOP) // le cul : le bout du corps, à l'opposé du palonnier
   const inner = SERVO_L + SIDE_PLAY
-  const H = 12
+  const H = 12.3 // hauteur des 3 planches debout : 0,3 mm de plus que le corps du moteur (12 mm), pour que la planche du dessus ne le touche pas
   const W = inner + 2 * t // largeur de la planche du cul et de celle du dessus
-  const L = SERVO_DEPTH - BODY_TOP + t / 2 // longueur des côtés : jusqu'à la face arrière des ailettes
+  const L = SERVO_DEPTH - BODY_TOP + t / 2 + EARS_SHIFT // longueur des côtés : jusqu'à la face arrière des ailettes (décalées de EARS_SHIFT)
   const box = (o) => {
     const us = o.map((q) => q[0])
     const vs = o.map((q) => q[1])
@@ -267,7 +268,8 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
   // le côté de l'axe du servo (le bout du corps le plus près de l'axe) a sa planche raccourcie de SHORT mm du côté de la planche du cul : pas de crans à ce bout
   const axisSide = -s.sx // -1 : côté des x petits (gauche), 1 : côté des x grands
   const SHORT = 6
-  const BIT_H = 3 // hauteur du bout qui touche S-01
+  const BIT_H = 3 // hauteur du bout du haut qui relie la bande à la planche
+  const BAND_W = 3 // largeur de la bande collée à S-01, sur toute la hauteur
   // derrière (plan XY) : languettes en haut, encoches sur les bords debout (là où entrent les côtés ; pas du côté de l'axe)
   const backO = plateOutline(W, H, { top: { d: t }, ...(axisSide === -1 ? {} : { left: { d: -t } }), ...(axisSide === 1 ? {} : { right: { d: -t } }) })
   const b = box(backO)
@@ -278,13 +280,13 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
     const len = short ? L - SHORT : L
     const sideO = plateOutline(len, H, { top: { d: t }, ...(short ? {} : d > 0 ? { left: { d: t } } : { right: { d: t } }) })
     if (short) {
-      // en haut, un bout de SHORT mm (BIT_H de haut) qui va toucher la planche du cul (S-01) : la planche raccourcie y retrouve son contact
+      // une bande de BAND_W mm sur toute la hauteur, collée à la planche du cul (S-01), reliée à la planche raccourcie par un bout du haut (BIT_H de haut)
       if (d > 0) {
         sideO.pop() // le dernier point est le coin haut gauche, déjà le premier
-        sideO.push([0, BIT_H], [-SHORT, BIT_H], [-SHORT, 0])
+        sideO.push([0, BIT_H], [-BAND_W, BIT_H], [-BAND_W, H], [-SHORT, H], [-SHORT, 0])
       } else {
         const at = sideO.findIndex((q, k) => q[0] === len && q[1] === 0 && sideO[k - 1] && sideO[k - 1][0] === len && sideO[k - 1][1] === 0)
-        sideO.splice(at + 1, 0, [len + SHORT, 0], [len + SHORT, BIT_H], [len, BIT_H])
+        sideO.splice(at + 1, 0, [len + SHORT, 0], [len + SHORT, H], [len + BAND_W, H], [len + BAND_W, BIT_H], [len, BIT_H])
       }
     }
     const sb = box(sideO)
@@ -292,12 +294,21 @@ panels.push({ id: 'C', category: 'Couvercle', thickness: t, outer: rect(0, 0, LI
     panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(sideO), position: [r2(cx + sx * (inner / 2 + t / 2)), r2(LID_TOP + H - sb.cv), r2(zu0 + sb.cu)], rotation: [0, -90, 0] })
   }
   // dessus (à plat) : encoches sur le bord du cul et sur les deux bords, là où entrent les languettes du haut
-  const LP = SERVO_DEPTH + t // la planche du dessus va du dos de la planche du cul jusqu'au bout du moteur (MOT-02, le corps)
+  if (d < 0) throw new Error("le bloc devant le moteur n'est prévu que pour un moteur dont le cul est vers les z petits")
+  // le bloc devant le moteur, du côté qui n'est pas celui de l'axe, collé à la face avant du corps ; il monte jusqu'à la planche du dessus
+  // côté axe : 1 mm de moins que l'embase ; côté opposé : jusqu'au coin de la planche du dessus (le bord dehors de la planche de ce côté)
+  const bx = [s.xs + s.sx * (BOSS_R + 1), cx + s.sx * (W / 2)].sort((a, b2) => a - b2)
+  const BW = bx[1] - bx[0]
+  const blockO = plateOutline(BW, H, { top: { d: t } })
+  const bb = box(blockO)
+  panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(blockO), position: [r2(bx[0] + bb.cu), r2(LID_TOP + H - bb.cv), r2(rear + SERVO_DEPTH + t / 2)] })
+  const LP = SERVO_DEPTH + 2 * t // la planche du dessus va du dos de la planche du cul jusqu'au devant du bloc (t après le bout du corps, MOT-02)
+  const blockU0 = bx[0] - (cx - W / 2) // où le bloc commence sur la planche du dessus (u)
   const zoneFor = (sx) => {
     const cut = sx === axisSide ? SHORT : 0
     return d > 0 ? { a: t + cut, b: t + L } : { a: SERVO_DEPTH - L, b: SERVO_DEPTH - cut }
   }
-  const topO = plateOutline(W, LP, { ...(d > 0 ? { top: { d: -t } } : { bottom: { d: -t } }), left: { d: -t, ...zoneFor(-1) }, right: { d: -t, ...zoneFor(1) } })
+  const topO = plateOutline(W, LP, { top: { d: -t }, bottom: { d: -t, a: blockU0, b: blockU0 + BW }, left: { d: -t, ...zoneFor(-1) }, right: { d: -t, ...zoneFor(1) } })
   const tb = box(topO)
   const zv0 = d > 0 ? rear - t : rear - SERVO_DEPTH // z du bord v = 0
   panels.push({ id: 'S', category: 'Planche moteur', thickness: t, outer: r2o(topO), position: [r2(cx - W / 2 + tb.cu), r2(LID_TOP + H + t / 2), r2(zv0 + tb.cv)], rotation: [-90, 0, 0] })
@@ -309,7 +320,7 @@ for (const s of KEPT) {
   const z = (a, b) => [r2(s.zp + s.dir * ((a + b) / 2)), Math.abs(b - a)] // [centre en z, épaisseur] d'un étage de la pile (de a à b depuis le centre de la plaque)
   const body = z(-(SERVO_DEPTH - BODY_TOP), BODY_TOP) // du fond du corps jusqu'à son haut
   panels.push({ id: 'MOT', category: 'Moteurs', thickness: body[1], outer: rect(0, 0, SERVO_L, SERVO_W), cut: false, position: [r2(s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END)), PIVOT_Y, body[0]] })
-  const ears = z(t / 2, t / 2 + 2.5)
+  const ears = z(t / 2 + EARS_SHIFT, t / 2 + 2.5 + EARS_SHIFT)
   panels.push({ id: 'MOT', category: 'Moteurs', thickness: ears[1], outer: rect(0, 0, EARS_L, SERVO_W), cut: false, position: [r2(s.xs + s.sx * (SERVO_L / 2 - PIVOT_FROM_END)), PIVOT_Y, ears[0]] })
   const boss = z(BODY_TOP, HORN_Z0)
   panels.push({ id: 'MOT', category: 'Embase', thickness: boss[1], outer: cyl(BOSS_R), cut: false, position: [r2(s.xs), PIVOT_Y, boss[0]] })
