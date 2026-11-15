@@ -215,8 +215,8 @@ const slotOf = (s) => {
 const lidHoles = [...windowsAt(LID / 2), ...servos.map(slotOf)]
 // la plaque est couverte de mini croix, une à chaque intersection d'un quadrillage de GRID mm (la première à GRID_FIRST mm du bord) : un bras de CROSS mm de chaque côté du point.
 // Partout sur le bois ; une croix qui touche un trou est coupée au bord du trou (on ne grave jamais dans un trou).
-const GRID = 1
-const GRID_FIRST = 0.5
+const GRID = 5
+const GRID_FIRST = 2.5
 const CROSS = 0.15
 const CROSS_W = 0.12 // trait fin de 0,12 mm, une seule passe (pas de 1), comme les traits des numéros (NUM_LINE_W de livre-avent-v2)
 const crossRules = () => {
