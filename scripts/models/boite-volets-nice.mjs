@@ -428,40 +428,119 @@ const PITCH = FOND + COPY_GAP
   // un trou de 20 × 20 mm vers l'arrière (z petits) de la planche de gauche seulement, à 10 mm du bout, au milieu de la hauteur
   const sideHole = rect(10, r2((HB - 20) / 2), 20, 20)
   for (const sx of [-1, 1]) panels.push({ id: 'G', category: 'Grande boîte', thickness: t, outer: sideO, holes: sx === -1 ? [sideHole] : [], position: [r2(cxB + sx * (IX / 2 + t / 2)), r2(HB - sb.cv), r2(zc - IZ / 2 + sb.cu)], rotation: [0, -90, 0] })
-  // une planche à plat sur le fond, dans la bande de 4 cm ajoutée derrière, sur toute la longueur de la boîte
-  panels.push({ id: 'F', category: 'Fond', thickness: t, outer: rect(0, 0, IX, BACK_MORE), position: [r2(cxB), t / 2, r2(zc - IZ / 2 + BACK_MORE / 2)], rotation: [-90, 0, 0] })
+  // le couvercle de la grande boîte, en 2 parties (gauche et droite) : une plaque qui déborde des parois (de t + MARGE) et des bords de SKIRT_H de haut, hors des parois (collés contre elles), encastrés dans la plaque
+  // (languettes du haut dans des fenêtres) ; aux coins, le bord du bout entre dans des encoches des bords avant et arrière. Les deux parties se rejoignent au milieu en x.
+  const SKIRT_H = 10 // tous les bords du couvercle font 1 cm de haut
+  const END_H = SKIRT_H
+  const r2o = (o) => o.map(([a, b]) => [r2(a), r2(b)])
+  const MARGIN = 5 // bois entre les bords et le bord de la plaque
+  const LS = IX / 2 + 2 * t // longueur des bords avant et arrière, du milieu jusqu'à l'extérieur du bord du bout
+  const WP = LS + MARGIN
+  const ZP = IZ + 4 * t + 2 * MARGIN
+  const ZS = IZ + 2 * t // longueur du bord du bout (entre les bords avant et arrière)
+  const mir = (pts) => pts.map(([u, v]) => [r2(WP - u), v])
+  const holesR = [
+    ...windowsFor(LS, t, MARGIN, true, 0, LS, 0), // bord avant (z petits)
+    ...windowsFor(LS, t, ZP - MARGIN - t, true, 0, LS, 0), // bord arrière
+    ...windowsFor(ZS, t, LS - t, false, 0, ZS, MARGIN + t), // bord du bout
+  ]
+  const endO = plateOutline(ZS, END_H, { top: { d: t }, left: { d: t }, right: { d: t } })
+  const eb = box(endO)
+  const skirtO = (sx) => plateOutline(LS, SKIRT_H, { top: { d: t }, ...(sx > 0 ? { right: { d: -t, a: 0, b: END_H } } : { left: { d: -t, a: 0, b: END_H } }) })
+  for (const sx of [1, -1]) {
+    // les deux parties s'emboîtent au milieu par des crans (comme les parois, impairs, profondeur t) : la partie de droite (L-01) a les languettes, celle de gauche les encoches
+    const plO = sx > 0 ? plateOutline(WP, ZP, { left: { d: t } }) : plateOutline(WP, ZP, { right: { d: -t } })
+    const pb = box(plO)
+    panels.push({ id: 'L', category: 'Couvercle boîte', thickness: t, outer: r2o(plO), holes: (sx > 0 ? holesR : holesR.map(mir)).map(r2o), position: [r2((sx > 0 ? cxB : cxB - WP) + pb.cu), r2(HB + t / 2), r2(zc - ZP / 2 + pb.cv)], rotation: [-90, 0, 0] })
+    const so = skirtO(sx)
+    const sb2 = box(so)
+    for (const sz of [-1, 1]) panels.push({ id: 'L', category: 'Couvercle boîte', thickness: t, outer: so, position: [r2(sx > 0 ? cxB + sb2.cu : cxB - LS + sb2.cu), r2(HB - sb2.cv), r2(zc + sz * (IZ / 2 + t + t / 2))] })
+    panels.push({ id: 'L', category: 'Couvercle boîte', thickness: t, outer: endO, position: [r2(cxB + sx * (IX / 2 + t + t / 2)), r2(HB - eb.cv), r2(zc - (IZ / 2 + t) + eb.cu)], rotation: [0, -90, 0] })
+  }
+  // une petite boîte crantée à côté de la grande (à droite, 5 cm après son couvercle), pour le support E : intérieur = l'emprise de E (65 × 39 mm), cotes exactes ;
+  // hauteur intérieure = 5 fois celle de la pile E (6 plaques de t = 18 mm), soit 90 mm. Fond + 4 parois crantées comme la grande, ouverte en haut.
+  const E_W = 65
+  const E_D = 39
+  const E_H = 6 * t // hauteur de la pile E
+  const HE = 5 * E_H // hauteur intérieure de la petite boîte
+  // la petite boîte est POSÉE sur la partie gauche du couvercle de la grande (L-04), son côté trou (paroi de gauche) contre le bord gauche, au niveau (z) du trou de la paroi G-03
+  const EDGE = 20 // la petite boîte est à 2 cm du bord gauche et du bord arrière de L-04
+  const ex = r2(cxB - WP + EDGE + t + E_W / 2) // milieu de la petite boîte en x (= milieu de E)
+  const mz = r2(zc - ZP / 2 + EDGE + t + E_D / 2) // milieu en z de la petite boîte
+  const ez = r2(zc - IZ / 2 + BACK_MORE / 2) // milieu en z (même z que E avant)
+  {
+    const LX = E_W + 2 * t
+    const fO = plateOutline(LX, E_D + 2 * t, { top: { d: -t }, bottom: { d: -t }, left: { d: -t, a: t, b: t + E_D }, right: { d: -t, a: t, b: t + E_D } })
+    panels.push({ id: 'J', category: 'Boîte E', thickness: t, outer: fO, position: [ex, -t / 2, ez], rotation: [-90, 0, 0] })
+    const lO = plateOutline(LX, HE, { bottom: { d: t }, left: { d: -t }, right: { d: -t } })
+    const lb2 = box(lO)
+    for (const sz of [-1, 1]) panels.push({ id: 'J', category: 'Boîte E', thickness: t, outer: lO, position: [r2(ex - LX / 2 + lb2.cu), r2(HE - lb2.cv), r2(ez + sz * (E_D / 2 + t / 2))] })
+    const sO = plateOutline(E_D, HE, { bottom: { d: t }, left: { d: t }, right: { d: t } })
+    const sb3 = box(sO)
+    // le trou du câble d'alimentation : dans la paroi de gauche, en face de l'ouverture des cadres E (14 mm de large en z, de 6 à 15 mm de haut)
+    const cableHole = rect(12.5, r2(HE - 15), 14, 9)
+    for (const sx of [-1, 1]) panels.push({ id: 'J', category: 'Boîte E', thickness: t, outer: sO, holes: sx === -1 ? [cableHole] : [], position: [r2(ex + sx * (E_W / 2 + t / 2)), r2(HE - sb3.cv), r2(ez - E_D / 2 + sb3.cu)], rotation: [0, -90, 0] })
+    // le couvercle, comme celui de la grande boîte (L) mais d'une pièce et sans rien qui dépasse : une plaque de la taille de la boîte (K-01 au ras des parois) et des bords de 1 cm de haut
+    // DANS les parois (contre leur face intérieure), encastrés dans la plaque (languettes du haut dans des fenêtres) ; aux coins, les bords du bout entrent dans des encoches des bords avant et arrière
+    const SK = 10
+    const PW = E_W + 2 * t
+    const PD = E_D + 2 * t
+    const ZS2 = E_D - 2 * t // longueur des bords du bout (entre les bords avant et arrière)
+    const lidHoles2 = [
+      ...windowsFor(E_W, t, t, true, 0, E_W, 0).map((h) => h.map(([u, v]) => [r2(u + t), r2(v)])), // bord avant (z petits)
+      ...windowsFor(E_W, t, PD - 2 * t, true, 0, E_W, 0).map((h) => h.map(([u, v]) => [r2(u + t), r2(v)])), // bord arrière
+      ...windowsFor(ZS2, t, t, false, 0, ZS2, 2 * t), // bord du bout à gauche
+      ...windowsFor(ZS2, t, E_W, false, 0, ZS2, 2 * t), // à droite
+    ]
+    panels.push({ id: 'K', category: 'Couvercle petite boîte', thickness: t, outer: rect(0, 0, PW, PD), holes: lidHoles2.map((h) => h.map(([u, v]) => [r2(u), r2(v)])), position: [ex, r2(HE + t / 2), ez], rotation: [-90, 0, 0] })
+    const skO = plateOutline(E_W, SK, { top: { d: t }, left: { d: -t, a: 0, b: SK }, right: { d: -t, a: 0, b: SK } })
+    const sk = box(skO)
+    for (const sz of [-1, 1]) panels.push({ id: 'K', category: 'Couvercle petite boîte', thickness: t, outer: skO, position: [r2(ex - E_W / 2 + sk.cu), r2(HE - sk.cv), r2(ez + sz * (E_D / 2 - t / 2))] })
+    const enO = plateOutline(ZS2, SK, { top: { d: t }, left: { d: t }, right: { d: t } })
+    const en = box(enO)
+    for (const sx of [-1, 1]) panels.push({ id: 'K', category: 'Couvercle petite boîte', thickness: t, outer: enO, position: [r2(ex + sx * (E_W / 2 - t / 2)), r2(HE - en.cv), r2(ez - (E_D / 2 - t) + en.cu)], rotation: [0, -90, 0] })
+  }
   // un cadre de 5 mm de large (fenêtre de 55 × 29 mm) posé sur une plaque pleine de même contour (65 × 39 mm), elle-même posée sur la planche de la bande arrière, au milieu
-  const ez = r2(zc - IZ / 2 + BACK_MORE / 2)
   // des fentes de 2 mm de large, une tous les 4 mm (2 mm de bois entre deux), qui courent sur la largeur (39 mm en z), à 4 mm des bords
   const slats = []
   for (let x = 4; x + 2 <= 65 - 4; x += 4) slats.push(rect(x, 4, 2, 39 - 8))
   slats.pop() // la première et la dernière fente sont supprimées
   slats.shift()
-  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 65, 39), holes: slats, position: [r2(cxB), r2(2 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 65, 39), holes: slats, position: [r2(ex), r2(t + t / 2), ez], rotation: [-90, 0, 0] })
   // un bout du côté gauche est enlevé : la bande de gauche est coupée sur 14 mm au milieu, la fenêtre s'ouvre sur le bord (contour d'un seul tenant)
   const CUT0 = 12.5
   const CUT1 = 26.5
   const frameO = [[0, 0], [65, 0], [65, 39], [0, 39], [0, CUT1], [5, CUT1], [5, 34], [60, 34], [60, 5], [5, 5], [5, CUT0], [0, CUT0]]
-  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(3 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(ex), r2(2 * t + t / 2), ez], rotation: [-90, 0, 0] })
   // un deuxième cadre identique par-dessus le premier (même numéro)
-  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(4 * t + t / 2), ez], rotation: [-90, 0, 0] })
-  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(cxB), r2(5 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(ex), r2(3 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: frameO, position: [r2(ex), r2(4 * t + t / 2), ez], rotation: [-90, 0, 0] })
   // une planche de 7 × 39 mm (0,7 cm de long, aussi large que E-01 : 39 mm en z) sous E-01, de chaque côté (elles la surélèvent), à fleur de son bord droit
-  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(cxB + 65 / 2 - 7 / 2), r2(t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(ex + 65 / 2 - 7 / 2), r2(t / 2), ez], rotation: [-90, 0, 0] })
   // et la même de l'autre côté, à fleur du bord gauche
-  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(cxB - 65 / 2 + 7 / 2), r2(t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(ex - 65 / 2 + 7 / 2), r2(t / 2), ez], rotation: [-90, 0, 0] })
   // et les 2 mêmes planches restent aussi sur le dernier cadre E-02, une de chaque côté
-  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(cxB + 65 / 2 - 7 / 2), r2(6 * t + t / 2), ez], rotation: [-90, 0, 0] })
-  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(cxB - 65 / 2 + 7 / 2), r2(6 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(ex + 65 / 2 - 7 / 2), r2(5 * t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'E', category: 'Support carte', thickness: t, outer: rect(0, 0, 7, 39), position: [r2(ex - 65 / 2 + 7 / 2), r2(5 * t + t / 2), ez], rotation: [-90, 0, 0] })
   // un autre composant (famille H), à côté du E, dans la bande arrière : même pile (une plaque pleine et 3 cadres), fenêtre de 64 × 26 mm (6,4 × 2,6 cm), bande de 5 mm autour
   const HW = 64
   const HD = 26
   const hx = r2(cxB + 65 / 2 + 10 + (HW + 10) / 2)
   const hFrame = [[0, 0], [HW + 10, 0], [HW + 10, HD + 10], [0, HD + 10]]
-  panels.push({ id: 'H', category: 'Support relais', thickness: t, outer: hFrame, position: [hx, r2(t + t / 2), ez], rotation: [-90, 0, 0] })
+  panels.push({ id: 'H', category: 'Support relais', thickness: t, outer: hFrame, position: [hx, r2(t / 2), ez], rotation: [-90, 0, 0] })
   // les cadres H-02 n'ont plus de côté gauche : la fenêtre s'ouvre sur le bord (contour d'un seul tenant)
   const hOpen = [[0, 0], [HW + 10, 0], [HW + 10, HD + 10], [0, HD + 10], [0, HD + 5], [HW + 5, HD + 5], [HW + 5, 5], [0, 5]]
-  for (let k = 2; k <= 4; k++) panels.push({ id: 'H', category: 'Support relais', thickness: t, outer: hOpen, position: [hx, r2(k * t + t / 2), ez], rotation: [-90, 0, 0] })
+  for (let k = 2; k <= 4; k++) panels.push({ id: 'H', category: 'Support relais', thickness: t, outer: hOpen, position: [hx, r2((k - 1) * t + t / 2), ez], rotation: [-90, 0, 0] })
+  // la petite boîte (J), son couvercle (K) et E montent sur la plaque L-04 (dessus à HB + t, le dessous du fond de J est à -t)
+  for (const p of panels) if (['J', 'K', 'E'].includes(p.id)) {
+    p.position[1] = r2(p.position[1] + HB + 2 * t)
+    p.position[2] = r2(p.position[2] + mz - ez)
+  }
+  // 4 mini planches de 5 mm de large, collées à L-04 autour de la petite boîte (devant et derrière couvrent les coins)
+  const CW = 5
+  const cy = r2(HB + t + t / 2)
+  for (const sz of [-1, 1]) panels.push({ id: 'M', category: 'Cales petite boîte', thickness: t, outer: rect(0, 0, E_W + 2 * t + 2 * CW, CW), position: [ex, cy, r2(mz + sz * (E_D / 2 + t + CW / 2))], rotation: [-90, 0, 0] })
+  for (const sx of [-1, 1]) panels.push({ id: 'M', category: 'Cales petite boîte', thickness: t, outer: rect(0, 0, CW, E_D + 2 * t), position: [r2(ex + sx * (E_W / 2 + t + CW / 2)), cy, mz], rotation: [-90, 0, 0] })
   console.log('boîte', IX, 'x', IZ, ', haut de l élément le plus haut', r2(top), ', parois', HB)
 }
 
