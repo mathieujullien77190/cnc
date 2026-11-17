@@ -479,7 +479,7 @@ const PITCH = FOND + COPY_GAP
     const sb3 = box(sO)
     // le trou du câble d'alimentation : dans la paroi de gauche, en face de l'ouverture des cadres E (14 mm de large en z, de 6 à 15 mm de haut)
     const cableHole = rect(12.5, r2(HE - 15), 14, 9)
-    for (const sx of [-1, 1]) panels.push({ id: 'J', category: 'Boîte E', thickness: t, outer: sO, holes: sx === -1 ? [cableHole] : [], position: [r2(ex + sx * (E_W / 2 + t / 2)), r2(HE - sb3.cv), r2(ez - E_D / 2 + sb3.cu)], rotation: [0, -90, 0] })
+    for (const sx of [-1, 1]) panels.push({ id: 'J', category: 'Boîte E', thickness: t, outer: sO, holes: sx === -1 ? [cableHole] : [circle(r2(E_D / 2), 15, 5, 32)], position: [r2(ex + sx * (E_W / 2 + t / 2)), r2(HE - sb3.cv), r2(ez - E_D / 2 + sb3.cu)], rotation: [0, -90, 0] })
     // le couvercle, comme celui de la grande boîte (L) mais d'une pièce et sans rien qui dépasse : une plaque de la taille de la boîte (K-01 au ras des parois) et des bords de 1 cm de haut
     // DANS les parois (contre leur face intérieure), encastrés dans la plaque (languettes du haut dans des fenêtres) ; aux coins, les bords du bout entrent dans des encoches des bords avant et arrière
     const SK = 10
