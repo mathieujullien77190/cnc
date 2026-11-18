@@ -1,5 +1,6 @@
 import { inside } from '../laser/job/geometry'
 import type { Pt } from './types'
+import { ARIAL_CAP, ARIAL_GLYPHS } from './fontArial'
 import { SCRIPT_CAP, SCRIPT_GLYPHS, type ScriptGlyph } from './fontScript'
 
 // Nom gravé sur chaque pièce (ex. CX-01) : petits rectangles fermés (le laser grave les contours bleus fermés),
@@ -110,7 +111,7 @@ const segmentRect = (a: Pt, b: Pt, w: number): Pt[] => {
   return [[ax - uy * h, ay + ux * h], [bx - uy * h, by + ux * h], [bx + uy * h, by - ux * h], [ax + uy * h, ay - ux * h]]
 }
 
-// Police manuscrite (Astoria, contours remplis : voir fontScript.ts pour la licence). Chaque glyphe est gravé par son contour
+// Polices à contours remplis : manuscrite (Astoria, voir fontScript.ts pour la licence) et Arial (fontArial.ts, usage personnel aussi). Chaque glyphe est gravé par son contour
 // (segments de largeur SCRIPT_STROKE) puis, là où le plein est épais, par un hachurage horizontal fin. Avance proportionnelle.
 const SCRIPT_STROKE = 0.5 // trait du contour, en mm (fixe : la finesse du laser ne dépend pas de la taille du texte)
 const SCRIPT_HATCH = 0.6 // pas du hachurage (mm), trait de 80 % du pas
@@ -120,14 +121,26 @@ export const filledWidths = (w: number, step = 0.25, min = 0.1): number[] => {
   while (ws[ws.length - 1] - step >= min) ws.push(ws[ws.length - 1] - step)
   return ws
 }
+const LINE_STROKE = 0.3 // trait de `arial-line` (mm) : une seule ligne fine le long du contour, comme les traits des chiffres ; `filledWidths(0.3)` = un seul rectangle
 const SCRIPT_MIN_FILL = 0.4 // un plein de moins de cette largeur (mm) à l'intérieur du contour n'est pas hachuré
 
-/** Contours du texte manuscrit en unités de la police (y vers le haut) et largeur, après décalage pour que le bord gauche soit à 0. */
-const scriptLayout = (text: string) => {
+/** Les polices à contours : ses glyphes et la hauteur de ses capitales (unités de la police). */
+const OUTLINE_FONTS = {
+  script: { glyphs: SCRIPT_GLYPHS, cap: SCRIPT_CAP, stroke: SCRIPT_STROKE, fill: true },
+  arial: { glyphs: ARIAL_GLYPHS, cap: ARIAL_CAP, stroke: SCRIPT_STROKE, fill: true },
+  // Arial en simple ligne : le contour seulement, un trait fin, sans hachurage ni jambages remplis.
+  'arial-line': { glyphs: ARIAL_GLYPHS, cap: ARIAL_CAP, stroke: LINE_STROKE, fill: false },
+} as const
+type OutlineFont = keyof typeof OUTLINE_FONTS
+const isOutline = (font?: MarkFont): font is OutlineFont => font === 'script' || font === 'arial' || font === 'arial-line'
+
+/** Contours du texte en unités de la police (y vers le haut) et largeur, après décalage pour que le bord gauche soit à 0. */
+const scriptLayout = (text: string, font: OutlineFont) => {
+  const table = OUTLINE_FONTS[font].glyphs
   const glyphs: { g: ScriptGlyph; pen: number }[] = []
   let pen = 0
   for (const ch of text) {
-    const g = SCRIPT_GLYPHS[ch] ?? SCRIPT_GLYPHS[' ']
+    const g = table[ch] ?? table[' ']
     glyphs.push({ g, pen })
     pen += g.a
   }
@@ -160,10 +173,11 @@ const turn = (c: number[], i: number) => {
 /** Octogone de diamètre w centré en (x, y) : arrondit les jonctions entre segments successifs. */
 const joint = (x: number, y: number, w: number): Pt[] => Array.from({ length: 8 }, (_, k): Pt => [x + (w / 2) * Math.cos(((k + 0.5) * Math.PI) / 4), y + (w / 2) * Math.sin(((k + 0.5) * Math.PI) / 4)])
 
-const scriptRects = (text: string, x: number, y: number, h: number): Pt[][] => {
-  const k = h / SCRIPT_CAP // mm par unité
-  const { glyphs, x0 } = scriptLayout(text)
-  const pad = SCRIPT_STROKE / 2
+const scriptRects = (text: string, x: number, y: number, h: number, font: OutlineFont): Pt[][] => {
+  const k = h / OUTLINE_FONTS[font].cap // mm par unité
+  const { glyphs, x0 } = scriptLayout(text, font)
+  const { stroke, fill } = OUTLINE_FONTS[font]
+  const pad = stroke / 2
   const at = (px: number, py: number): Pt => [x + pad + (px - x0) * k, y + h - py * k]
   const out: Pt[][] = []
   const seg = (ax: number, ay: number, bx: number, by: number, w: number) => {
@@ -171,10 +185,10 @@ const scriptRects = (text: string, x: number, y: number, h: number): Pt[][] => {
     for (const sw of filledWidths(w)) out.push(segmentRect(at(ax, ay), at(bx, by), sw)) // le laser ne suit que les contours : traits emboîtés pour que l'intérieur soit brûlé aussi
   }
   for (const { g, pen } of glyphs) {
-    for (const c of g.c) for (let i = 0, n = c.length / 2; i < n; i++) seg(pen + c[2 * i], c[2 * i + 1], pen + c[2 * ((i + 1) % n)], c[2 * ((i + 1) % n) + 1], SCRIPT_STROKE)
-    for (const c of g.c) for (let i = 0, n = c.length / 2; i < n; i++) if (turn(c, i) > 0.15) out.push(joint(...at(pen + c[2 * i], c[2 * i + 1]), SCRIPT_STROKE)) // sommet arrondi : pas d'encoche entre deux segments
-    for (const c of g.o ?? []) for (let i = 0; i + 3 < c.length; i += 2) seg(pen + c[i], c[i + 1], pen + c[i + 2], c[i + 3], SCRIPT_STROKE * 1.2)
-    if (!g.c.length) continue
+    for (const c of g.c) for (let i = 0, n = c.length / 2; i < n; i++) seg(pen + c[2 * i], c[2 * i + 1], pen + c[2 * ((i + 1) % n)], c[2 * ((i + 1) % n) + 1], stroke)
+    for (const c of g.c) for (let i = 0, n = c.length / 2; i < n; i++) if (turn(c, i) > 0.15) out.push(joint(...at(pen + c[2 * i], c[2 * i + 1]), stroke)) // sommet arrondi : pas d'encoche entre deux segments
+    for (const c of g.o ?? []) for (let i = 0; i + 3 < c.length; i += 2) seg(pen + c[i], c[i + 1], pen + c[i + 2], c[i + 3], stroke * 1.2)
+    if (!fill || !g.c.length) continue
     const step = SCRIPT_HATCH / k
     const ys = g.c.flat().filter((_, i) => i % 2)
     const margin = (SCRIPT_STROKE / 2 + SCRIPT_MIN_FILL / 2) / k
@@ -188,11 +202,11 @@ const scriptRects = (text: string, x: number, y: number, h: number): Pt[][] => {
 
 const textW = (n: number) => n * ADVANCE - (ADVANCE - GLYPH_W)
 
-export type MarkFont = 'round' | 'script'
+export type MarkFont = 'round' | 'script' | 'arial' | 'arial-line'
 
-/** Rectangles (4 points) d'un texte, coin haut-gauche en (x, y), hauteur h, y vers le bas. `font: 'script'` : écriture manuscrite (Astoria : casse respectée, accents français, avance proportionnelle ; h = hauteur des capitales, les jambages passent sous la boîte de 0,35 h, `passes` ignoré). `font: 'round'` : chiffres et quelques lettres arrondis (A C D O P R U ; les autres caractères gardent la police à segments). */
+/** Rectangles (4 points) d'un texte, coin haut-gauche en (x, y), hauteur h, y vers le bas. `font: 'script'` : écriture manuscrite (Astoria : casse respectée, accents français, avance proportionnelle ; h = hauteur des capitales, les jambages passent sous la boîte de 0,35 h, `passes` ignoré). `font: 'arial'` : Arial (même tracé que `script` : contour de 0,5 mm + hachurage, casse et accents d'origine, avance proportionnelle ; h = hauteur des capitales). `font: 'round'` : chiffres et quelques lettres arrondis (A C D O P R U ; les autres caractères gardent la police à segments). */
 export const digitRects = (text: string, x: number, y: number, h: number, passes = 2, font?: MarkFont): Pt[][] => {
-  if (font === 'script') return scriptRects(text, x, y, h)
+  if (isOutline(font)) return scriptRects(text, x, y, h, font)
   const k = h / GLYPH_H
   const w = textW([...text].length)
   const clamp = ([px, py]: Pt): Pt => [Math.min(Math.max(px, 0), w) * k, Math.min(Math.max(py, 0), GLYPH_H) * k]
@@ -211,7 +225,7 @@ export const digitRects = (text: string, x: number, y: number, h: number, passes
   return out
 }
 
-/** Lignes centrales des traits d'un texte (polylignes, mm, mêmes cases que `digitRects` : coin haut-gauche en (x, y), hauteur h, y vers le bas) et largeur d'un trait. Servent à tracer un contour par passe sans repasser sur les petits segments. Pas de `script` (écriture pleine). */
+/** Lignes centrales des traits d'un texte (polylignes, mm, mêmes cases que `digitRects` : coin haut-gauche en (x, y), hauteur h, y vers le bas) et largeur d'un trait. Servent à tracer un contour par passe sans repasser sur les petits segments. Pas de `script` ni de `arial` (écriture pleine). */
 export const digitStrokes = (text: string, x: number, y: number, h: number, font?: MarkFont): { strokes: Pt[][]; width: number } => {
   const k = h / GLYPH_H
   const w = textW([...text].length)
@@ -225,8 +239,8 @@ export const digitStrokes = (text: string, x: number, y: number, h: number, font
   return { strokes, width: STROKE * k }
 }
 
-/** Largeur réelle du texte (proportionnelle pour `script`) et hauteur h de la boîte. */
-export const markSize = (text: string, h: number, font?: MarkFont) => ({ w: font === 'script' ? (text ? scriptLayout(text).w * (h / SCRIPT_CAP) + SCRIPT_STROKE : 0) : textW([...text].length) * (h / GLYPH_H), h })
+/** Largeur réelle du texte (proportionnelle pour `script` et `arial`) et hauteur h de la boîte. */
+export const markSize = (text: string, h: number, font?: MarkFont) => ({ w: isOutline(font) ? (text ? scriptLayout(text, font).w * (h / OUTLINE_FONTS[font].cap) + OUTLINE_FONTS[font].stroke : 0) : textW([...text].length) * (h / GLYPH_H), h })
 
 /** Rectangles du texte posé dans la boîte de coin haut-gauche (x, y), `c` mm de matière libre autour. Couché : rotation de 90° dans la boîte du texte (x, y) -> (h - y, x). */
 const placeText = (text: string, h: number, vertical: boolean, x: number, y: number, c: number, passes: number): Pt[][] =>
