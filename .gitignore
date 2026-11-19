@@ -2,3 +2,4 @@ node_modules
 dist
 fonts/
 scripts/models/wifi-invite.runs.json
+models/wifi-invite.model.json
