@@ -191,4 +191,20 @@ const slide: ActionType<Hinge> = {
   },
 }
 
-export const ACTION_TYPES: Record<string, ActionType<unknown>> = { move, turn, hinge, swing: slide, choice }
+type Angle = Hinge & { min: number; max: number }
+/** Curseur en degrés : la valeur du curseur EST l'angle (de « min » à « max », par exemple -12 à 12) ; chaque pas tourne de « by » × valeur, « by » étant l'axe (un degré par degré du curseur, par exemple [0, 1, 0]). */
+const angle: ActionType<Angle> = {
+  describe: 'curseur en degrés de « min » à « max » : fait tourner les planches de chaque pas de « steps » ([{ panels, by (axe, un degré par degré du curseur : [0, 1, 0]), pivot }]) autour de son pivot, de « by » × valeur ; montre « show » et cache « hide » dès que la valeur n’est pas nulle',
+  check: (p, panels) => {
+    const h = hinge.check(p, panels) as Hinge
+    if (!isNum(p.min) || !isNum(p.max) || p.min >= p.max) return fail('"min" et "max" doivent être deux nombres (degrés) avec min < max')
+    return { ...h, min: p.min, max: p.max }
+  },
+  param: ({ min, max }, key, label, def) => (isNum(def) && def >= min && def <= max ? { key, label, type: 'number', default: def, min, max, step: 1, unit: '°' } : fail('"default" doit être un nombre de degrés entre "min" et "max"')),
+  apply: (panels, h, value) => {
+    const k = isNum(value) ? Math.min(h.max, Math.max(h.min, value)) : 0
+    return h.steps.map((s) => ({ ...s, by: s.by.map((d) => d * k) as Vec3 })).reduce(swing, setVisible(panels, h, k !== 0))
+  },
+}
+
+export const ACTION_TYPES: Record<string, ActionType<unknown>> = { move, turn, hinge, swing: slide, angle, choice }
