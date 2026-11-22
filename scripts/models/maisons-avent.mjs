@@ -720,7 +720,7 @@ const buildHouse = (i, pose, out, keep = false) => {
   P({ id: 'P', category: 'Pignon', thickness: t, ...gableFront(HOUSE_NUMBERS[i % HOUSE_NUMBERS.length], KINDS[Math.min(Math.floor(i / SERIE), KINDS.length - 1)]), position: gp(frontOutline, gx), rotation: [0, 90, 0] }) // retournée : la face avant (celle qui porte le numéro) regarde vers l'extérieur de la maison
   for (const sx of [1, -1]) P({ id: 'CH', category: 'Chevron', thickness: t, outer: chevronOutline, position: gp(chevronOutline, sx * (gx - t)), rotation: [0, -90, 0] })
   const kind = KINDS[Math.min(Math.floor(i / SERIE), KINDS.length - 1)] // ligne 1 ronde, 2 carrée, 3 hexagone
-  // les pièces FE (fenêtres) sont déjà coupées : on ne les génère plus, seul le trou du pignon reste (windowPiece sert à le dimensionner)
+  P({ id: 'FE', category: 'Fenêtre', thickness: t, ...windowPiece(kind), position: [gx, H - WIN_V, 0], rotation: [0, -90, 0] })
   P({ id: 'PA', category: 'Pignon arrière', thickness: t, outer: backOutline, holes: wallSlots, position: gp(frontOutline, -gx), rotation: [0, -90, 0] })
   for (const sz of [-1, 1]) P({ id: 'M', category: 'Mur', thickness: t, outer: wallOuter, holes: wallHolesByHouse[(i % SERIE) % wallHolesByHouse.length], position: [0, Hw / 2, sz * (Wd / 2 - t / 2)], rotation: [0, 0, 0] })
   // repère (y, z) : A côté z < 0 (pente montante vers +z), B côté z > 0
