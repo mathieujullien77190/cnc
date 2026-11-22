@@ -708,8 +708,22 @@ const plateauX = -205
 const plateauZ = 100
 const TIER_STEP = houseTop + 10 + t // d'un plateau au suivant (dessous à dessous) : hauteur d'une maison + 1 cm + épaisseur
 const PLATEAUX = [{ id: 'PL', d: 290 }, { id: 'PM', d: 240 }, { id: 'PN', d: 190 }, { id: 'PO', d: 140 }, { id: 'PP', d: 90 }] // 29, 24, 19, 14 et 9 cm
-// maisons par étage, de bas en haut : 8 (8 à 1), 7 (15 à 9), 5 (20 à 16), 3 (23 à 21) et 1 (24) ; en couronne, façade (le numéro) vers l'extérieur, qui déborde un peu du plateau
-const TIERS = [[8, 7, 6, 5, 4, 3, 2, 1], [15, 14, 13, 12, 11, 10, 9], [20, 19, 18, 17, 16], [23, 22, 21], [24]]
+// maisons par étage, de bas en haut : 8, 7, 5 et 3 maisons (numéros mélangés) puis la 24 ; en couronne, façade (le numéro) vers l'extérieur, qui déborde un peu du plateau
+// les maisons 1 à 23 sont mélangées (tirage fixe : le même à chaque génération), la 24 reste seule en haut
+const mulberry32 = (seed) => () => {
+  seed |= 0
+  seed = (seed + 0x6d2b79f5) | 0
+  let z = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+  z = (z + Math.imul(z ^ (z >>> 7), 61 | z)) ^ z
+  return ((z ^ (z >>> 14)) >>> 0) / 4294967296
+}
+const rand = mulberry32(24)
+const shuffled = Array.from({ length: 23 }, (_, k) => k + 1)
+for (let i = shuffled.length - 1; i > 0; i--) {
+  const j = Math.floor(rand() * (i + 1))
+  ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+}
+const TIERS = [shuffled.slice(0, 8), shuffled.slice(8, 15), shuffled.slice(15, 20), shuffled.slice(20, 23), [24]] // 8, 7, 5 et 3 maisons mélangées, puis la 24
 const TANG = 90 // place tangentielle d'une maison dans la couronne (largeur 85 mm + 5 mm)
 const HX = L / 2 + SIDE_OVER // demi-empreinte d'une maison dans le sens du faîtage (radial : le faîtage pointe vers l'extérieur)
 const HZ = 43 // demi-empreinte dans l'autre sens (toit compris)
