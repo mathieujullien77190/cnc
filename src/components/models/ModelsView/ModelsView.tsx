@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Notice } from '@/components/ui'
-import { saveText } from '@/laser'
 import { MODELS, modelById } from '@/models/registry'
-import { modelToJson } from '@/models/json'
 import { panelsToCutParts } from '@/models/toCutParts'
 import { cleanParams, defaultParams, type Panel } from '@/models/types'
 import { Viewer3D } from '@/models/viewer3d'
@@ -176,9 +174,6 @@ export const ModelsView = () => {
     }, SYNC_DELAY)
     return () => clearTimeout(id)
   }, [cut]) // eslint-disable-line react-hooks/exhaustive-deps
-  const download = () => cut && model && saveText(JSON.stringify(cut.file), `${model.id}.cutparts.json`)
-  // le modèle figé en JSON : à déposer dans `models/` pour l'avoir dans la liste sans code
-  const downloadModel = () => result && model && saveText(JSON.stringify(modelToJson(model, result.raw), null, 2), `${model.id}.model.json`)
 
   useCnc3dApi({ pick, setParam, toCut, hide, hideMany, showAll, model, params, result, cut, selected }, { viewer, setMeasuring, setExplode, setSection })
 
@@ -198,7 +193,7 @@ export const ModelsView = () => {
       <div className="space-y-3">
         <ModelList models={MODELS} currentId={model?.id} onPick={toggle} />
         {model && <ModelSettings model={model} params={params} explode={explode} colored={colored} onColored={setColored} marks={marks} onMarks={setMarks} onParam={setParam} onReset={reset} onExplode={setExplode} />}
-        {cut && model && <CutActions report={report} onRefresh={() => void toCut()} onDownload={download} onDownloadModel={downloadModel} />}
+        {cut && model && <CutActions report={report} onRefresh={() => void toCut()} />}
       </div>
 
       <div className="min-w-0 space-y-3">

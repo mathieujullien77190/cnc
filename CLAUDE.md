@@ -35,7 +35,7 @@ Imports : `@/...` (alias de `src/`) entre dossiers, `./...` dans un composant. U
 
 ## Les trois onglets
 
-- **Modèles 3D** : liste des modèles (titre seul). Choisir un modèle envoie ses planches à la découpe (le catalogue est remplacé) ; recliquer le désélectionne (plus de planches). Réglages = les actions du modèle (interrupteurs) + l'éclaté. Clic droit : cacher une planche ou son groupe, réafficher une par une ou tout. Téléchargement du `.cutparts.json` ou du `.model.json` figé. API `window.cnc3d`.
+- **Modèles 3D** : liste des modèles (titre seul). Choisir un modèle envoie ses planches à la découpe (le catalogue est remplacé) ; recliquer le désélectionne (plus de planches). Réglages = les actions du modèle (interrupteurs) + l'éclaté. Clic droit : cacher une planche ou son groupe, réafficher une par une ou tout. API `window.cnc3d`.
 - **Planches automatiques** : toutes les pièces, une série de planches par épaisseur (« Optimiser par type » : une série par famille). Clic sur une pièce de la liste → sa planche ; clic sur une pièce de la planche → sa ligne dans la liste. « Afficher dans planche perso » copie une planche en perso sans toucher à l'automatique.
 - **Planche perso** : une seule planche, pièces de toute épaisseur (essai, habillage en okoumé…), quantités par pièce (− / +), glisser, tourner (R ou angle), les pièces en trop empilées en haut à gauche (en conflit, à déplacer).
 
