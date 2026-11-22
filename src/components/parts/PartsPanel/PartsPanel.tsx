@@ -1,20 +1,13 @@
-import { useRef } from 'react'
-import { Btn, Notice, PartTag, Section } from '@/components/ui'
+import { Notice, PartTag, Section } from '@/components/ui'
 import PartTree from '@/components/parts/PartTree'
 import { round1 as mm } from '@/helpers'
 import type { PartsPanelProps } from './types'
 
-/** Import des fichiers `.cutparts.json` et liste des pièces regroupées par épaisseur, avec leur quantité (elle vient du fichier, elle ne se règle pas ici). */
-export const PartsPanel = ({ parts, reports, onFiles, onPick, reveal, selectedKey, onClear }: PartsPanelProps) => {
-  const input = useRef<HTMLInputElement>(null)
+/** Liste des pièces regroupées par épaisseur, avec leur quantité (elle vient du fichier, elle ne se règle pas ici). */
+export const PartsPanel = ({ parts, reports, onPick, reveal, selectedKey, onClear }: PartsPanelProps) => {
   const thicknesses = [...new Set(parts.map((p) => p.thickness))].sort((a, b) => a - b)
   return (
     <div className="space-y-2.5">
-      <input ref={input} type="file" accept=".json,application/json" multiple hidden onChange={(e) => { onFiles([...(e.target.files ?? [])]); e.target.value = '' }} />
-      <div className="rounded-lg border-2 border-dashed border-stone-300 bg-white/60 p-3 text-center">
-        <Btn variant="primary" block={false} onClick={() => input.current?.click()}>Importer des pièces…</Btn>
-        <p className="mt-1.5 text-[11px] text-stone-500">ou dépose ici un ou plusieurs fichiers <b>.cutparts.json</b></p>
-      </div>
       {reports.map((r, i) => (
         <Notice key={`${r.file}-${i}`} kind={r.errors.length ? 'warn' : 'ok'}>
           <b>{r.file}</b> : {r.added} ajoutée(s){r.replaced ? `, ${r.replaced} mise(s) à jour` : ''}.

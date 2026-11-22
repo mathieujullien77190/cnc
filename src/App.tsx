@@ -54,7 +54,7 @@ export const App = () => {
       <div className={`grid flex-1 gap-4 p-4 ${tab === 'modeles' ? '' : 'lg:grid-cols-[20rem_1fr]'}`}>
         {/* les vues restent toutes montées (masquées hors de leur onglet) : sélections, zoom, branches ouvertes et vue 3D se retrouvent comme on les a laissés */}
         <aside className={`space-y-3 ${tab === 'modeles' ? 'hidden' : ''} lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto`}>
-          <PartsPanel selectedKey={selectedKey} reveal={reveal} parts={parts} reports={reports} onFiles={(f) => void onFiles(f)} onPick={tab === 'auto' ? (key) => dispatch(uiActions.partFocused(key)) : undefined} onClear={project.clearAll} />
+          <PartsPanel selectedKey={selectedKey} reveal={reveal} parts={parts} reports={reports} onPick={tab === 'auto' ? (key) => dispatch(uiActions.partFocused(key)) : undefined} onClear={project.clearAll} />
           <SettingsPanel parts={parts} settings={settings} onChange={project.setSettings} onCrenelTest={() => startTest(crenelTestSheet)} onGoujonTest={() => startTest(goujonTestSheet)} onPowerSpeedTest={m.startTest} />
         </aside>
         <main className="min-w-0">
