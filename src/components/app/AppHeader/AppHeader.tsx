@@ -20,6 +20,6 @@ export const AppHeader = ({ tab, onTab, laserLowered, onLaserClick, modelName, t
         </button>
       ))}
     </nav>
-    <Btn block={false} variant={laserLowered ? 'primary' : 'secondary'} onClick={onLaserClick}>{laserLowered ? '▴ Remonter le pilotage laser' : 'Piloter la laser'}</Btn>
+    <Btn block={false} variant={laserLowered ? 'primary' : 'secondary'} onClick={onLaserClick}>{laserLowered ? '▴ Remonter le pilotage laser' : 'Piloter le laser'}</Btn>
   </header>
 )

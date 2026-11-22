@@ -1,6 +1,6 @@
 # Découpe CNC / laser
 
-App qui range des pièces 2D sur des planches et pilote une laser (Sculpfun E1 Pro 21 W, zone 400 × 320 mm, GRBL 1.1, Web Serial : Chrome ou Edge). Les pièces viennent de modèles 3D (`models/*.model.json`) ou de fichiers `.cutparts.json` (`docs/FORMAT.md`).
+App qui range des pièces 2D sur des planches et pilote un laser (Sculpfun E1 Pro 21 W, zone 400 × 320 mm, GRBL 1.1, Web Serial : Chrome ou Edge). Les pièces viennent de modèles 3D (`models/*.model.json`) ou de fichiers `.cutparts.json` (`docs/FORMAT.md`).
 
 Langue : français (interface, commentaires, docs), code en anglais. Commits : Conventional Commits en anglais, faits par l'utilisateur, jamais de co-auteur ni de mention de l'assistant.
 

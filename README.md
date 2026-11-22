@@ -18,7 +18,7 @@ Idée ──► IA (LLM) ──► Modèle 3D ──► Planches à plat ──�
 2. **La vue 3D.** Le modèle apparaît tout seul dans l'onglet « Modèles 3D », avec ses réglages et un curseur d'éclaté pour vérifier l'assemblage.
 3. **Les pièces.** Choisir un modèle envoie ses planches à la découpe toutes seules. Elles arrivent au format `.cutparts.json`, le même qu'on peut importer depuis n'importe quel projet three.js.
 4. **Le rangement.** Les pièces sont rangées automatiquement sur des feuilles, une série par épaisseur. On peut aussi composer une planche à la main.
-5. **La découpe.** L'application pilote la laser en direct : cadre à vide, gravure des noms, découpe.
+5. **La découpe.** L'application pilote le laser en direct : cadre à vide, gravure des noms, découpe.
 
 ## Ce que fait l'application
 
