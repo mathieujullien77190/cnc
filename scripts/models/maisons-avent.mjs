@@ -182,7 +182,41 @@ const roundedHex = (cx, cy) => roundCorners(hexagon(cx, cy, HEX_R), [0, 1, 2, 3,
 const roundedOct = (cx, cy) => roundCorners(octagon(cx, cy, OCT_R), [0, 1, 2, 3, 4, 5, 6, 7], SQUARE_ROUND)
 const roundedSquare = (x, y) => roundCorners(rect(x, y, 2 * WIN_R, 2 * WIN_R), [0, 1, 2, 3], SQUARE_ROUND)
 // trou du pignon, contour de la pièce FE et vitres selon la forme (round, square, hex)
-const windowHole = (kind) => (kind === 'square' ? roundedSquare(Wd / 2 - WIN_R, WIN_V - WIN_R) : kind === 'hex' ? roundedHex(Wd / 2, WIN_V) : kind === 'octagon' ? roundedOct(Wd / 2, WIN_V) : kind === 'heart' ? heart(Wd / 2, WIN_V) : kind === 'diamond' ? roundedDiamond(Wd / 2, WIN_V) : circle(Wd / 2, WIN_V, WIN_R, 72))
+const windowHoleFull = (kind) => (kind === 'square' ? roundedSquare(Wd / 2 - WIN_R, WIN_V - WIN_R) : kind === 'hex' ? roundedHex(Wd / 2, WIN_V) : kind === 'octagon' ? roundedOct(Wd / 2, WIN_V) : kind === 'heart' ? heart(Wd / 2, WIN_V) : kind === 'diamond' ? roundedDiamond(Wd / 2, WIN_V) : circle(Wd / 2, WIN_V, WIN_R, 72))
+// le trou du pignon est plus petit que la fenêtre FE de WIN_FIT mm sur tout son tour (la fenêtre s'y enfonce serrée)
+const WIN_FIT = 0.1
+const shrinkPoly = (poly, d) => {
+  const pts = poly.filter((p, i) => { const q = poly[(i + poly.length - 1) % poly.length]; return Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-9 })
+  const sgn = pts.reduce((a, p, i) => { const q = pts[(i + 1) % pts.length]; return a + p[0] * q[1] - q[0] * p[1] }, 0) > 0 ? 1 : -1
+  const nor = (a, b) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]); return [-sgn * (b[1] - a[1]) / l, sgn * (b[0] - a[0]) / l] } // vers l'intérieur
+  let out = pts.map((c, i) => {
+    const n1 = nor(pts[(i + pts.length - 1) % pts.length], c)
+    const n2 = nor(c, pts[(i + 1) % pts.length])
+    const k = d / Math.max(0.02, 1 + n1[0] * n2[0] + n1[1] * n2[1])
+    return [c[0] + (n1[0] + n2[0]) * k, c[1] + (n1[1] + n2[1]) * k]
+  })
+  // aux pointes très aiguës (bas du cœur) le décalage fait se croiser le contour : on coupe la boucle
+  const cross = (p, q, r, s2) => {
+    const dx = q[0] - p[0], dy = q[1] - p[1], ex = s2[0] - r[0], ey = s2[1] - r[1]
+    const den = dx * ey - dy * ex
+    if (Math.abs(den) < 1e-12) return null
+    const t = ((r[0] - p[0]) * ey - (r[1] - p[1]) * ex) / den, u = ((r[0] - p[0]) * dy - (r[1] - p[1]) * dx) / den
+    return t > 0 && t < 1 && u > 0 && u < 1 ? [p[0] + t * dx, p[1] + t * dy] : null
+  }
+  for (let again = true; again; ) {
+    again = false
+    const n = out.length
+    for (let i = 0; i < n && !again; i++) {
+      for (let j = i + 2; j < n && !again; j++) {
+        if (i === 0 && j === n - 1) continue
+        const x = cross(out[i], out[(i + 1) % n], out[j], out[(j + 1) % n])
+        if (x) { out = [...out.slice(0, i + 1), x, ...out.slice(j + 1)]; again = true }
+      }
+    }
+  }
+  return out
+}
+const windowHole = (kind) => shrinkPoly(windowHoleFull(kind), WIN_FIT)
 const windowPiece = (kind) =>
   kind === 'square'
     ? { outer: roundedSquare(0, 0), holes: squarePanes(WIN_R, WIN_R) }
