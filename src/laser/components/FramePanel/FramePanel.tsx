@@ -1,4 +1,4 @@
-import { Btn, Chip, Hint } from '../../ui';
+import { Btn, Chip } from '../../ui';
 import { formatDuration } from '../../grbl';
 import type { LaserMachine } from '../../hooks/useLaserMachine';
 
@@ -15,7 +15,6 @@ export function FramePanel({ m }: { m: LaserMachine }) {
       <Btn variant="primary" disabled={!m.canFrame} onClick={() => frame && m.job.start('frame', frame)}>
         Tracer le cadre à vide{frame ? ` (${formatDuration(frame.stats.seconds)})` : ''}
       </Btn>
-      <Hint>Le laser reste éteint : la machine reçoit M5 puis des déplacements $J= qui ne peuvent pas allumer le laser. Vérifie que le rectangle tombe bien sur ton matériau. Le bouton Arrêt reste disponible.</Hint>
     </div>
   );
 }

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Btn, Chip, ConfirmDialog, Hint, Notice, StatusDot } from '../../ui';
+import { Btn, Chip, ConfirmDialog, Notice, StatusDot } from '../../ui';
 import { alarmMessage, webSerialProblem } from '../../grbl';
 import type { LaserMachine } from '../../hooks/useLaserMachine';
 import { indicator, mm } from './helpers';
 
-/** Connexion à la laser (port USB), état en direct, positions et réglages GRBL utiles ($30, $32). */
+/** Connexion à le laser (port USB), état en direct, positions et réglages GRBL utiles ($30, $32). */
 export function ConnectionBar({ m }: { m: LaserMachine }) {
   const { grbl } = m;
   const [confirmLaser, setConfirmLaser] = useState(false);
@@ -16,7 +16,7 @@ export function ConnectionBar({ m }: { m: LaserMachine }) {
     <div className="space-y-2.5">
       {grbl.linkLost && (
         <div role="alert" className="rounded-md border-2 border-rose-600 bg-rose-50 p-3 text-sm font-bold text-rose-800">
-          LIAISON AVEC LA LASER PERDUE ({grbl.linkLost}). Le contrôleur éteint le laser quand il perd le port, mais ne te fie pas à cela :
+          LIAISON AVEC LE LASER PERDUE ({grbl.linkLost}). Le contrôleur éteint le laser quand il perd le port, mais ne te fie pas à cela :
           vérifie la machine, coupe l'alimentation au besoin, puis reconnecte-toi. La position de la tête est peut-être perdue.
         </div>
       )}
@@ -29,9 +29,8 @@ export function ConnectionBar({ m }: { m: LaserMachine }) {
         <div className="space-y-2">
           {unsupported && <Notice kind="error">{unsupported}</Notice>}
           <div className="flex flex-wrap gap-2">
-            <Btn block={false} variant="primary" disabled={!!unsupported || grbl.conn === 'connecting'} onClick={() => void grbl.connect('serial')}>Connecter la laser</Btn>
+            <Btn block={false} variant="primary" disabled={!!unsupported || grbl.conn === 'connecting'} onClick={() => void grbl.connect('serial')}>Connecter le laser</Btn>
           </div>
-          <Hint>Câble USB de la laser branché, laser allumée, aucun autre programme (LaserGRBL, LightBurn) connecté au port. Chrome ou Edge uniquement. Rien n'est envoyé tant que tu ne lances pas toi-même une action.</Hint>
         </div>
       )}
 
@@ -68,7 +67,7 @@ export function ConnectionBar({ m }: { m: LaserMachine }) {
 
       {confirmLaser && (
         <ConfirmDialog title="Activer le mode laser ?" confirmLabel="Écrire $32=1" onCancel={() => setConfirmLaser(false)} onConfirm={() => { setConfirmLaser(false); void grbl.enableLaserMode(); }}>
-          <p>Cela écrit <b>$32=1</b> dans la mémoire du contrôleur GRBL. C'est le réglage normal d'une laser à diode : le laser s'éteint dès que la tête ne coupe pas (déplacements rapides, arrêt) et la puissance suit la vitesse.</p>
+          <p>Cela écrit <b>$32=1</b> dans la mémoire du contrôleur GRBL. C'est le réglage normal d'un laser à diode : le laser s'éteint dès que la tête ne coupe pas (déplacements rapides, arrêt) et la puissance suit la vitesse.</p>
           <p>Ce réglage reste enregistré dans la machine, y compris pour les autres logiciels.</p>
         </ConfirmDialog>
       )}

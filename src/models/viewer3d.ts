@@ -182,7 +182,7 @@ export interface Measure {
 
 const SNAP_PX = 16
 
-/** Couleur de la tranche (le bord de 3 mm) de toutes les planches, de tous les modèles : un marron très foncé, comme un bord brûlé par la laser, quelle que soit la couleur de la face. */
+/** Couleur de la tranche (le bord de 3 mm) de toutes les planches, de tous les modèles : un marron très foncé, comme un bord brûlé par le laser, quelle que soit la couleur de la face. */
 export const EDGE_COLOR = 0x3f2713
 /** Couleur unique quand les couleurs par famille sont désactivées : contreplaqué clair, uni. */
 export const PLAIN_WOOD = 0xd4b07a

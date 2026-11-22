@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Btn, ConfirmDialog, Hint, Notice, ProgressBar } from '../../ui';
+import { Btn, ConfirmDialog, Notice, ProgressBar } from '../../ui';
 import { formatDuration } from '../../grbl';
 import { resumeFrom, type Resume } from '../../job';
 import type { LaserMachine } from '../../hooks/useLaserMachine';
@@ -55,7 +55,6 @@ export function SendPanel({ m }: { m: LaserMachine }) {
             setResume(m.cut && head ? resumeFrom(m.cut, head) : null);
             setAskResume(true);
           }}>Reprendre après une coupure…</Btn>
-          <Hint>Rien ne part sans ton clic et une confirmation. En cours de route : Pause (!) / Reprendre (~) / Arrêt (pause, réinitialisation, M5).</Hint>
         </>
       )}
       {askResume && (

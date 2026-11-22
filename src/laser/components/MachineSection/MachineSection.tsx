@@ -1,9 +1,9 @@
-import { Btn, Hint, ProgressBar, Section, StatusDot } from '../../ui';
+import { Btn, ProgressBar, Section, StatusDot } from '../../ui';
 import type { LaserMachine } from '../../hooks/useLaserMachine';
 import { indicator } from '../ConnectionBar/helpers';
 import { StopButton } from '../StopButton';
 
-/** Bloc repliable du pilotage laser : état de la laser, accès à la fenêtre de pilotage, avancement et Arrêt pendant un envoi. Sous-bloc de « Découpe laser » par défaut (titre « Machine … »), ou bloc à part entière (`title`, `defaultOpen`). */
+/** Bloc repliable du pilotage laser : état de le laser, accès à la fenêtre de pilotage, avancement et Arrêt pendant un envoi. Sous-bloc de « Découpe laser » par défaut (titre « Machine … »), ou bloc à part entière (`title`, `defaultOpen`). */
 export function MachineSection({ m, title = 'Machine (laser Sculpfun)', defaultOpen = false }: { m: LaserMachine; title?: string; defaultOpen?: boolean }) {
   const ind = indicator(m.grbl);
   const snap = m.job.view.snap;
@@ -19,7 +19,6 @@ export function MachineSection({ m, title = 'Machine (laser Sculpfun)', defaultO
         </div>
       )}
       <Btn variant="primary" onClick={() => m.setOpen(true)}>Ouvrir l'application</Btn>
-      <Hint>Connexion USB (Chrome ou Edge), déplacements, cadre à vide, envoi du G-code planche par planche. « Machine simulée » pour essayer sans laser.</Hint>
     </Section>
   );
 }

@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Btn, Hint, IconButton, Notice, Section } from '../../ui';
+import { Btn, IconButton, Notice, Section } from '../../ui';
 import type { LaserMachine } from '../../hooks/useLaserMachine';
 
 /** Fichiers à découper : ouvrir un SVG ou un G-code (ou le déposer sur la page), choisir lequel piloter, retirer, charger l'exemple. */
@@ -19,7 +19,6 @@ export function FilesPanel({ m, errors, onFiles, onExample, onRemove }: {
         <Btn block={false} variant="primary" disabled={locked} onClick={() => input.current?.click()}>Ouvrir un SVG / G-code…</Btn>
         <Btn block={false} disabled={locked} onClick={onExample}>Exemple</Btn>
       </div>
-      <Hint>Tu peux aussi déposer le fichier n'importe où sur la page. SVG : 1 unité = 1 mm, traits noirs = coupe, traits bleus = gravure, le viewBox est la planche. G-code : envoyé tel quel.</Hint>
       {errors.map((e) => <Notice key={e} kind="error">{e}</Notice>)}
       {files.length === 0 && <p className="text-[11px] text-stone-500">Aucun fichier chargé.</p>}
       <ul className="space-y-1">

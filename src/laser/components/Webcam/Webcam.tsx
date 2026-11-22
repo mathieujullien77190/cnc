@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Btn, Chip, Hint, Notice, Slider } from '../../ui';
+import { Btn, Chip, Notice, Slider } from '../../ui';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { CAMERA_KEY, CORNER_NAMES, DEFAULT_CALIBRATION, parseCalibration, type CameraCalibration } from './calibration';
 import { createFlatRenderer } from './flatView';
@@ -133,12 +133,6 @@ export function Webcam() {
           </div>
         </div>
       ))}
-      <Hint>
-        {cal.flat
-          ? 'Vue de dessus redressée du rectangle de référence. Si les lignes droites ne le sont pas, « Régler ».'
-          : `Pose un rectangle de taille connue (la planche, ou le plateau) et tire les 4 coins numérotés dessus : ${CORNER_NAMES.map((n, i) => `${i + 1} ${n}`).join(', ')} (de la machine). Règle « Correction de l'objectif » jusqu'à ce que les lignes droites le soient, saisis la taille du rectangle, puis « Vue plate ».`}
-        {' '}La caméra de la E1 Pro se branche au PC par son propre câble USB-A (port « Camera ») ; ferme Sculpfun Space et LightBurn avant. Précision indicative (le constructeur annonce 0,5 à 1 mm après calibration) : pour regarder, pas pour positionner une coupe.
-      </Hint>
     </div>
   );
 }

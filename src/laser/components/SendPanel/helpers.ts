@@ -18,7 +18,7 @@ export const JOB_LABEL: Record<JobKind, string> = { cut: 'Découpe', frame: 'Cad
 export function blockers(m: LaserMachine): string[] {
   const out: string[] = [];
   const { grbl } = m;
-  if (!grbl.connected) return ['Connecte la laser.'];
+  if (!grbl.connected) return ['Connecte le laser.'];
   const s = grbl.status?.state;
   if (s === 'Alarm') out.push('La machine est en alarme : déverrouille-la ($X) puis refais l\'origine.');
   else if (s && s !== 'Idle') out.push('La machine doit être inactive.');

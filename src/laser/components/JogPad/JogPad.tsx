@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Btn, Chip, ConfirmDialog, Hint, Slider } from '../../ui';
+import { Btn, Chip, ConfirmDialog, Slider } from '../../ui';
 import { JOG_STEPS, PLATE_ORIGIN } from '../../constants';
 import type { LaserMachine } from '../../hooks/useLaserMachine';
 
@@ -42,7 +42,6 @@ export function JogPad({ m }: { m: LaserMachine }) {
         <Btn variant="warn" disabled={!grbl.connected || state !== 'Alarm'} onClick={() => setConfirm('unlock')}>Déverrouiller ($X)</Btn>
         <Btn disabled={!grbl.connected || m.job.running} onClick={() => setConfirm('reset')}>Réinitialiser</Btn>
       </div>
-      <Hint>L'origine de travail (X0 Y0) est le coin bas-gauche de la planche : place la tête sur ce coin du matériau puis « Origine ici », ou, après le référencement ($H), « Origine planche » : la tête se range {PLATE_ORIGIN.x} mm plus loin sur X et {PLATE_ORIGIN.y} mm sur Y de l'origine machine. X augmente vers la droite, Y vers l'arrière de la machine.</Hint>
       {confirm === 'unlock' && (
         <ConfirmDialog title="Déverrouiller la machine ?" confirmLabel="Envoyer $X" danger onCancel={() => setConfirm(null)} onConfirm={() => { setConfirm(null); void grbl.unlock(); }}>
           <p>$X lève l'alarme sans vérifier la position de la tête. Après une alarme, la position connue par la machine peut être fausse.</p>

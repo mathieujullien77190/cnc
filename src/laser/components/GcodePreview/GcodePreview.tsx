@@ -69,7 +69,7 @@ export function GcodePreview({ m }: { m: LaserMachine }) {
         </div>
       )}
       <svg
-        ref={svg} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} className="max-h-[calc(52vh+100px)] w-full cursor-grab touch-none select-none rounded-md border border-stone-200 bg-stone-50 active:cursor-grabbing" role="img" aria-label="Aperçu du trajet de la laser"
+        ref={svg} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} className="max-h-[calc(52vh+100px)] w-full cursor-grab touch-none select-none rounded-md border border-stone-200 bg-stone-50 active:cursor-grabbing" role="img" aria-label="Aperçu du trajet de le laser"
         onDoubleClick={() => setView(base)}
         onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture?.(e.pointerId); }}
         onPointerMove={(e) => {
@@ -102,9 +102,6 @@ export function GcodePreview({ m }: { m: LaserMachine }) {
         </g>
       </svg>
       </div>
-      <p className="text-[11px] text-stone-500">
-        Rouge = coupe, bleu = gravure (le trait passe en pointillé au fur et à mesure que la laser le fait, pendant l'envoi), pointillés gris = déplacements rapides (laser éteint), cadre bleu = « Cadre à vide », rond vert = origine (X0 Y0), croix orange = la tête. Pointillés noirs = zone de la machine {MACHINE_AREA.W} × {MACHINE_AREA.H} mm.
-      </p>
       {program && <JobStats program={program} settings={m.settings} extra={m.item?.extra} />}
       {st?.outOfBounds && <Notice kind="error">Une partie du tracé sort de la planche ({W} × {H} mm) : une pièce est plus grande que la planche.</Notice>}
       {m.item?.notice && <Notice kind="info">{m.item.notice}</Notice>}

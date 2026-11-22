@@ -1,6 +1,6 @@
 # src/state/
 
-Les hooks qui relient le store, la laser et les composants. Pas d'état partagé ici : il est dans `src/store/`.
+Les hooks qui relient le store, le laser et les composants. Pas d'état partagé ici : il est dans `src/store/`.
 
 | Fichier | Rôle |
 |---|---|

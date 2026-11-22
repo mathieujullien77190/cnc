@@ -7,7 +7,7 @@ export type LinkKind = 'serial';
 const LOG_MAX = 600;
 
 /**
- * Connexion à la laser (port USB) : état en direct (statut, réglages `$$`, alarme, liaison perdue), journal des échanges
+ * Connexion à le laser (port USB) : état en direct (statut, réglages `$$`, alarme, liaison perdue), journal des échanges
  * et commandes manuelles. Aucune commande de mouvement ou de puissance n'est envoyée sans appel explicite.
  */
 export function useGrbl() {
