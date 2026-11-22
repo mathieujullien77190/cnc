@@ -661,8 +661,10 @@ const carveWall = (q, { cx, cz, Rd, y0, y1 }) => {
       })
       return out
     }
+    const upper = make(q, cut(vA, true), holes.filter((h) => h.every((pt) => pt[1] < vA)))
+    if (q.kind === 'PA') return [upper] // la bande du pignon arrière sous le plateau ne sert à rien : on ne la découpe pas
     return [
-      make(q, cut(vA, true), holes.filter((h) => h.every((pt) => pt[1] < vA))),
+      upper,
       make({ ...q, kind: q.kind + 'B' }, cut(vB, false), holes.filter((h) => h.every((pt) => pt[1] > vB))),
     ]
   }
@@ -813,10 +815,11 @@ const layouts = TIERS.map((nums, k) => {
   return nums.map((n, j) => ({ n, R, phi: tierPhase(k) + (j * 360) / nums.length }))
 })
 console.log('rainure de référence (maison 21) :', GROOVE.toFixed(1), 'mm ; rayons des couronnes :', layouts.map((h) => h[0].R.toFixed(0)).join(', '))
+const SKIPPED = [12] // maisons retirées (essai) : leur place reste vide sur le plateau, le reste de la couronne ne bouge pas
 layouts.forEach((houses, k) => {
   const top = k === TIERS.length - 1 // la maison du haut n'est pas descendue ni coupée
   const plate = top ? undefined : { cx: plateauX, cz: plateauZ, Rd: PLATEAUX[k].d / 2, y0: k * TIER_STEP, y1: k * TIER_STEP + t }
-  houses.forEach(({ n, R, phi }) => buildHouse(n - 1, { x: plateauX + R * Math.cos(phi * deg), y: k * TIER_STEP + t - (top ? 0 : DROP), z: plateauZ + R * Math.sin(phi * deg), yaw: -phi, plate }, panels))
+  houses.filter(({ n }) => !SKIPPED.includes(n)).forEach(({ n, R, phi }) => buildHouse(n - 1, { x: plateauX + R * Math.cos(phi * deg), y: k * TIER_STEP + t - (top ? 0 : DROP), z: plateauZ + R * Math.sin(phi * deg), yaw: -phi, plate }, panels))
 })
 // colonnes entre chaque plateau et celui du dessus : autant de planches `CO` que de maisons sur l'étage du dessous, à égale distance les unes des autres, entre les maisons
 // chaque planche : bord droit au centre (à 5 mm de l'axe), bord extérieur en quart de cercle creux (rayon g / √2) dont les coins sont à 45 mm de l'axe ; 1 cran en haut et 1 en bas, à des distances de l'axe différentes (le cran du haut, côté extérieur, 34 mm ; celui du bas 16 mm) pour que les fenêtres des deux séries d'un même plateau ne se touchent jamais
