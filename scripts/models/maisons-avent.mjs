@@ -810,35 +810,18 @@ for (let k = 0; k < PLATEAUX.length - 1; k++) {
   })
 }
 // plateaux : disques entiers (ce sont les maisons qui sont coupées là où ils passent), percés des fenêtres des crans des colonnes
-// repère gravé : le rectangle (60 × 60 mm, les murs) de chaque maison, tracé sur son plateau pour savoir où elle se pose ; coupé là où il sort du disque (bois plein à 1,5 mm du bord) ou traverse une fenêtre de cran
-const houseMarks = (k) => {
-  const d = PLATEAUX[k].d
-  const slots = plateSlots[k]
-  const free = (x, y) => Math.hypot(x - d / 2, y - d / 2) <= d / 2 - 1.5 && !slots.some((poly) => inPoly([x, y], poly) || poly.some(([a, b], i) => { const [c, e] = poly[(i + 1) % poly.length]; const dx = c - a; const dy = e - b; const tt = Math.max(0, Math.min(1, ((x - a) * dx + (y - b) * dy) / (dx * dx + dy * dy))); return Math.hypot(x - (a + tt * dx), y - (b + tt * dy)) < 1 }))
-  const rules = []
-  layouts[k].forEach(({ R, phi }) => {
-    const c = [d / 2 + R * Math.cos(phi * deg), d / 2 + R * Math.sin(phi * deg)]
-    const a = [Math.cos(phi * deg), Math.sin(phi * deg)]
-    const b = [-a[1], a[0]]
-    const corners = [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([i, j]) => [c[0] + a[0] * (L / 2) * i + b[0] * (Wd / 2) * j, c[1] + a[1] * (L / 2) * i + b[1] * (Wd / 2) * j])
-    corners.forEach((p0, e) => {
-      const p1 = corners[(e + 1) % 4]
-      const len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1])
-      const n = Math.round(len / 0.2)
-      let run = null
-      for (let q = 0; q <= n; q++) {
-        const x = p0[0] + ((p1[0] - p0[0]) * q) / n
-        const y = p0[1] + ((p1[1] - p0[1]) * q) / n
-        if (free(x, y)) run = run ? [run[0], [x, y]] : [[x, y], [x, y]]
-        else if (run) { if (Math.hypot(run[1][0] - run[0][0], run[1][1] - run[0][1]) > 0.5) rules.push([+run[0][0].toFixed(3), +run[0][1].toFixed(3), +run[1][0].toFixed(3), +run[1][1].toFixed(3), 0.12, 1]); run = null }
-      }
-      if (run && Math.hypot(run[1][0] - run[0][0], run[1][1] - run[0][1]) > 0.5) rules.push([+run[0][0].toFixed(3), +run[0][1].toFixed(3), +run[1][0].toFixed(3), +run[1][1].toFixed(3), 0.12, 1])
-    })
-  })
-  return rules
-}
+// mini pieds de 2 cm de haut et 6 cm de long sous le plateau du bas (29 cm) : un entre chaque maison du bas (8), vers le bord, avec un cran dans une fenêtre du plateau
+const FOOT_H = 20 // hauteur d'un pied
+const FOOT_L = 60 // longueur d'un pied dans le sens radial (3 fois plus long qu'un carré de 20 mm)
+const FOOT_RHO = 105 // distance de l'axe du centre du pied (il va de 75 à 135 mm, le plateau a 145 mm de rayon)
+const footOutline = [[0, 0], [FOOT_L / 2 - COL_TAB_W / 2, 0], [FOOT_L / 2 - COL_TAB_W / 2, -t], [FOOT_L / 2 + COL_TAB_W / 2, -t], [FOOT_L / 2 + COL_TAB_W / 2, 0], [FOOT_L, 0], [FOOT_L, FOOT_H], [0, FOOT_H]]
+TIERS[0].forEach((_, i) => {
+  const phi = tierPhase(0) + 360 / TIERS[0].length / 2 + (i * 360) / TIERS[0].length // entre deux maisons du bas
+  panels.push({ id: 'PI', category: 'Pied', thickness: t, outer: footOutline, position: [plateauX + FOOT_RHO * Math.cos(phi * deg), -(FOOT_H - t) / 2, plateauZ + FOOT_RHO * Math.sin(phi * deg)], rotation: [0, -phi, 0] })
+  plateSlots[0].push(slotAt(PLATEAUX[0].d, phi, FOOT_RHO))
+})
 PLATEAUX.forEach(({ id, d }, k) => {
-  panels.push({ id, category: 'Plateau', thickness: t, outer: circle(d / 2, d / 2, d / 2, d >= 200 ? 180 : 120), ...(plateSlots[k].length ? { holes: plateSlots[k] } : {}), rules: houseMarks(k), position: [plateauX, t / 2 + k * TIER_STEP, plateauZ], rotation: [-90, 0, 0] })
+  panels.push({ id, category: 'Plateau', thickness: t, outer: circle(d / 2, d / 2, d / 2, d >= 200 ? 180 : 120), ...(plateSlots[k].length ? { holes: plateSlots[k] } : {}), position: [plateauX, t / 2 + k * TIER_STEP, plateauZ], rotation: [-90, 0, 0] })
 })
 layouts.forEach((houses, k) => {
   if (houses.length < 2) return
