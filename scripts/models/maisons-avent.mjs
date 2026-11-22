@@ -629,7 +629,7 @@ const carveWall = (q, { cx, cz, Rd, y0, y1 }) => {
     }
     return [
       make(q, cut(vA, true), holes.filter((h) => h.every((pt) => pt[1] < vA))),
-      make({ ...q, id: q.id + 'B' }, cut(vB, false), holes.filter((h) => h.every((pt) => pt[1] > vB))),
+      make({ ...q, kind: q.kind + 'B' }, cut(vB, false), holes.filter((h) => h.every((pt) => pt[1] > vB))),
     ]
   }
   if (!left && !right) return [make(q, q.outer, [...holes, rect(iA, vA, iB - iA, vB - vA)])] // fente fermée au milieu du mur
@@ -668,10 +668,12 @@ const carveWall = (q, { cx, cz, Rd, y0, y1 }) => {
   }
   return [make(q, outer, kept)]
 }
-const carve = (q, plate) => (q.id === 'M' || q.id === 'PA' ? carveWall(q, plate) : [q]) // le sol est sous le plateau (3 mm plus bas) : rien à lui retirer
+const carve = (q, plate) => (q.kind === 'M' || q.kind === 'PA' ? carveWall(q, plate) : [q]) // le sol est sous le plateau (3 mm plus bas) : rien à lui retirer
 // construit une maison (numéro i + 1 : lune / étoile / marque-page / flocon selon la colonne, forme de fenêtre selon la ligne) à la pose donnée
-const buildHouse = (i, pose, out) => {
-  const P = (p) => out.push(...(pose.plate ? carve(placed(p, pose), pose.plate) : [placed(p, pose)]))
+const buildHouse = (i, pose, out, keep = false) => {
+  // toutes les pièces d'une maison sont dans le groupe « Maison » (même lettre M, même couleur) ; la fenêtre est un autre groupe « Fenêtre » (lettre FE)
+  const finish = ({ kind, ...q }) => ({ ...q, id: kind === 'FE' ? 'FE' : 'M', category: kind === 'FE' ? 'Fenêtre' : 'Maison' })
+  const P = (p) => out.push(...(pose.plate ? carve(placed({ ...p, kind: p.id }, pose), pose.plate) : [placed({ ...p, kind: p.id }, pose)]).map(keep ? (q) => q : finish))
   const gx = L / 2 - t / 2
   // position d'une pièce du plan du pignon : centre de sa boîte (u → z, v vers le bas depuis le haut du mur)
   const gp = (outline, x) => {
@@ -692,9 +694,9 @@ const buildHouse = (i, pose, out) => {
 }
 // hauteur d'une maison : point le plus haut du toit, mesuré sur une maison de référence posée à l'origine
 const ref = []
-buildHouse(0, { x: 0, y: 0, z: 0, yaw: 0 }, ref)
+buildHouse(0, { x: 0, y: 0, z: 0, yaw: 0 }, ref, true) // sans renommage : on y repère les pans de toit par leur `kind`
 const houseTop = Math.max(
-  ...ref.filter((q) => q.id === 'TA' || q.id === 'TB').flatMap((q) => {
+  ...ref.filter((q) => q.kind === 'TA' || q.kind === 'TB').flatMap((q) => {
     const a = (q.rotation[0] * Math.PI) / 180
     const vs = q.outer.map((pt) => pt[1])
     const vc = (Math.min(...vs) + Math.max(...vs)) / 2
@@ -753,11 +755,14 @@ const grooveDepth = (Rd, R) => Math.sqrt(Rd * Rd - WALL_IN * WALL_IN) + L / 2 - 
 const REF_TIER = 3 // l'étage de la maison 21 (23, 22, 21 sur le plateau de 14 cm)
 const REF_R = ringRadii(TIERS[REF_TIER].length)[0] + 20 // sa couronne : sans chevauchement, reculée de 2 cm (la position validée)
 const GROOVE = grooveDepth(PLATEAUX[REF_TIER].d / 2, REF_R)
+// les maisons d'un étage ne sont pas alignées avec celles de l'étage voisin : chaque étage est tourné d'un angle différent (TIER_PHASES)
+const TIER_PHASES = [-90, 106, 0, 4, -90] // phase de chaque étage (calculée pour que les maisons de deux étages voisins soient au moins à 3° les unes des autres)
+const tierPhase = (k) => TIER_PHASES[k]
 const layouts = TIERS.map((nums, k) => {
   const minR = ringRadii(nums.length)[0]
   // rayon qui donne la même rainure que la maison 21 (jamais en dessous de la couronne sans chevauchement)
   const R = nums.length > 1 ? Math.max(minR, Math.sqrt((PLATEAUX[k].d / 2) ** 2 - WALL_IN * WALL_IN) + L / 2 - GROOVE) : 0
-  return nums.map((n, j) => ({ n, R, phi: -90 + (j * 360) / nums.length }))
+  return nums.map((n, j) => ({ n, R, phi: tierPhase(k) + (j * 360) / nums.length }))
 })
 console.log('rainure de référence (maison 21) :', GROOVE.toFixed(1), 'mm ; rayons des couronnes :', layouts.map((h) => h[0].R.toFixed(0)).join(', '))
 layouts.forEach((houses, k) => {
@@ -765,41 +770,75 @@ layouts.forEach((houses, k) => {
   const plate = top ? undefined : { cx: plateauX, cz: plateauZ, Rd: PLATEAUX[k].d / 2, y0: k * TIER_STEP, y1: k * TIER_STEP + t }
   houses.forEach(({ n, R, phi }) => buildHouse(n - 1, { x: plateauX + R * Math.cos(phi * deg), y: k * TIER_STEP + t - (top ? 0 : DROP), z: plateauZ + R * Math.sin(phi * deg), yaw: -phi, plate }, panels))
 })
-// 3 planches (colonnes) entre le plateau du haut (9 cm) et celui du dessous (14 cm), à 120° autour de l'axe, entre les maisons : bords ronds comme le dessin
-// chaque planche : bord droit au centre (à 5 mm de l'axe), bord extérieur en quart de cercle creux dont les coins sont à fleur du bord du plateau du haut (rayon g / √2), 2 languettes (haut et bas) dans des fenêtres des deux plateaux
-const COL_R0 = 5 // distance de l'axe au coin intérieur des planches (elles ne se touchent pas)
-const COL_W = 45 - COL_R0 // largeur d'une planche : son bord droit est à 45 mm de l'axe = bord du plateau du haut (rayon 45)
-const COL_TAB_W = 16 // largeur des languettes
-const colG = TIER_STEP - t // hauteur entre les deux plateaux (dessus du plateau du bas → dessous du plateau du haut) : hauteur d'une maison + 1 cm
+// colonnes entre chaque plateau et celui du dessus : autant de planches `CO` que de maisons sur l'étage du dessous, à égale distance les unes des autres, entre les maisons
+// chaque planche : bord droit au centre (à 5 mm de l'axe), bord extérieur en quart de cercle creux (rayon g / √2) dont les coins sont à 45 mm de l'axe ; 1 cran en haut et 1 en bas, à des distances de l'axe différentes (le cran du haut, côté extérieur, 34 mm ; celui du bas 16 mm) pour que les fenêtres des deux séries d'un même plateau ne se touchent jamais
+const COL_R0 = 5 // distance de l'axe au bord droit des planches
+const COL_W = 45 - COL_R0 // largeur d'une planche (bord extérieur à 45 mm de l'axe : tient dans le plus petit plateau)
+const COL_TAB_W = 16 // longueur des crans (dans le sens radial)
+const COL_TOP = 34 // distance de l'axe du centre du cran du haut
+const COL_BOTTOM = 16 // distance de l'axe du centre du cran du bas
+const colG = TIER_STEP - t // hauteur entre deux plateaux (dessus du plateau du bas → dessous du plateau du haut) : hauteur d'une maison + 1 cm
 const colR = colG / Math.SQRT2 // rayon du quart de cercle (corde = g, angle 90°)
-const COL_ANGLES = [-30, 90, 210] // entre les maisons (23, 22, 21 sont à -90, 30 et 150)
+// la planche est retournée de 180° autour de la verticale : le repère u de son contour (0 = côté creux) va vers l'axe ; distance de l'axe d'un point u : COL_R0 + COL_W - u
+const uOf = (rho) => COL_R0 + COL_W - rho // abscisse u du contour pour une distance à l'axe donnée
 const colOutline = (() => {
-  const a0 = COL_W / 2 - COL_TAB_W / 2
-  const a1 = COL_W / 2 + COL_TAB_W / 2
+  const [t0, t1] = [uOf(COL_TOP + COL_TAB_W / 2), uOf(COL_TOP - COL_TAB_W / 2)] // cran du haut
+  const [b0, b1] = [uOf(COL_BOTTOM + COL_TAB_W / 2), uOf(COL_BOTTOM - COL_TAB_W / 2)] // cran du bas
   const arc = Array.from({ length: 25 }, (_, k) => {
     const th = (45 - (90 * k) / 24) * deg // de +45° (bas) à -45° (haut)
     return [-colG / 2 + colR * Math.cos(th), colG / 2 + colR * Math.sin(th)]
   })
-  return [[0, 0], [a0, 0], [a0, -t], [a1, -t], [a1, 0], [COL_W, 0], [COL_W, colG], [a1, colG], [a1, colG + t], [a0, colG + t], [a0, colG], ...arc.slice(0, -1)]
+  return [[0, 0], [t0, 0], [t0, -t], [t1, -t], [t1, 0], [COL_W, 0], [COL_W, colG], [b1, colG], [b1, colG + t], [b0, colG + t], [b0, colG], ...arc.slice(0, -1)]
 })()
-const colSlots = (k) => {
-  // fenêtres des languettes dans le plateau k (coordonnées de la planche : u → x, v → z, centre du disque en (d / 2, d / 2))
-  const d = PLATEAUX[k].d
-  return COL_ANGLES.map((phi) => {
-    const rho = COL_R0 + COL_W / 2
-    const c = [d / 2 + rho * Math.cos(phi * deg), d / 2 + rho * Math.sin(phi * deg)]
-    const ra = [Math.cos(phi * deg), Math.sin(phi * deg)]
-    const ta = [-ra[1], ra[0]]
-    return [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([i, j]) => [+(c[0] + ra[0] * (COL_TAB_W / 2) * i + ta[0] * (t / 2) * j).toFixed(4), +(c[1] + ra[1] * (COL_TAB_W / 2) * i + ta[1] * (t / 2) * j).toFixed(4)])
+const colAngles = (n, k) => Array.from({ length: n }, (_, j) => tierPhase(k) + 180 / n + (j * 360) / n) // entre les maisons de l'étage k (maisons à tierPhase(k) + j × 360 / n)
+const slotAt = (d, phi, rho) => {
+  // fenêtre d'un cran (COL_TAB_W dans le sens radial, t dans l'autre) dans un plateau de diamètre d (repère de la planche : u → x, v → z, centre en (d / 2, d / 2))
+  const c = [d / 2 + rho * Math.cos(phi * deg), d / 2 + rho * Math.sin(phi * deg)]
+  const ra = [Math.cos(phi * deg), Math.sin(phi * deg)]
+  const ta = [-ra[1], ra[0]]
+  return [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([i, j]) => [+(c[0] + ra[0] * (COL_TAB_W / 2) * i + ta[0] * (t / 2) * j).toFixed(4), +(c[1] + ra[1] * (COL_TAB_W / 2) * i + ta[1] * (t / 2) * j).toFixed(4)])
+}
+const plateSlots = PLATEAUX.map(() => [])
+const midY = (k) => k * TIER_STEP + t + colG / 2 // milieu de la hauteur entre le plateau k et le plateau k + 1
+for (let k = 0; k < PLATEAUX.length - 1; k++) {
+  const n = TIERS[k].length
+  colAngles(n, k).forEach((phi) => {
+    const rho = COL_R0 + COL_W / 2 // centre de la planche (la boîte du contour va de 5 à 45 mm)
+    panels.push({ id: 'CO', category: 'Colonne', thickness: t, outer: colOutline, position: [plateauX + rho * Math.cos(phi * deg), midY(k), plateauZ + rho * Math.sin(phi * deg)], rotation: [0, 180 - phi, 0] })
+    plateSlots[k].push(slotAt(PLATEAUX[k].d, phi, COL_BOTTOM)) // cran du bas dans le plateau du dessous
+    plateSlots[k + 1].push(slotAt(PLATEAUX[k + 1].d, phi, COL_TOP)) // cran du haut dans le plateau du dessus
   })
 }
-COL_ANGLES.forEach((phi) => {
-  const rho = COL_R0 + COL_W / 2
-  panels.push({ id: 'CO', category: 'Colonne', thickness: t, outer: colOutline, position: [plateauX + rho * Math.cos(phi * deg), 3 * TIER_STEP + t + colG / 2 + 0, plateauZ + rho * Math.sin(phi * deg)], rotation: [0, 180 - phi, 0] })
-})
-// plateaux : disques entiers (ce sont les maisons qui sont coupées là où ils passent) ; les deux plateaux reliés par les colonnes ont leurs fenêtres
+// plateaux : disques entiers (ce sont les maisons qui sont coupées là où ils passent), percés des fenêtres des crans des colonnes
+// repère gravé : le rectangle (60 × 60 mm, les murs) de chaque maison, tracé sur son plateau pour savoir où elle se pose ; coupé là où il sort du disque (bois plein à 1,5 mm du bord) ou traverse une fenêtre de cran
+const houseMarks = (k) => {
+  const d = PLATEAUX[k].d
+  const slots = plateSlots[k]
+  const free = (x, y) => Math.hypot(x - d / 2, y - d / 2) <= d / 2 - 1.5 && !slots.some((poly) => inPoly([x, y], poly) || poly.some(([a, b], i) => { const [c, e] = poly[(i + 1) % poly.length]; const dx = c - a; const dy = e - b; const tt = Math.max(0, Math.min(1, ((x - a) * dx + (y - b) * dy) / (dx * dx + dy * dy))); return Math.hypot(x - (a + tt * dx), y - (b + tt * dy)) < 1 }))
+  const rules = []
+  layouts[k].forEach(({ R, phi }) => {
+    const c = [d / 2 + R * Math.cos(phi * deg), d / 2 + R * Math.sin(phi * deg)]
+    const a = [Math.cos(phi * deg), Math.sin(phi * deg)]
+    const b = [-a[1], a[0]]
+    const corners = [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([i, j]) => [c[0] + a[0] * (L / 2) * i + b[0] * (Wd / 2) * j, c[1] + a[1] * (L / 2) * i + b[1] * (Wd / 2) * j])
+    corners.forEach((p0, e) => {
+      const p1 = corners[(e + 1) % 4]
+      const len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+      const n = Math.round(len / 0.2)
+      let run = null
+      for (let q = 0; q <= n; q++) {
+        const x = p0[0] + ((p1[0] - p0[0]) * q) / n
+        const y = p0[1] + ((p1[1] - p0[1]) * q) / n
+        if (free(x, y)) run = run ? [run[0], [x, y]] : [[x, y], [x, y]]
+        else if (run) { if (Math.hypot(run[1][0] - run[0][0], run[1][1] - run[0][1]) > 0.5) rules.push([+run[0][0].toFixed(3), +run[0][1].toFixed(3), +run[1][0].toFixed(3), +run[1][1].toFixed(3), 0.12, 1]); run = null }
+      }
+      if (run && Math.hypot(run[1][0] - run[0][0], run[1][1] - run[0][1]) > 0.5) rules.push([+run[0][0].toFixed(3), +run[0][1].toFixed(3), +run[1][0].toFixed(3), +run[1][1].toFixed(3), 0.12, 1])
+    })
+  })
+  return rules
+}
 PLATEAUX.forEach(({ id, d }, k) => {
-  panels.push({ id, category: 'Plateau', thickness: t, outer: circle(d / 2, d / 2, d / 2, d >= 200 ? 180 : 120), ...(k === 3 || k === 4 ? { holes: colSlots(k) } : {}), position: [plateauX, t / 2 + k * TIER_STEP, plateauZ], rotation: [-90, 0, 0] })
+  panels.push({ id, category: 'Plateau', thickness: t, outer: circle(d / 2, d / 2, d / 2, d >= 200 ? 180 : 120), ...(plateSlots[k].length ? { holes: plateSlots[k] } : {}), rules: houseMarks(k), position: [plateauX, t / 2 + k * TIER_STEP, plateauZ], rotation: [-90, 0, 0] })
 })
 layouts.forEach((houses, k) => {
   if (houses.length < 2) return
@@ -811,7 +850,7 @@ console.log('hauteur maison', houseTop.toFixed(1), 'mm ; plateaux à', PLATEAUX.
 
 writeFileSync(
   'models/maisons-avent.model.json',
-  JSON.stringify({ format: 'cnc-model', version: 1, id: 'maisons-avent', name: 'Maisons de l’Avent', description: 'Une petite maison numérotée, 60 × 60 × 90 mm.', panels }, null, 1),
+  JSON.stringify({ format: 'cnc-model', version: 1, id: 'maisons-avent', name: 'Maisons de l’Avent', colors: { Maison: '#d2a679', Fenêtre: '#6b4423' }, description: 'Une petite maison numérotée, 60 × 60 × 90 mm.', panels }, null, 1),
 )
 await server.close()
 console.log(panels.length, 'planches')
