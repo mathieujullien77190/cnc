@@ -3,7 +3,7 @@
  "version": 1,
  "id": "le-cable",
  "name": "Le câble",
- "description": "Plateau 50 × 60 mm percé de 9 trous de 3 mm au-dessus ; montant à 90° au bord (50 mm de large en haut, 40 mm en dessous) avec un trou à câble : une rainure de 6 mm ouverte jusqu'au bord, terminée par un rond de 6 mm allongé de 3 mm en largeur ; un flanc sur le côté ; un peigne à 2 branches dans 2 trous de goujon de M-01 pour verrouiller le câble ; collés par crans. Le composant est répété 10 fois sur une ligne.",
+ "description": "Plateau 50 × 60 mm percé de 9 trous de 3 mm au-dessus ; montant à 90° au bord (50 mm de large en haut, 40 mm en dessous) avec un trou à câble : une rainure de 6 mm ouverte jusqu'au bord, terminée par un rond de 6 mm allongé de 3 mm en largeur ; un flanc sur le côté ; un peigne à 2 branches de 3,3 mm dans 2 trous de goujon de M-01 pour verrouiller le câble ; collés par crans. Le composant est répété 10 fois sur une ligne.",
  "panels": [
   {
    "id": "P",
@@ -932,35 +932,35 @@
     ],
     [
      0,
-     18
+     18.15
     ],
     [
      -3,
-     18
+     18.15
     ],
     [
      -3,
-     15
+     14.85
     ],
     [
      0,
-     15
+     14.85
     ],
     [
      0,
-     5
+     5.15
     ],
     [
      -3,
-     5
+     5.15
     ],
     [
      -3,
-     2
+     1.85
     ],
     [
      0,
-     2
+     1.85
     ]
    ],
    "position": [
@@ -1909,35 +1909,35 @@
     ],
     [
      0,
-     18
+     18.15
     ],
     [
      -3,
-     18
+     18.15
     ],
     [
      -3,
-     15
+     14.85
     ],
     [
      0,
-     15
+     14.85
     ],
     [
      0,
-     5
+     5.15
     ],
     [
      -3,
-     5
+     5.15
     ],
     [
      -3,
-     2
+     1.85
     ],
     [
      0,
-     2
+     1.85
     ]
    ],
    "position": [
@@ -2886,35 +2886,35 @@
     ],
     [
      0,
-     18
+     18.15
     ],
     [
      -3,
-     18
+     18.15
     ],
     [
      -3,
-     15
+     14.85
     ],
     [
      0,
-     15
+     14.85
     ],
     [
      0,
-     5
+     5.15
     ],
     [
      -3,
-     5
+     5.15
     ],
     [
      -3,
-     2
+     1.85
     ],
     [
      0,
-     2
+     1.85
     ]
    ],
    "position": [
@@ -3863,35 +3863,35 @@
     ],
     [
      0,
-     18
+     18.15
     ],
     [
      -3,
-     18
+     18.15
     ],
     [
      -3,
-     15
+     14.85
     ],
     [
      0,
-     15
+     14.85
     ],
     [
      0,
-     5
+     5.15
     ],
     [
      -3,
-     5
+     5.15
     ],
     [
      -3,
-     2
+     1.85
     ],
     [
      0,
-     2
+     1.85
     ]
    ],
    "position": [
@@ -4840,35 +4840,35 @@
     ],
     [
      0,
-     18
+     18.15
     ],
     [
      -3,
-     18
+     18.15
     ],
     [
      -3,
-     15
+     14.85
     ],
     [
      0,
-     15
+     14.85
     ],
     [
      0,
-     5
+     5.15
     ],
     [
      -3,
-     5
+     5.15
     ],
     [
      -3,
-     2
+     1.85
     ],
     [
      0,
-     2
+     1.85
     ]
    ],
    "position": [
@@ -5817,35 +5817,35 @@
     ],
     [
      0,
-     18
+     18.15
     ],
     [
      -3,
-     18
+     18.15
     ],
     [
      -3,
-     15
+     14.85
     ],
     [
      0,
-     15
+     14.85
     ],
     [
      0,
-     5
+     5.15
     ],
     [
      -3,
-     5
+     5.15
     ],
     [
      -3,
-     2
+     1.85
     ],
     [
      0,
-     2
+     1.85
     ]
    ],
    "position": [
@@ -6794,35 +6794,35 @@
     ],
     [
      0,
-     18
+     18.15
     ],
     [
      -3,
-     18
+     18.15
     ],
     [
      -3,
-     15
+     14.85
     ],
     [
      0,
-     15
+     14.85
     ],
     [
      0,
-     5
+     5.15
     ],
     [
      -3,
-     5
+     5.15
     ],
     [
      -3,
-     2
+     1.85
     ],
     [
      0,
-     2
+     1.85
     ]
    ],
    "position": [
@@ -7771,35 +7771,35 @@
     ],
     [
      0,
-     18
+     18.15
     ],
     [
      -3,
-     18
+     18.15
     ],
     [
      -3,
-     15
+     14.85
     ],
     [
      0,
-     15
+     14.85
     ],
     [
      0,
-     5
+     5.15
     ],
     [
      -3,
-     5
+     5.15
     ],
     [
      -3,
-     2
+     1.85
     ],
     [
      0,
-     2
+     1.85
     ]
    ],
    "position": [
@@ -8748,35 +8748,35 @@
     ],
     [
      0,
-     18
+     18.15
     ],
     [
      -3,
-     18
+     18.15
     ],
     [
      -3,
-     15
+     14.85
     ],
     [
      0,
-     15
+     14.85
     ],
     [
      0,
-     5
+     5.15
     ],
     [
      -3,
-     5
+     5.15
     ],
     [
      -3,
-     2
+     1.85
     ],
     [
      0,
-     2
+     1.85
     ]
    ],
    "position": [
@@ -9725,35 +9725,35 @@
     ],
     [
      0,
-     18
+     18.15
     ],
     [
      -3,
-     18
+     18.15
     ],
     [
      -3,
-     15
+     14.85
     ],
     [
      0,
-     15
+     14.85
     ],
     [
      0,
-     5
+     5.15
     ],
     [
      -3,
-     5
+     5.15
     ],
     [
      -3,
-     2
+     1.85
     ],
     [
      0,
-     2
+     1.85
     ]
    ],
    "position": [
